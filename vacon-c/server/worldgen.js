@@ -194,6 +194,22 @@ const DEFAULTS = {
   // `generateWorld()` gets the exact unchanged world the whole test
   // suite already asserts counts against.
   religiousOrdersPerCommunity: false,
+  // **Opt-in, same posture as `extendedFamily`/`scopedGovernments`/
+  // `religiousOrdersPerCommunity` just above, for the identical
+  // reason.** `generateOrganization` has never written a real
+  // `leader_id` for a gang, government, or business at generation —
+  // only a real election (`politics.js`) or a real takeover
+  // (`control.js#seize`) ever does, for any of the three, so a freshly
+  // generated, never-ticked world's criminal and business main
+  // characters resolve `null` almost always (the forty-eighth standing
+  // rule's own measured finding, carried forward rather than fixed
+  // retroactively at the time, for the stated reason: "retroactively
+  // changing how every existing organization gets its initial leader
+  // risks the 50+ tests already asserting generation counts and
+  // behavior against the current, leaderless-at-birth shape"). Off,
+  // every existing call to `generateWorld()` gets the exact unchanged
+  // world the whole test suite already asserts against.
+  foundingLeaders: false,
   businessesPerCommunity: 2,
   factionsPerCity: 2,
   // Homes are generated to house everybody with a margin, which is
@@ -2317,6 +2333,100 @@ function generateWorld(options = {}) {
       landmarkProperty.operating_organization_id = business.id;
       summary.organizations += 1;
     });
+  }
+
+  // ---- real founding leaders for gangs, governments, and businesses ------
+  // Opt-in (config.foundingLeaders) — see that flag's own header above
+  // for why. Run here, after every family head in the world has been
+  // computed (the "a family needs a head" pass, earlier in this
+  // function) and after this round's own landmark-operator pass — the
+  // identical real `influenceRatingOf` metric the religious-order
+  // archetype already uses for its own founding leader, generalized to
+  // the three organization types that have never gotten one.
+  //
+  // **No new bookkeeping was added to find each organization's real
+  // scope — every scope below is read from a real, already-existing
+  // link, never inferred or guessed.** A gang's scope is the
+  // communities it actually holds real territory in
+  // (`territoryBlocks.faction_id`); a business's scope is the
+  // community of a real property it actually operates
+  // (`properties.operating_organization_id`, this file's own
+  // long-standing link and this round's own landmark-operator pass's
+  // output); a government's scope is its own real
+  // `governments.scope_type`/`.scope_id` row. An organization with no
+  // real scope to read (a gang holding no territory, a business
+  // operating no building) gets no founding leader this round — an
+  // honest gap, not a guess, the same posture every other "no real
+  // leader yet" case in this registry already holds.
+  if (config.foundingLeaders) {
+    const familyHeadsByCommunity = new Map();
+    for (const family of w.families || []) {
+      if (family.head_npc_id == null) continue;
+      const head = (w.npcs || []).find((n) => n.id === family.head_npc_id);
+      if (!head || head.communityId == null) continue;
+      const list = familyHeadsByCommunity.get(head.communityId) || [];
+      list.push(head);
+      familyHeadsByCommunity.set(head.communityId, list);
+    }
+
+    // The real highest-`influenceRatingOf` family head across however
+    // many communities are in scope — the identical selection rule
+    // the religious-order archetype already uses, generalized from one
+    // community to an arbitrary real set of them.
+    const bestHeadIn = (communityIds) => {
+      let best = null;
+      let bestScore = -Infinity;
+      for (const communityId of communityIds) {
+        for (const head of familyHeadsByCommunity.get(communityId) || []) {
+          const rating = influence.influenceRatingOf(w, head.id);
+          if (rating > bestScore) { bestScore = rating; best = head; }
+        }
+      }
+      return best;
+    };
+
+    const allCommunityIds = (w.communities || []).map((cm) => cm.id);
+
+    for (const org of w.organizations || []) {
+      if (org.leader_id != null) continue;
+
+      if (org.type === 'gang') {
+        const heldCommunityIds = (w.territoryBlocks || [])
+          .filter((block) => block.faction_id === org.id)
+          .map((block) => block.community_id);
+        if (heldCommunityIds.length === 0) continue;
+        const leader = bestHeadIn(heldCommunityIds);
+        if (leader) org.leader_id = leader.id;
+        continue;
+      }
+
+      if (org.type === 'business') {
+        const operatedProperty = (w.properties || []).find((p) => p.operating_organization_id === org.id);
+        if (!operatedProperty || operatedProperty.community_id == null) continue;
+        const leader = bestHeadIn([operatedProperty.community_id]);
+        if (leader) org.leader_id = leader.id;
+        continue;
+      }
+
+      if (org.type === 'government') {
+        const government = (w.governments || []).find((g) => g.organization_id === org.id);
+        let scopedCommunityIds = allCommunityIds;
+        if (government?.scope_type === 'city') {
+          scopedCommunityIds = (w.communities || [])
+            .filter((cm) => cm.city_id === government.scope_id)
+            .map((cm) => cm.id);
+        } else if (government?.scope_type === 'region') {
+          scopedCommunityIds = (w.communities || [])
+            .filter((cm) => {
+              const city = (w.cities || []).find((c) => c.id === cm.city_id);
+              return city && city.region_id === government.scope_id;
+            })
+            .map((cm) => cm.id);
+        }
+        const leader = bestHeadIn(scopedCommunityIds);
+        if (leader) org.leader_id = leader.id;
+      }
+    }
   }
 
   // ---- who works for the press and the state -----------------------------

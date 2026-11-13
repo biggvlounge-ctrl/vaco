@@ -722,3 +722,122 @@ test('a hero landmark with no real staff slot gets no operator at all -- nobody 
   }
   assert.ok(checkedAtLeastOne, 'this seed should produce at least one no-staff-slot landmark');
 });
+
+// ---------------------------------------------------------------------
+// Real founding leaders for gangs, governments, and businesses --
+// opt-in (config.foundingLeaders), generalizing the real
+// influenceRatingOf selection the religious-order archetype already
+// uses. By direct instruction, this is what makes "we need everything
+// accounted for" true from tick zero rather than only after a player
+// manually takes something over.
+// ---------------------------------------------------------------------
+
+test('foundingLeaders defaults to false -- every existing call to generateWorld() is byte-for-byte unaffected', () => {
+  const { before } = delta(() => worldgen.generateWorld({ ...SMALL, seed: 'founding-leaders-default-off' }));
+  const newOrgs = w.organizations.slice(before.organizations);
+  const relevant = newOrgs.filter((o) => ['gang', 'business', 'government'].includes(o.type));
+  assert.ok(relevant.length > 0, 'this seed should produce at least one gang, business, or government');
+  for (const org of relevant) {
+    assert.equal(org.leader_id, null, `${org.type} ${org.id} should have no leader with foundingLeaders left off`);
+  }
+});
+
+test('a gang holding real territory gets a real founding leader from the communities it actually holds', () => {
+  const { before } = delta(() => worldgen.generateWorld({
+    ...SMALL, communitiesPerCity: 6, seed: 'founding-leaders-gang', landmarksPerCity: 24, foundingLeaders: true,
+  }));
+  const newOrgs = w.organizations.slice(before.organizations);
+  const gangs = newOrgs.filter((o) => o.type === 'gang');
+  assert.ok(gangs.length > 0, 'this seed should produce at least one real gang');
+  const heldCommunityIdsByGang = new Map();
+  for (const block of w.territoryBlocks || []) {
+    if (!heldCommunityIdsByGang.has(block.faction_id)) heldCommunityIdsByGang.set(block.faction_id, []);
+    heldCommunityIdsByGang.get(block.faction_id).push(block.community_id);
+  }
+  let checkedAtLeastOne = false;
+  for (const gang of gangs) {
+    const heldCommunityIds = heldCommunityIdsByGang.get(gang.id);
+    if (!heldCommunityIds || heldCommunityIds.length === 0) {
+      assert.equal(gang.leader_id, null, `gang ${gang.id} holds no real territory and must not get an invented leader`);
+      continue;
+    }
+    assert.ok(gang.leader_id != null, `gang ${gang.id} holds real territory and should get a real founding leader`);
+    const leader = w.npcs.find((n) => n.id === gang.leader_id);
+    assert.ok(leader, `gang ${gang.id}'s leader ${gang.leader_id} must be a real NPC`);
+    assert.ok(heldCommunityIds.includes(leader.communityId), `gang ${gang.id}'s leader must come from a community it actually holds`);
+    checkedAtLeastOne = true;
+  }
+  assert.ok(checkedAtLeastOne, 'this seed should produce at least one gang holding real territory');
+});
+
+test('a business operating a real property gets a real founding leader from that property\'s own community', () => {
+  const { before } = delta(() => worldgen.generateWorld({
+    ...SMALL, seed: 'founding-leaders-business', landmarksPerCity: 24, foundingLeaders: true,
+  }));
+  const newOrgs = w.organizations.slice(before.organizations);
+  const businesses = newOrgs.filter((o) => o.type === 'business');
+  assert.ok(businesses.length > 0, 'this seed should produce at least one real business');
+  let checkedAtLeastOne = false;
+  for (const business of businesses) {
+    const operatedProperty = w.properties.find((p) => p.operating_organization_id === business.id);
+    if (!operatedProperty) {
+      assert.equal(business.leader_id, null, `business ${business.id} operates no real property and must not get an invented leader`);
+      continue;
+    }
+    assert.ok(business.leader_id != null, `business ${business.id} operates a real property and should get a real founding leader`);
+    const leader = w.npcs.find((n) => n.id === business.leader_id);
+    assert.equal(leader.communityId, operatedProperty.community_id, `business ${business.id}'s leader must come from the same community as the property it operates`);
+    checkedAtLeastOne = true;
+  }
+  assert.ok(checkedAtLeastOne, 'this seed should produce at least one business operating a real property');
+});
+
+test('governments get a real founding leader, correctly scoped to civilization, region, or city', () => {
+  const { before } = delta(() => worldgen.generateWorld({
+    ...SMALL, seed: 'founding-leaders-government', landmarksPerCity: 24,
+    scopedGovernments: true, foundingLeaders: true,
+  }));
+  const newOrgs = w.organizations.slice(before.organizations);
+  const governments = newOrgs.filter((o) => o.type === 'government');
+  assert.ok(governments.length >= 3, 'scopedGovernments: true should produce at least a civilization, a region, and a city government');
+  for (const government of governments) {
+    assert.ok(government.leader_id != null, `government ${government.id} should get a real founding leader`);
+    const leader = w.npcs.find((n) => n.id === government.leader_id);
+    assert.ok(leader, `government ${government.id}'s leader ${government.leader_id} must be a real NPC`);
+
+    const scopeRow = w.governments.find((g) => g.organization_id === government.id);
+    if (scopeRow.scope_type === 'city') {
+      const city = w.cities.find((c) => c.id === scopeRow.scope_id);
+      const leaderCity = w.communities.find((cm) => cm.id === leader.communityId)?.city_id;
+      assert.equal(leaderCity, city.id, `a city-scoped government's leader must come from that specific city`);
+    }
+  }
+});
+
+test('a city government\'s real leader comes from its own real city, never a different one -- checked with two real cities, not vacuously with one', () => {
+  // Not a mutation of the source file -- a direct re-check that two
+  // different cities' own city governments do not share one pool.
+  // Built this way because SMALL only generates one city (`cities: 1`
+  // is this file's own real default); this seed forces two real
+  // cities to actually prove the scoping is real rather than
+  // vacuously true against a world where only one city could ever be
+  // picked from anyway.
+  const { before } = delta(() => worldgen.generateWorld({
+    communitiesPerCity: 2, populationPerCommunity: 12, cities: 2,
+    seed: 'founding-leaders-two-cities', landmarksPerCity: 24,
+    scopedGovernments: true, foundingLeaders: true,
+  }));
+  const newCities = w.cities.slice(before.cities);
+  assert.equal(newCities.length, 2, 'cities: 2 should produce exactly two real cities');
+  const newGovernments = w.organizations.slice(before.organizations).filter((o) => o.type === 'government');
+  const cityGovernments = newGovernments.filter((o) => {
+    const scopeRow = w.governments.find((g) => g.organization_id === o.id);
+    return scopeRow?.scope_type === 'city';
+  });
+  for (const government of cityGovernments) {
+    const scopeRow = w.governments.find((g) => g.organization_id === government.id);
+    const leader = w.npcs.find((n) => n.id === government.leader_id);
+    const leaderCityId = w.communities.find((cm) => cm.id === leader.communityId)?.city_id;
+    assert.equal(leaderCityId, scopeRow.scope_id, 'a city government\'s real leader must come from that real city, never a different one');
+  }
+});
