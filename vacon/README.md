@@ -44,6 +44,15 @@ specialized AI executive operating inside VACON... accessed through
 V4... with MIA as executive orchestrator" — the exact split this
 project implements).
 
+**Roster-list correction (13 Nov 2026).** The named-executive list in
+the opening paragraph above was written before Stephanie (Phase 4) and
+Jake (Phase 5) joined the roster and was never updated to include
+them — corrected here rather than rewritten above, per this file's own
+convention. The full current roster is QVAN, Leslie, Deskins, Kevin,
+Kay, Gibson, DREA, Anderson, Stephanie, Ava, Autumn, Jacobi, and Jake —
+13 named executives plus MIA, 14 total (`lib/agents.js`'s own
+`ALL_AGENTS`).
+
 **Do not confuse this with `../vacon-c/`** — genuinely different
 system, a naming collision this session already resolved once
 (`vacon-c/README.md`'s own naming-correction note). VACON is the
@@ -174,12 +183,54 @@ QuantConnect for our competitive intelligence"`) correctly routes to
 `stephanie` via `POST /api/route`, and an unrelated vacation-planning
 query does not. See `dev-docs/phase-4-stephanie-vex-business/`.
 
+**Jake (Phase 5)**, the record this file's own "A note on 'Jake'"
+section above pointed to and that was missing until this pass (13 Nov
+2026) — registry now 14 total (13 + MIA): `lib/agents.js`'s own
+`ALL_AGENTS`, confirmed directly. `getAgent('jake')` returns VENVM's
+own Production Executive; `listAgents({app:'VENVM'})` returns exactly
+him. `test/orchestrator.test.js`'s own "Jake's registration" cases
+(already in the suite, re-run clean this pass) confirm he's on the
+roster and that production/reformatting queries route to him via the
+real word-boundary/specificity-weighted router — no separate ad-hoc
+check was needed since the suite already exercises exactly that.
+
+**A real, filed-not-fixed cross-app drift, found this pass.** When
+Jake was added to `V4Prototype.jsx`'s own `AGENTS` array (see this
+file's note above and that file's own comment at the `jake` entry), he
+was given `tier: "vulture"` there — copied from the Vvltvre entries
+immediately above him in that array rather than from VACON's own
+registry, where his real tier is `tier: 'user'` (he represents VENVM,
+not Vvltvre Media). `V4Prototype.jsx`'s own `syncAgentRosterFromVacon`
+deliberately does not overwrite `tier` for a known agent — its own
+header says plainly that tier is a local UI-grouping concern VACON's
+registry "has no opinion on" — so this is not a sync bug and nothing
+here will self-correct it. Left unfixed: `V4Prototype.jsx` is
+`v4-proxy`'s own file, out of scope to edit from this app's own
+reconciliation pass (read-only cross-app check, same posture as
+everywhere else in this pass). Concretely, Jake currently renders in
+V4's Command Center under the Vvltvre-colored tier bucket instead of
+the user-facing one his actual role belongs in.
+
 ## Real persistence
 `lib/persistence.js` wraps `server.js`'s own store in a real file-backed
 store, `data/store.json` (port 8805) — VACON's own real state now survives a
 restart. Live-verified: routed a real agent request through the network,
 killed the running process, restarted it, and confirmed the same real state
 came back from a real GET. See `dev-docs/phase-3-real-persistence/`.
+
+**Missing coverage, added 13 Nov 2026**: `server.js` now builds its
+store through `lib/storeBackend.js`'s shared `attachStore` (the same
+module every other app in this ecosystem uses), not a direct
+`createPersistentStore` call — and that module gives VACON a second,
+real backend this file never documented. With `DATABASE_URL` set, the
+store lives in Postgres instead (`lib/persistencePg.js`), version-
+checked on every write so two instances cannot silently diverge; a
+request is held by a real gate until the store has finished loading,
+and a store that fails to load makes the process exit rather than
+serve from empty. Without `DATABASE_URL`, nothing above changes — same
+JSON file, same guarantees. See `lib/storeBackend.js`'s own header for
+the full account; this was already true of VACON's own running code,
+just never written down here.
 
 ## Frontend coverage pass (31 Oct 2026)
 
@@ -246,15 +297,29 @@ coverage pass").
 - Real LLM-backed routing (MIA's own routing is real but deterministic
   keyword scoring, not a model call — a deliberate choice, not a gap,
   see `lib/orchestrator.js`'s own header).
-- No real auth/rate-limiting at this layer — `v4-proxy` already has
-  per-IP rate limiting on the actual LLM call; VACON's own endpoints
-  are unprotected, same posture as the rest of this prototype-stage
-  ecosystem (no user accounts exist yet).
-- `V4Prototype.jsx`'s own Command Center UI still renders from its
-  local `AGENTS` const, not a live `GET /api/agents` fetch — the
-  identity/prompt truth now lives in VACON, but the UI's display
-  roster wasn't refactored into a real fetch (out of proportionate
-  scope for a file with no build tooling to verify it against).
 - Multi-agent routing (today's `/api/route` returns one ranked list;
   nothing chains a request across more than one agent, e.g. MIA
   delegating part of a request to Leslie and part to Deskins).
+
+**Two of the items that used to be listed above are stale, corrected
+13 Nov 2026 rather than deleted:**
+- *"No real auth/rate-limiting at this layer... VACON's own endpoints
+  are unprotected"* — no longer true. `server.js` mounts
+  `lib/serviceAuth.cjs`'s real trusted-service allowlist app-wide
+  (`app.use(serviceAuth.middleware)`), in `enforce` mode by default:
+  every mutating route (`POST /api/route`, `POST /api/agents/:id/invoke`)
+  401s a caller with neither a user session nor a valid
+  `X-Service-Name`/`X-Service-Token` pair. Reads stay open by design —
+  see the "Trusted-service allowlist" comment in `server.js` itself.
+  `v4-proxy`'s own per-IP rate limiting on the LLM call is unaffected
+  and still real.
+- *"`V4Prototype.jsx`'s own Command Center UI still renders from its
+  local `AGENTS` const, not a live `GET /api/agents` fetch"* — also no
+  longer true, and checked directly against that file rather than
+  taken on faith: its own `syncAgentRosterFromVacon()` fetches
+  `GET /api/agents` on mount and mutates the existing `AGENTS`/
+  `AGENT_BY_TIER` arrays in place with VACON's real name/role/app/
+  systemPrompt data (falling back to the hardcoded roster only if
+  VACON isn't reachable). `tier` is the one field deliberately left
+  unsynced — see the Jake (Phase 5) note above for a real, current
+  consequence of that.

@@ -1,13 +1,16 @@
 // VACON -- MIA's real routing logic.
 // Real, deliberate design choice: deterministic keyword scoring
 // against each agent's own domain, not a real ML/LLM classifier.
-// Routing a request to the right one of 10 agents doesn't need its
-// own model call -- burning an Anthropic call just to decide who
-// should get the *next* Anthropic call would add real latency/cost
-// for no real accuracy gain at this scale. Flagged plainly as real,
-// genuinely-used routing logic that is not "intelligent" in the AI
-// sense, the same honesty this session already applied to VENVS's
-// own NPCs (real wander AI, not real conversation).
+// Routing a request to the right one of VACON's named agents (13 as
+// of 13 Nov 2026 -- Jake was the most recent addition; corrected here
+// from an earlier "10", which this comment had let go stale as the
+// roster grew) doesn't need its own model call -- burning an
+// Anthropic call just to decide who should get the *next* Anthropic
+// call would add real latency/cost for no real accuracy gain at this
+// scale. Flagged plainly as real, genuinely-used routing logic that is
+// not "intelligent" in the AI sense, the same honesty this session
+// already applied to VENVS's own NPCs (real wander AI, not real
+// conversation).
 
 const { AGENTS } = require('./agents');
 
