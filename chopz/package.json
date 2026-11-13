@@ -2,11 +2,12 @@
   "name": "chopz",
   "version": "0.1.0",
   "private": true,
-  "description": "CHOPZ SHOP -- the ecosystem's short-form video/social commerce app. TikTok Shop model: native in-app checkout, creator-set performance-only affiliate commission, VOID fulfillment.",
+  "description": "CHOPZ -- the ecosystem's short-form video/social app (TikTok's role in this build). The commerce layer lives in the separate chopz-shop/ app -- see README.md.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

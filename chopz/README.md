@@ -93,6 +93,20 @@ restart. Live-verified: uploaded a real video, killed the running process,
 restarted it, and confirmed the same real state came back from a real GET.
 See `dev-docs/phase-4-real-persistence/`.
 
+**Addition (13 Nov 2026), checked directly against `server.js` rather
+than assumed from the paragraph above**: this section described the
+file-backed path only, but `server.js` no longer builds its store with
+`createPersistentStore` directly — it boots through
+`lib/storeBackend.js#attachStore`, a later, ecosystem-wide addition
+(its own header: wired into "every real app in this ecosystem that
+holds meaningful mutable state"). Without `DATABASE_URL` set, nothing
+above changes — same file, same guarantees. With it set, the store
+instead lives in Postgres via `lib/persistencePg.js`, behind a gate
+that holds every request until the store has actually loaded, and the
+process exits rather than serving against a store that never loaded.
+This real capability already existed in the code; it was never
+written down here until now.
+
 ## Frontend coverage pass (31 Oct 2026)
 
 Audited `public/index.html` against every route `server.js` registers.
@@ -327,8 +341,21 @@ count.
   is at the data layer, not a fabricated rendering step.
 - ~~For You ranking (a real recommendation algorithm)~~ **Done (5 Nov
   2026) — see "For You ranking" below.**
-- Live shopping formats and the four real ad formats named in
-  `CHOPZ_TIKTOK_COMPARABLES.md`.
+- ~~Live shopping formats...~~ **The live-shopping half is done, but
+  in CHOPZ SHOP, not here (13 Nov 2026) — checked directly rather than
+  left stale.** `chopz-shop/README.md`'s own "Live Shopping Events"
+  section and `chopz-shop/lib/liveShoppingEvents.js` are real: a
+  seller can schedule a live shopping event against a real, verified
+  Vavlt Stvdios channel they own, with real featured products and a
+  real checkout attribution. Live shopping is a commerce feature —
+  per this same file's own naming-collision section above, commerce
+  lives in CHOPZ SHOP, not in this video/social app — so there is
+  nothing left on *this* app's side of that gap. The four real ad
+  formats named in `CHOPZ_TIKTOK_COMPARABLES.md` are still not built
+  anywhere in this pair of apps; `chopz-shop/README.md`'s own "Not yet
+  built" section already names the real reason (no existing
+  seller-to-VENVM-brand onboarding seam) and declines them outright,
+  rather than leaving it an open question.
 - The VENVM/Storytime engine integration the user's intro message
   asked about — real source material exists (see above), but building
   it would mean fabricating the AI scene/character/animation generation

@@ -79,9 +79,35 @@ curl -X POST http://localhost:8801/chopz-shop/products -H "Content-Type: applica
   through a cart leaves the already-placed orders real and placed, not
   rolled back — a true all-or-nothing transaction would need real
   distributed-transaction infrastructure this project doesn't have.
+- `lib/dashboards.js` — **undocumented here until 13 Nov 2026, found
+  and fixed in a doc-reconciliation pass; the real code and its tests
+  (`test/dashboards.test.js`, 7 tests) have existed since this
+  project's very first commit.** `creatorDashboard`/`sellerDashboard`
+  are real aggregations over `store.orders`/`store.affiliateLinks`
+  only — nothing invented, nothing from an outside model: real
+  clicks/conversions/commission actually paid per affiliate link (read
+  from the order's own recorded `affiliateCommission`, never
+  recomputed from a rate that can change after the order settles), and
+  a seller's real revenue/platform fees/affiliate share with a
+  per-product breakdown. `trendingProducts` ranks real listed products
+  by real completed-order count/revenue — explicitly not a
+  personalization model; this file's own header says the "AI product
+  recommendations" half of the original ask was declined because this
+  session's environment has no generative-AI API key configured.
 - `server.js` — a real Express API (CommonJS) wrapping all of the
   above, with real injected `transferVCoin` / `requestVoidCourierJob`
-  functions calling the actual running V3 mock and VOID servers.
+  functions calling the actual running V3 mock and VOID servers. Also
+  mounts the three open, unguarded read routes `lib/dashboards.js`
+  needs: `GET /chopz-shop/dashboards/creator/:creatorId`, `GET
+  /chopz-shop/dashboards/seller/:sellerId`, `GET
+  /chopz-shop/discovery/trending` (`?limit=`, default 10) — same
+  no-actor-guard posture `GET /chopz-shop/products` already takes, a
+  creator's or seller's own real numbers not being a secret the way a
+  payment credential would be. **Honest gap, named rather than left
+  silent**: none of these three routes has a frontend tab in
+  `public/index.html` — checked directly, no reference to any of them
+  there. Out of scope for this doc-only pass; see
+  `dev-docs/RECONCILIATION_TRACKING.md`.
 
 ## Verified
 33 plain-Node checks (product/affiliate-link/order validation, the
@@ -126,12 +152,41 @@ real order with no `affiliateLinkId` in the request at all — the order
 still correctly attributed itself to that click and paid the real
 `$10` commission, confirmed against V3's own balance.
 
+**Count correction (13 Nov 2026), checked directly against the real
+test files rather than re-citing the numbers above.** The
+phase-by-phase counts above (33 baseline / 12 Phase 2 / 6 Phase 3)
+do not sum against the real, current test suite — they never did:
+`test/money.test.js` has always been one consolidated file (16 tests
+today) covering baseline order/payout logic together with the
+category-fee, cart-checkout, and click-attribution cases, not three
+separate per-phase files. The accurate counts, run directly: 16
+(`test/money.test.js`) + 7 (`test/dashboards.test.js`) = 23, matching
+this section's own "Full suite: 23/23" line; + 11
+(`test/liveShoppingEvents.test.js`) = 34 overall, matching "34/34"
+below. The running totals were (and are) correct; only the
+baseline/Phase-2/Phase-3 sub-counts above were not, left struck
+through rather than silently deleted: ~~33 plain-Node checks~~ /
+~~12 plain-Node checks~~ / ~~6 plain-Node checks~~ — the real,
+current per-file counts are stated just above instead.
+
 ## Real persistence
 `lib/persistence.js` wraps `server.js`'s own store in a real file-backed
 store, `data/store.json` (port 8801) — CHOPZ SHOP's own real state now
 survives a restart. Live-verified: created a real product listing, killed
 the running process, restarted it, and confirmed the same real state came
 back from a real GET. See `dev-docs/phase-4-real-persistence/`.
+
+**Addition (13 Nov 2026), checked directly against `server.js` rather
+than assumed from the paragraph above**: this section described the
+file-backed path only, but `server.js` no longer builds its store with
+`createPersistentStore` directly — it boots through
+`lib/storeBackend.js#attachStore`, a later, ecosystem-wide addition.
+Without `DATABASE_URL` set, nothing above changes — same file, same
+guarantees. With it set, the store instead lives in Postgres via
+`lib/persistencePg.js`, behind a gate that holds every request until
+the store has actually loaded, and the process exits rather than
+serving against a store that never loaded. This real capability
+already existed in the code; it was never written down here until now.
 
 ## Real metrics feed
 Every real cart checkout pushes a real `checkout_revenue` metric to
