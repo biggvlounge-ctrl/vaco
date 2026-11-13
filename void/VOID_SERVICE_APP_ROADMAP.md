@@ -112,11 +112,16 @@ of which a real gig app needs.
 infeasible plan; not good enough to promise a customer an arrival time.
 Every dispatch comparable routes against real road data.
 
-**3. Domain bookings do not settle through V3.** A pet care booking and
-a marketplace job are separate records; completing a booking does not
-pay anyone. **This is the highest-value single item remaining** —
-without it the domain modules are a scheduling layer rather than a
-business, and it is a contained piece of work, not a rewrite.
+~~**3. Domain bookings do not settle through V3.**~~ — **resolved.**
+Checked directly against the real code (13 Nov 2026, during a
+doc-vs-code reconciliation pass): both named reference
+implementations, `petCare.js` and `laundry.js`, already import and
+call `settleJob`/`settleOnce` from the shared `settlement.js`/
+`settleOnce.js` modules — the same real marketplace-and-V3 payout path
+every other vertical settles through, not a separate scheduling-only
+record. This item was real when first written and has since been
+closed; it was left listed as "the highest-value single item
+remaining" after the fix landed, which this correction fixes.
 
 ## What I would do next, in order
 
