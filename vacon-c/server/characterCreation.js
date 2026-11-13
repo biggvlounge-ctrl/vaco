@@ -553,6 +553,11 @@ module.exports = {
   MAX_COUSINS_PER_AUNT_UNCLE,
   createCharacter,
   describeFamilyTree,
+  // Exported for `recruitment.js`'s own chaos-driven family-absorption
+  // pass to reuse directly — a pure read over `family_memberships`,
+  // the identical reuse-not-duplicate reasoning `generateAuntOrUncle`'s
+  // own export comment just below already gives.
+  familyIdFor,
   // Exported for `worldgen.js` to reuse directly — see that file's own
   // extended-family block for why this is the one piece of real
   // generation logic ordinary NPCs needed and createCharacter() already

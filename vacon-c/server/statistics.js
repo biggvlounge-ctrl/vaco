@@ -1160,13 +1160,17 @@ const CATALOGUE = [
     key: 'chaos_recruitment_events', category: 'organization', unit: 'count', scope: 'community',
     compute: (ctx) => recruitment.recruitmentEventsFor(ctx.worldState, ctx.communityId).length,
   },
+  // No longer `unavailable` — `recruitment.js`'s own "Families/tribes"
+  // section closes the real, narrower version of this: kinship
+  // absorbing an already-orphaned child (a real birth record, both
+  // real parents no longer living) into a different real family under
+  // local danger, picked by that family's own real `unity`. A
+  // stranger-joins-as-a-peer mechanism, the thing this key's own
+  // comment used to decline building, still does not exist — see
+  // `recruitment.js`'s own header for exactly where that line sits.
   {
     key: 'tribe_family_recruitment_growth', category: 'organization', unit: 'count', scope: 'community',
-    unavailable: 'extended-family (characterCreation.js aunts/uncles/cousins) and the families '
-      + 'table have no real "a stranger joins after the fact" mechanism anywhere in this engine — '
-      + 'membership is fixed at birth or at generation time, never recruited into. Reported here as '
-      + 'an open, named gap rather than a fabricated adoption mechanic; see recruitment.js\'s own '
-      + 'header for the direct instruction this answers in part.',
+    compute: (ctx) => recruitment.familyAbsorptionEventsFor(ctx.worldState, ctx.communityId).length,
   },
 
   // ---- territory -----------------------------------------------------

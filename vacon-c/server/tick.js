@@ -1208,6 +1208,13 @@ function runSecurityPhase(worldState) {
   // the rate directly.
   recruitment.runChaosRecruitment(worldState, { tick: worldState.tick });
 
+  // Same phase, same real danger measure: the family-side half of the
+  // same instruction — a kinship absorbing an already-orphaned child,
+  // not a stranger joining as a peer. See `recruitment.js`'s own
+  // "Families/tribes" section for exactly what this does and does not
+  // cover.
+  recruitment.runChaosFamilyAbsorption(worldState, { tick: worldState.tick });
+
   return events;
 }
 

@@ -54,27 +54,36 @@ const BASE_RECRUITMENT_RISK = crime.BASE_DEPRIVATION_RISK * 10;
 const membership = require('./membership.js');
 const influence = require('./influence.js');
 const worldStore = require('./worldStore.js');
+const mortality = require('./mortality.js');
+const characterCreation = require('./characterCreation.js');
 const { seededDraw } = require('./seeded.js');
 
+// No cycle to check here, unlike `justice.js`'s own `ensurePrisonGang`
+// needing a lazy, in-function `require('./engine.js')`: `mortality.js`
+// and `characterCreation.js` both sit outside the `engine.js` →
+// `tick.js` → `recruitment.js` loop that forces that one lazy — neither
+// requires `tick.js`, `engine.js`, or this file back.
+
 // ---------------------------------------------------------------------
-// Scope: real gangs only — tribes and families are a real, named,
-// NOT-closed gap, not a silent omission
+// Scope at this section: real gangs only — see this file's own
+// "Families/tribes" section, below `runChaosRecruitment`, for what
+// closes the tribes/families half and what stays a real, named,
+// narrower gap even there
 // ---------------------------------------------------------------------
 // `membership.organizationPresence`'s own `isGang` flag (type 'gang'
 // OR a real faction) is the only group shape in this engine an NPC
-// actually JOINS through a real, already-built mechanism
-// (`membership.joinOrganization`). `characterCreation.js`'s real
-// extended-family generation (aunts/uncles/cousins) and the
-// `families` table itself have no equivalent "a stranger joins this
-// family" mechanism anywhere in this engine — family membership is
-// fixed at birth or at `addFamilyMember`-time generation, never
-// recruited into after the fact. Building one here would be
-// fabricating a family-adoption mechanic nobody asked for in order to
-// answer a word in the request ("tribes, families") that this
-// engine's own real substrate does not yet support — named here as
-// the honest, open gap for a future round, the same posture
-// `worldgen.js`'s prison-operator fix just took for every OTHER hero
-// landmark category it did not also fix.
+// actually JOINS as a STRANGER, through a real, already-built
+// mechanism (`membership.joinOrganization`). `characterCreation.js`'s
+// real extended-family generation (aunts/uncles/cousins) and the
+// `families` table itself have no equivalent "an unrelated stranger
+// joins this family" mechanism anywhere in this engine, and none is
+// built here either — family membership for a stranger stays fixed at
+// birth or at `addFamilyMember`-time generation, never recruited into
+// after the fact. What the "Families/tribes" section below closes is
+// narrower and real: kinship absorbing an already-orphaned CHILD, not
+// a stranger joining as a peer, which is this engine's own real
+// family-side analogue of what a gang does with a stranger rather than
+// a copy of the gang mechanism's own shape.
 
 // Real residents of a community who are not already a member of this
 // organization and are not currently behind bars — the one filter
@@ -177,9 +186,213 @@ function recruitmentEventsFor(worldState, communityId) {
   return (worldState.chaosRecruitmentEvents || []).filter((e) => e.communityId === communityId);
 }
 
+// ---------------------------------------------------------------------
+// Families/tribes: the gap the section above named is now closed, at
+// exactly the width this engine's real substrate actually supports
+// ---------------------------------------------------------------------
+// The scope note above is still correct as written: there is no "a
+// stranger joins this family" mechanism, and none is built here
+// either. What this closes is narrower and real — kinship absorbing an
+// already-orphaned child during local danger, the direct family-side
+// analogue of a gang absorbing a vulnerable stranger. "Tribe" needs no
+// separate mechanism of its own: `engine.tribeIdFor` already reads a
+// tribe straight off `family_memberships` (see that function's own
+// comment), so "tribes, families" in the original instruction names
+// one real engine concept twice, not two.
+//
+// **Why this reads birth records, not `family_memberships.role`.**
+// The obvious design is "find family members with role 'parent', check
+// if they're alive" — and it was tried first here, against a real
+// generated world, and measured to be permanently empty. `worldgen.js`
+// assigns every ordinary NPC's own family role a flat `'member'`
+// (line ~1268/1547, the forty-ninth standing rule's own finding), and
+// `births.js` gives a NEWBORN role `'child'` but never relabels the
+// bearing parent `'parent'` — so `familyMembersWithRole(..., 'parent')`
+// returns empty for every family in every world this engine has ever
+// generated, the sixth standing rule's own trap in a new place. The
+// real place a child's parent is recorded is `births.js`'s own birth
+// record (`historicalRecords` entry, `what: 'birth'`, `who: [child,
+// bearer, other?]` — that file's own comment: "the only place a
+// parent's identity is stored"). `parentIdsOf` reads that instead.
+//
+// **Real, honest, named scope limit this creates**: only a child who
+// was actually BORN during this simulation (via `births.js`) can ever
+// be detected as an orphan here, because only such a child has a real
+// birth record to read a parent's identity from. An NPC present from
+// initial world generation has no birth record and is never a
+// candidate — not a silent gap, the identical honest-ceiling posture
+// `PARENT_DECEASED_CHANCE`'s own one-time character-creation draw
+// already holds for a different mechanism entirely.
+function parentIdsOf(worldState, childId) {
+  const birthRecord = (worldState.historicalRecords || [])
+    .find((r) => r.what === 'birth' && Array.isArray(r.who) && r.who[0] === childId);
+  if (!birthRecord) return null;
+  return birthRecord.who.slice(1);
+}
+
+const ADULT_AGE_YEARS = 18;
+
+// A minor with a real, recorded birth parent, none of whom are among
+// the living. `parentIds === null` (no birth record at all) and an
+// empty `parentIds` array are both "not a modeled orphan case," not
+// "orphaned" — the sixth standing rule's own lesson about not reading
+// a missing fact as a zero.
+function isOrphan(worldState, npc) {
+  const age = mortality.ageInYears(worldState, npc);
+  if (age === null || age >= ADULT_AGE_YEARS) return false;
+  const parentIds = parentIdsOf(worldState, npc.id);
+  if (!parentIds || parentIds.length === 0) return false;
+  const livingIds = new Set((worldState.npcs || []).map((n) => n.id));
+  return parentIds.every((pid) => !livingIds.has(pid));
+}
+
+// Already absorbed once: this engine gives nobody a second real
+// `family_memberships` row through any other path (a cousin/aunt/uncle
+// is cross-linked via a `relationships` row instead, never a second
+// membership row on the SAME entity — `characterCreation.js`'s own
+// `cousinsThroughParent` reads it that way), so more than one row for
+// this entity can only mean this pass already ran for them.
+function alreadyAbsorbed(worldState, entityId) {
+  return (worldState.familyMemberships || []).filter((m) => m.entity_id === entityId).length > 1;
+}
+
+function communityHasLivingMember(worldState, familyId, communityId) {
+  const memberIds = new Set(
+    (worldState.familyMemberships || [])
+      .filter((m) => m.family_id === familyId)
+      .map((m) => m.entity_id),
+  );
+  return (worldState.npcs || []).some((n) => memberIds.has(n.id) && n.communityId === communityId);
+}
+
+// Real candidate families to absorb an orphan: present (a living
+// member actually resides here — never the orphan's own community by
+// label alone) in the real community, excluding the orphan's own
+// family (re-absorbing into the family that already counts them would
+// not be the real growth the instruction asked be measured).
+function absorbingFamilyCandidates(worldState, communityId, excludeFamilyId) {
+  return (worldState.families || [])
+    .filter((f) => f.id !== excludeFamilyId && communityHasLivingMember(worldState, f.id, communityId));
+}
+
+// The real family-side "characteristics of the people that they
+// encounter": `families.unity` is this engine's own already-real,
+// already-written measure of how well a household actually holds
+// together (`control.js#cohesionOf`'s own real substrate) — the
+// family-level parallel to picking a gang's recruit by the highest
+// `influence.influenceRatingOf`, not a second invented score. Tie
+// broken on the lower real id, the same deterministic-pick shape
+// `justice.js#ensurePrisonGang`'s own leader draw already uses.
+function bestAbsorbingFamily(candidates) {
+  let best = candidates[0];
+  for (const candidate of candidates.slice(1)) {
+    if (candidate.unity > best.unity || (candidate.unity === best.unity && candidate.id < best.id)) {
+      best = candidate;
+    }
+  }
+  return best;
+}
+
+// The real write, direct on the passed `worldState` — mirroring
+// `engine.addFamilyMember`'s own field semantics exactly, but never
+// calling through it. `engine.addFamilyMember` mutates `engine.
+// WorldState`'s own family object by reference; a constructed test
+// fixture's `worldState.families` entry is deliberately a DIFFERENT
+// object with the same id (standing rule 8), and `justice.js#
+// ensurePrisonGang`'s own header already names exactly this hazard for
+// `generateOrganization`/`generateFaction`. `membership.
+// joinOrganization` in this same file's own sibling module never
+// routes through `engine.js` for the identical reason — this follows
+// that real, already-established precedent rather than the
+// reconcile-after-the-fact one `ensurePrisonGang` needed because IT
+// had no choice but to call through `engine.js` for trait generation.
+// This call needs no trait generation at all, so it has the choice,
+// and takes it.
+function absorbIntoFamily(worldState, { familyId, entityId, role, generationNumber }) {
+  const family = (worldState.families || []).find((f) => f.id === familyId);
+  if (!family) throw new Error(`absorbIntoFamily: no family with id ${familyId}`);
+  const membershipRow = {
+    entity_id: entityId,
+    family_id: familyId,
+    role: role ?? null,
+    generation_number: generationNumber ?? family.generation,
+  };
+  worldState.familyMemberships = worldState.familyMemberships || [];
+  worldState.familyMemberships.push(membershipRow);
+  family.total_members = (family.total_members ?? 0) + 1;
+  family.updatedTick = worldState.tick;
+  return membershipRow;
+}
+
+// One real chaos-driven family-absorption pass, same real danger-
+// scaled rate as `runChaosRecruitment` above (`BASE_RECRUITMENT_RISK`
+// reused, not a second invented constant needing its own defence —
+// the real mechanism differs in WHO is eligible and WHO receives them,
+// not in how chaotic the area has to be for either to happen at all).
+function runChaosFamilyAbsorption(worldState, options = {}) {
+  const { tick = worldState.tick ?? 0 } = options;
+  const danger = crime.dangerByCommunity(worldState, { tick });
+  const absorbed = [];
+
+  for (const community of worldState.communities || []) {
+    const dangerScore = danger.get(community.id);
+    if (!dangerScore) continue;
+
+    const orphans = (worldState.npcs || []).filter(
+      (n) => n.communityId === community.id && isOrphan(worldState, n) && !alreadyAbsorbed(worldState, n.id),
+    );
+
+    for (const orphan of orphans) {
+      const ownFamilyId = characterCreation.familyIdFor(worldState, orphan.id);
+      const candidates = absorbingFamilyCandidates(worldState, community.id, ownFamilyId);
+      if (candidates.length === 0) continue;
+
+      const chance = BASE_RECRUITMENT_RISK * dangerScore;
+      const draw = seededDraw([orphan.id, community.id, tick, 'chaos-family-absorption']);
+      if (draw >= chance) continue;
+
+      const family = bestAbsorbingFamily(candidates);
+      absorbIntoFamily(worldState, {
+        familyId: family.id, entityId: orphan.id, role: 'child', generationNumber: family.generation,
+      });
+
+      worldState.chaosFamilyAbsorptionEvents = worldState.chaosFamilyAbsorptionEvents || [];
+      worldState.chaosFamilyAbsorptionEvents.push({
+        familyId: family.id, communityId: community.id, entityId: orphan.id, tick,
+      });
+
+      worldStore.addHistoricalRecord(worldState, {
+        event_type: 'chaos_family_absorption',
+        description: `the ${family.surname} family takes in an orphaned child`
+          + `${community.name ? ` in ${community.name}` : ''}, where real danger reads `
+          + `${dangerScore.toFixed(2)}`,
+        when_tick: tick,
+        participants: [orphan.id],
+        where_location_id: null,
+      });
+
+      absorbed.push({ familyId: family.id, communityId: community.id, entityId: orphan.id });
+    }
+  }
+
+  return absorbed;
+}
+
+// The real growth-over-time figure for `statistics.js`'s own
+// `tribe_family_recruitment_growth` entry — the same
+// read-the-log-rather-than-a-second-counter shape
+// `recruitmentEventsFor` above already takes (standing rule 3).
+function familyAbsorptionEventsFor(worldState, communityId) {
+  return (worldState.chaosFamilyAbsorptionEvents || []).filter((e) => e.communityId === communityId);
+}
+
 module.exports = {
   BASE_RECRUITMENT_RISK,
   eligibleCandidates,
   runChaosRecruitment,
   recruitmentEventsFor,
+  parentIdsOf,
+  isOrphan,
+  runChaosFamilyAbsorption,
+  familyAbsorptionEventsFor,
 };

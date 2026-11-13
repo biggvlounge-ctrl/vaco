@@ -29,6 +29,8 @@ function dangerousWorld() {
     employmentRecords: [],
     entityTraits: [],
     historicalRecords: [],
+    families: [],
+    familyMemberships: [],
     nextEntityId: 1,
   };
   for (let i = 1; i <= 40; i += 1) {
@@ -147,4 +149,133 @@ test('who gets recruited is real and deterministic -- the highest real influence
 
 test('BASE_RECRUITMENT_RISK is a real multiple of crime.BASE_DEPRIVATION_RISK, not a bare invented number', () => {
   assert.equal(recruitment.BASE_RECRUITMENT_RISK, crime.BASE_DEPRIVATION_RISK * 10);
+});
+
+// ---------------------------------------------------------------------
+// Families/tribes: kinship absorbing an already-orphaned child
+// ---------------------------------------------------------------------
+
+// `memberId` is explicit, never drawn from `w.nextEntityId` -- this
+// fixture's own 40 base NPCs occupy ids 1-40 directly without ever
+// advancing that counter (`economy.reseedIds` does not touch it
+// either), so an auto-incremented id here would collide with one of
+// them.
+function familyRow(w, { id, unity = 50, memberId = null, memberCommunityId = null } = {}) {
+  const family = {
+    id, surname: `Family${id}`, founder_id: null, generation: 1, head_npc_id: null,
+    total_members: 0, wealth: 0, reputation: 50, unity, conflict: 0, traditions: null,
+    religion: null, political_influence: 0,
+  };
+  w.families.push(family);
+  if (memberId != null) {
+    w.npcs.push({ id: memberId, communityId: memberCommunityId, status: 'active', home_property_id: null });
+    w.familyMemberships.push({ entity_id: memberId, family_id: id, role: 'member', generation_number: 1 });
+    family.total_members = 1;
+  }
+  return family;
+}
+
+// Real shape `births.js` itself writes: a child, a birth historical
+// record naming the real bearer (and optional co-parent), and a
+// `family_memberships` row for the child under the bearer's own
+// family. Built directly rather than run through `births.js`/`tick.js`
+// for thousands of real ticks -- the same "construct the state you
+// need" fixture style this whole file already uses for `crimeIncidents`.
+function bornChild(w, { childId, bearerId, otherId = null, familyId, age }) {
+  w.npcs.push({ id: childId, communityId: 1, status: 'active', home_property_id: null, createdTick: 0 });
+  // `mortality.ageInYears` reads `createdTick` against the current
+  // tick at 365 ticks/year -- backdating `createdTick` is the real way
+  // to give a fixture NPC a specific age without waiting real ticks.
+  w.npcs.find((n) => n.id === childId).createdTick = w.tick - Math.round(age * 365);
+  w.historicalRecords.push({
+    what: 'birth', who: [childId, bearerId, ...(otherId ? [otherId] : [])], when_tick: 0,
+  });
+  if (familyId != null) {
+    w.familyMemberships.push({ entity_id: childId, family_id: familyId, role: 'child', generation_number: 2 });
+  }
+}
+
+test('parentIdsOf reads the real births.js birth record, not a family role nobody ever sets to parent', () => {
+  const w = dangerousWorld();
+  bornChild(w, { childId: 100, bearerId: 1, otherId: 2, familyId: null, age: 10 });
+  assert.deepEqual(recruitment.parentIdsOf(w, 100), [1, 2]);
+  assert.equal(recruitment.parentIdsOf(w, 1), null, 'an NPC with no real birth record must read null, not an empty-but-present list');
+});
+
+test('isOrphan is true only for a real minor whose every real birth parent is no longer among the living', () => {
+  const w = dangerousWorld();
+  bornChild(w, { childId: 100, bearerId: 1, familyId: null, age: 10 });
+  bornChild(w, { childId: 101, bearerId: 2, otherId: 3, familyId: null, age: 10 });
+  bornChild(w, { childId: 102, bearerId: 4, familyId: null, age: 20 }); // adult
+  const noBirthRecordMinor = w.npcs.find((n) => n.id === 5);
+
+  // 100's only real parent (1) is removed from the living.
+  w.npcs = w.npcs.filter((n) => n.id !== 1);
+  assert.equal(recruitment.isOrphan(w, w.npcs.find((n) => n.id === 100)), true);
+
+  // 101 has two real parents (2, 3); only one is removed -- still not an orphan.
+  w.npcs = w.npcs.filter((n) => n.id !== 2);
+  assert.equal(recruitment.isOrphan(w, w.npcs.find((n) => n.id === 101)), false);
+
+  assert.equal(recruitment.isOrphan(w, w.npcs.find((n) => n.id === 102)), false, 'an adult must never read as an orphan');
+  assert.equal(recruitment.isOrphan(w, noBirthRecordMinor), false, 'no real birth record means not a modeled orphan case, not a free pass');
+});
+
+test('runChaosFamilyAbsorption absorbs a real orphan into the real highest-unity eligible family, never the orphan\'s own', () => {
+  const w = dangerousWorld();
+  bornChild(w, { childId: 100, bearerId: 1, familyId: 1, age: 10 });
+  w.families = [];
+  familyRow(w, { id: 1, unity: 90, memberId: 200, memberCommunityId: 1 }); // the orphan's OWN family -- must never be picked
+  familyRow(w, { id: 2, unity: 40, memberId: 201, memberCommunityId: 1 });
+  familyRow(w, { id: 3, unity: 75, memberId: 202, memberCommunityId: 1 }); // real highest eligible unity
+  w.npcs = w.npcs.filter((n) => n.id !== 1); // the bearer dies
+
+  let result = null;
+  for (let tick = 400; tick < 400 + 8000 && !result; tick += 1) {
+    const absorbed = recruitment.runChaosFamilyAbsorption(w, { tick });
+    if (absorbed.length > 0) result = absorbed[0];
+  }
+  assert.ok(result, 'no absorption happened across 8000 real seeded draws');
+  assert.equal(result.entityId, 100);
+  assert.equal(result.familyId, 3, 'the real highest-unity eligible family (not the orphan\'s own, not the lower-unity one) was not chosen');
+
+  const row = w.familyMemberships.find((m) => m.entity_id === 100 && m.family_id === 3);
+  assert.ok(row, 'runChaosFamilyAbsorption reported an absorption with no real family_memberships row behind it');
+  assert.equal(row.role, 'child');
+
+  const family3 = w.families.find((f) => f.id === 3);
+  assert.equal(family3.total_members, 2, 'the real absorbing family\'s own total_members was not incremented');
+
+  assert.equal(w.chaosFamilyAbsorptionEvents.length, 1);
+  assert.equal(recruitment.familyAbsorptionEventsFor(w, 1).length, 1);
+  assert.ok(w.historicalRecords.some((r) => r.event_type === 'chaos_family_absorption'));
+});
+
+test('runChaosFamilyAbsorption never absorbs the same real orphan twice', () => {
+  const w = dangerousWorld();
+  bornChild(w, { childId: 100, bearerId: 1, familyId: 1, age: 10 });
+  w.families = [];
+  familyRow(w, { id: 1, unity: 50, memberId: 200, memberCommunityId: 1 });
+  familyRow(w, { id: 2, unity: 80, memberId: 201, memberCommunityId: 1 });
+  w.npcs = w.npcs.filter((n) => n.id !== 1);
+
+  let absorptions = 0;
+  for (let tick = 400; tick < 400 + 8000; tick += 1) {
+    absorptions += recruitment.runChaosFamilyAbsorption(w, { tick }).length;
+  }
+  assert.equal(absorptions, 1, 'the same real orphan was absorbed more than once across repeated ticks');
+});
+
+test('runChaosFamilyAbsorption never absorbs a real orphan when no other real family has a living member in that community', () => {
+  const w = dangerousWorld();
+  bornChild(w, { childId: 100, bearerId: 1, familyId: 1, age: 10 });
+  w.families = [];
+  familyRow(w, { id: 1, unity: 50, memberId: 200, memberCommunityId: 1 }); // the orphan's own, the only one present
+  w.npcs = w.npcs.filter((n) => n.id !== 1);
+
+  let absorptions = 0;
+  for (let tick = 400; tick < 400 + 8000; tick += 1) {
+    absorptions += recruitment.runChaosFamilyAbsorption(w, { tick }).length;
+  }
+  assert.equal(absorptions, 0, 'an orphan was absorbed with no real eligible family present at all');
 });
