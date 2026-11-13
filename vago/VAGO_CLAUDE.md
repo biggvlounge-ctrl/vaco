@@ -226,3 +226,37 @@ Those tokens are also among the few concrete per-app visual identities
 recorded anywhere in this project — worth keeping for whenever
 `vaco-shell/VISUAL_DESIGN_COHESION_DIRECTIVE.md` gets picked up, since
 that document notes almost no app has one written down.
+
+### Correction, 13 Nov 2026 — doc-vs-code reconciliation
+
+**The frontend claim directly above is now stale and was checked
+against the real repo rather than trusted.** `vago/public/index.html`
+is a real, substantial 1,218-line page with 148 real `function`/
+`fetch`/`addEventListener` occurrences — not a prototype living
+elsewhere. This README's own later "Competitions and BLIND, seeded and
+wired (5 Nov 2026)" section already documents two real tabs wired into
+this exact file with real seed data. VDP's district may still be a
+real additional surface, but "VAGO's server is real; its visible
+surface is VDP's district" understates what exists here now.
+
+**The thirteen-module count above is also stale.** `vago/lib/` real
+count, checked directly (`ls lib/*.js lib/*.cjs`): **24** modules, not
+13. Eleven real modules exist beyond the ones named above:
+`blindPredictions.js`, `groupWagers.js`, `groupWagerCompetitions.js`,
+`groupWagerLeaderboard.js` (real features — Group Wagers, Leagues/
+Tournaments, BLIND/Before-the-Answer, and their leaderboard, all
+documented in this app's own `README.md`), `persistencePg.js`,
+`settleOnce.js`, `storeBackend.js` (real persistence/concurrency
+infrastructure), and `decisionLog.cjs`/`operatorAuth.cjs`/
+`serviceAuth.cjs`/`tracing.cjs` (shared cross-cutting modules, the
+same shape other apps in this ecosystem use). None of this contradicts
+the document's own real findings above — it is growth since this
+status section was written, not a correction of what it originally
+got right.
+
+`vaco/VACO.md`'s own Part 2 ledger lists VAGO at "13 modules, 39
+routes" — also stale against the real current count (24 modules,
+`server.js` has 67 real route handlers, checked directly via
+`grep -cE "app\.(get|post|put|delete|patch)\("`). Not fixed here —
+that is a shared root file other concurrent work may be touching —
+flagged for whoever next updates that ledger.
