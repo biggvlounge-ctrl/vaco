@@ -58,6 +58,28 @@ cd ../void && npm install && npm start                   # localhost:8793 (neede
 cd vacay && npm install && npm start                       # localhost:8803
 ```
 
+**Correction, added during this round's doc-vs-code reconciliation (13
+Nov 2026).** The steps above are stale on two points, checked directly
+against the real current code rather than trusted from any earlier
+version of this section: (1) every mutating route in this app (30 of
+them, across all four sections -- `POST`/`PUT`/`PATCH`/`DELETE` counted
+directly in `lib/*/routes.js`) is gated by `requireActor`/
+`requireSession` from `lib/shieldAuth.cjs`, so Shield itself is a real,
+required dependency for anything beyond the read-only `/meta` and
+listing-read endpoints the Test section below exercises, and nothing
+above says to start it; (2) `venvs-mock-backend` on `:8791` really does
+stand in for *both* V3 and Shield (see its own real `/api/shield/
+session` route), but this app's own real defaults point elsewhere --
+`V3_API_URL` defaults to `http://localhost:8811` (the real `v3` app)
+and `SHIELD_API_URL` defaults to `http://localhost:8812` (the real
+`shield` app), not `:8791` -- so running the mock backend exactly as
+shown, with no env override, leaves VACAY's own mutating routes
+talking to ports nothing is listening on. Either run the real `v3`
+(`:8811`) and `shield` (`:8812`) apps instead of the one-port mock, or
+export `V3_API_URL=http://localhost:8791` and
+`SHIELD_API_URL=http://localhost:8791` before starting VACAY so both
+point at the combined stand-in.
+
 ## Test
 ```
 curl http://localhost:8803/api/health
@@ -103,7 +125,9 @@ curl http://localhost:8803/api/flights/meta
 - `lib/home/` — `listings.js` (real property records, no money
   attached), `leads.js` (the real core loop — free tour requests,
   agent-paid lead purchases with genuinely gated `contactInfo`),
-  `routes.js`.
+  `routes.js`. Also present, but **not mentioned here until this
+  correction (13 Nov 2026)** and not wired to anything —
+  `padSplit.js`: see "Not yet built" below.
 - `lib/auto/` — `vehicles.js`/`rentals.js` (Turo peer rental, real
   protection-plan-tiered owner-earn split), `carListings.js` (**new**:
   CarGurus' real buy/sell model — a flat seller listing fee and a real
@@ -230,6 +254,21 @@ restart. Live-verified: created a real stay listing, killed the running
 process, restarted it, and confirmed the same real state came back from a
 real GET. See `dev-docs/phase-13-real-persistence/`.
 
+**Correction (13 Nov 2026):** this now undersells what's real, checked
+directly against `server.js` rather than trusted from this section as
+originally written. `server.js` no longer calls `lib/persistence.js`
+directly -- it goes through `lib/storeBackend.js`'s `attachStore`,
+which picks the backend at boot: the file-backed `data/store.json`
+store described above when `DATABASE_URL` is unset (the default,
+logged as "safe for one process only"), or a real Postgres-backed
+store via `lib/persistencePg.js` when `DATABASE_URL` *is* set, with
+the same debounce-and-commit-before-responding shape either way.
+Neither `storeBackend.js` nor the Postgres path is VACAY-specific code
+-- both are the same shared, ecosystem-wide module every converted app
+uses, copied in rather than written for this app -- but this section
+never said VACAY had a second, Postgres-backed persistence option at
+all.
+
 ## Flight + Stay + Car bundles, and a VOID Ride Pack tie-in (1 Nov 2026)
 
 Per direct instruction: a real Priceline-style bundle ("a flight, a
@@ -315,6 +354,24 @@ refused with a real 401 before reaching anyone.
 - CarGurus' own real market-average computation — `marketAveragePrice`
   is honestly caller-supplied, not computed from any real aggregated
   data (none exists in this session).
+- **`lib/home/padSplit.js`, found during this round's doc-vs-code
+  reconciliation (13 Nov 2026) and never mentioned in this README
+  before now.** A real, complete PadSplit room-by-room co-living
+  module exists — split a `for-rent` listing into named, priced rooms,
+  move a member in/out, charge weekly rent split host/platform at a
+  real, flagged interpretive `PLATFORM_TAKE_RATE` (0.12) via
+  `settleFn`/V3, idempotent per week. But it is wired to nothing: no
+  route in `lib/home/routes.js` (or anywhere else) calls it, and no
+  test file exercises it — confirmed by searching, not assumed absent.
+  It is also currently broken if it ever is called: `lib/store.js`'s
+  `home` namespace never initializes the `rooms`/`residencies`/
+  `nextRoomId`/`nextResidencyId` fields `padSplit.js` assumes exist, so
+  `splitProperty` throws `TypeError: Cannot read properties of
+  undefined (reading 'push')` on its very first real call — reproduced
+  directly against a fresh store while writing this correction, not
+  inferred from reading the code. Reconciliation only documents this;
+  wiring real routes or fixing the store shape is real, unbuilt work
+  and is intentionally not done here.
 
 ## UI (11/12 Nov 2026) — the "Any UI, for any section" line above was stale, not true
 
@@ -362,6 +419,22 @@ under a blanket claim**: no UI anywhere for a host/agent/seller side
 reviewing a seller lead or a job application) — this round closed the
 guest/renter/buyer side only. No calendar widget — every date in this
 UI is a "days from now" prompt. No map/photo UI for any listing.
+
+> **Correction, added during this round's doc-vs-code reconciliation
+> (13 Nov 2026).** The blanket line above both overstates itself and
+> contradicts this same section's own earlier sentence about what was
+> "newly wired" — checked directly against `public/index.html` rather
+> than trusted. A real seller-side listing-creation flow already
+> exists, wired in this very round: the "List your car for sale ($25
+> flat fee)" button prompts for make/model/year/mileage/price/
+> `marketAveragePrice` and `POST`s to `/api/auto/for-sale-listings` as
+> the seller. What is still genuinely missing is the *other* three
+> creator sides — Stays host listing creation (`hostId`), Home agent
+> listing creation (`agentId`), and Auto/Turo vehicle owner listing
+> creation (`ownerId`) — none of which appears anywhere in
+> `public/index.html` — plus the host-cancellation-guarantee's strike
+> count, reviewing a seller lead, and reviewing a job application,
+> exactly as the rest of the original line already said.
 
 ### Verification
 `npm test`: 46 → 50 (the 4 new list-by-actor tests), zero regressions.
