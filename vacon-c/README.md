@@ -508,6 +508,22 @@ be detected as orphaned this way. The absorbing family is picked by
 the real `families.unity` field, the family-side mirror of picking a
 gang's recruit by `influenceRatingOf`.
 
+## The test/worldgen.test.js hang, actually fixed (seventy-first standing rule)
+See `CLAUDE.md`'s own seventy-first standing rule for the full account.
+A real, pre-existing hang (documented twice, never diagnosed) is now
+genuinely fixed rather than worked around: `--cpu-prof` traced it to
+`entityTraits.js#getLiveEntity`/`getEntityTraitsForEntity` doing an
+unindexed scan over the entire `entity_traits` array on every call —
+the same shape `traitDrift.js` had already fixed locally once, but
+that fix never reached the canonical version 111 call sites across 31
+files actually use. A `WeakMap`-keyed per-`worldState` cache closes it
+at the canonical layer, invalidated on the array's identity or length
+changing — `entity_traits` rows are append-only everywhere, confirmed
+directly. `test/entity-traits.test.js` is this file's first test file
+ever. Full suite, genuinely complete for the first time this session
+with no exclusion or timeout workaround: 2199 pass, 0 fail, 0
+cancelled, 17 skipped.
+
 ## Bluffing and its exposure
 See `CLAUDE.md`'s own fifty-second standing rule for the full design.
 `server/bluff.js` models the gap between what `weapons

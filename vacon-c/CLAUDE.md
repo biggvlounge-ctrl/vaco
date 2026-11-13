@@ -4368,6 +4368,66 @@ tests, 2088 pass, 0 fail, 6 cancelled (the pre-existing `worldgen
 .test.js` hang and its collateral, a separate concurrent fork's own
 fix target at the time -- unrelated to this round), 17 skipped.
 
+**A seventy-first, and it is the real root cause of the hang the
+sixty-third and sixty-fourth standing rules documented twice without
+ever finding why.** Traced with `--cpu-prof` rather than guessed:
+`server/entityTraits.js#getLiveEntity`/`getEntityTraitsForEntity` did
+an unindexed `.filter()`/`.find()` over the ENTIRE `entity_traits`
+array on every single call -- 29% and 8% of CPU samples respectively.
+`traitDrift.js` had already found and fixed this exact shape once,
+locally, with its own `indexRows`/`rowsFor` (its own header already
+says "ten million comparisons a tick... added twenty seconds to the
+test suite") -- but that fix never reached `entityTraits.js` itself,
+the canonical version 111 call sites across 31 files actually use.
+`test/worldgen.test.js` hit the catastrophic case specifically because
+it accumulates a module-global world across every test in the file by
+its own design, with no reset, and one test runs 60 real ticks over
+whatever had piled up -- measured at 300 NPCs and 38,000+ trait rows
+before that test's own `generateWorld` call even ran.
+
+**Fixed at the canonical layer, not patched locally a second time.** A
+`WeakMap`-keyed, per-`worldState` cache in `entityTraits.js`, the same
+proven shape `traitDrift.js` already uses. It invalidates on the
+array's identity changing (a full replacement, e.g. after a restore)
+or its length changing (an ordinary append) -- `entity_traits` rows are
+append-only everywhere in this engine, confirmed directly rather than
+assumed (every real writer is `births.js` plus three sites in
+`engine.js`; nothing splices or reassigns a row out), so a length check
+catches every real mutation, and rows already indexed are the same
+object references the flat array holds, so an in-place write needs no
+invalidation at all. Mutation-verified: disabled invalidation,
+confirmed a newly-generated NPC's traits vanished from a warmed cache
+(0 rows instead of the real 122), then confirmed the real fix finds
+them.
+
+**`test/entity-traits.test.js` is this file's first test file ever** --
+the same gap the twenty-sixth standing rule closed for `seeded.js`
+(imported by seven modules); this one is imported by thirty-one. Nine
+new tests cover the exact failure mode mutated against, plus the
+restore-shaped full-array-replacement case, the in-place-write case
+that needs no invalidation, and structural reuse of the cached map
+across repeated reads.
+
+**Fixing the hang surfaced a second, real, previously-masked
+regression rather than causing one.** Letting `test/worldgen.test.js`
+run to completion for the first time exposed a stale assertion whose
+expected declared-gap count had drifted to a transiently-real `10` --
+two concurrent rounds in the same session, one opening a tribe/family
+recruitment gap and another closing it before either had committed --
+corrected to the real current `9`.
+
+`test/worldgen.test.js` now completes in ~133s (was: never, for the
+entire life of this defect). **Full suite, genuinely complete for the
+first time this session with no exclusion and no `--test-timeout`
+workaround**: 2216 tests, 2199 pass, 0 fail, 0 cancelled, 17 skipped.
+
+**A real, separate, declared-not-fixed finding from the same
+profile**: `technicalSkillIn` (10% of samples) and
+`ownedPropertyValue` (7%) are secondary hot functions, unrelated to
+this hang -- the file now completes in bounded time without either
+being touched -- named here as a real future optimization target
+rather than silently left for someone to re-discover from scratch.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and
