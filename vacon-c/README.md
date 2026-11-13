@@ -581,6 +581,23 @@ every call. Both caches are tested for invalidation, not just values,
 and mutation-verified. Full suite genuinely faster end to end as a
 result, not just by test count.
 
+## Every hero landmark gets a real operator (seventy-sixth standing rule)
+See `CLAUDE.md`'s own seventy-sixth standing rule for the full
+account. Closes the broader gap the prison-staff round named and left
+open — museums, libraries, mosques, synagogues, skyscrapers, and the
+rest. Government-type landmarks get the same real operator prisons
+already use; religious landmarks (church/mosque/synagogue/temple)
+reuse the community's own real religious order and now carry a real
+title — priest, imam, rabbi, or "religious leader" — while the
+underlying occupation stays `preacher`; everything else with a real
+staff slot gets a freshly founded business. A real bug was caught
+before landing: a community with more than one religious landmark let
+the second silently overwrite the first's title on the shared order —
+fixed with a claim guard, mutation-verified. A real pre-existing
+interaction was found, not caused: a commercial landmark can already
+be claimed by the city's own school/hospital/library institutions or
+a faction, which this round's pass correctly leaves alone.
+
 ## Bluffing and its exposure
 See `CLAUDE.md`'s own fifty-second standing rule for the full design.
 `server/bluff.js` models the gap between what `weapons

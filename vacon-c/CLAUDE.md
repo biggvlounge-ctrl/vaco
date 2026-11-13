@@ -4613,6 +4613,68 @@ measurably faster end to end (roughly 266s this run against roughly
 357s the round before, same machine, not a controlled benchmark but
 consistent with the fix doing real work).
 
+**A seventy-sixth, and it closes the broader gap the forty-sixth
+standing rule's prison fix named and deliberately left open: "every
+OTHER hero landmark category... still has exactly the same missing
+operator link."** Asked directly, by name, for museums, libraries,
+cathedrals, mosques, synagogues, rabbis, imams, priests, gyms,
+skyscrapers -- "everything incorporated with all of that." Runs AFTER
+the civilization seat is chosen, deliberately: the seat picks "the
+first property with no operator yet," and wiring more landmarks before
+that check would change which property becomes the seat on worlds that
+already generate one today. Three real shapes, one per landmark
+category of staff, read from `landmarks.KEY_BUILDING_TYPES` itself
+rather than a second, hand-copied list.
+
+**Government-propertyType landmarks** (university, hospital, library,
+school, government-building) get the same real operator prisons
+already use. **Religious landmarks** (church/mosque/synagogue/temple)
+reuse the community's own real religious order if one was founded
+(`religiousOrdersPerCommunity`) and now carry a real, reported title
+matching the specific building -- priest, imam, rabbi, or "religious
+leader" for a temple -- while the underlying EMPLOYABLE occupation
+stays `preacher` throughout, the same single-grain discipline
+`athlete`/`entertainer` already hold (a title does not need its own
+tier/skill/employer set to be real). **Everything else with a real
+staff slot** (skyscraper, airport, train-station, art-museum, theater-
+concert-hall, zoo-aquarium, stadium-arena) gets a real, freshly founded
+business organization, the identical shape this file's own ordinary
+business generation already uses -- `leader_id` left null on purpose,
+since giving every organization in this engine a real founding leader
+at generation is its own real, separate, future round.
+
+**A real bug caught before landing, not after.** A community with MORE
+than one real religious landmark (the random hero-landmark draw does
+not cap how many a community can get -- measured directly: a seed
+produced one community with a temple, a synagogue, AND a church all
+sharing one order) let the second and third landmarks silently
+overwrite the first's title on the one shared organization, since the
+original wiring had no guard against re-claiming an order that had
+already claimed a different building. One real organization cannot
+coherently be both "the synagogue" and "the mosque." Fixed with a
+claim guard keyed on whether the order already carries a
+`religiousTitle` -- first real landmark wins, a second, DIFFERENT one
+in the same community is left honestly unoperated rather than wired
+under the wrong title. Mutation-verified: disabling the guard broke
+exactly the test written to prove it.
+
+**A real, pre-existing interaction found along the way, not caused by
+this round, and not fought with.** A commercial-ranked hero landmark
+can already be claimed by the `CITY_INSTITUTIONS` housing pass
+(school/hospital/library) or by a real faction, both of which run
+earlier in the same per-city pass and grab "the first free, ranked-
+commercial-first property" with no regard for landmark category --
+measured directly: a real skyscraper ended up operated by a city's own
+library institution on one seed, which is a legitimate real outcome
+(a library occupying space in a commercial tower), not a bug. This
+round's own pass only creates a fresh business for whatever is STILL
+unoperated by the time it runs; the tests check for any of these real
+outcomes rather than asserting away mechanisms this round does not
+own.
+
+6 new tests. Full suite: 2245 tests, 2228 pass, 0 fail, 0 cancelled,
+17 skipped.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and
