@@ -212,6 +212,28 @@ test('technology traits change how fast a city falls apart', () => {
     > infrastructure.effectiveMaintenance(v, row));
 });
 
+test('technicalSkillIn is cached per tick, not recomputed on every call -- a mid-tick in-place trait write is not visible until the tick advances', () => {
+  const w = bareWorld({ communities: [{ id: 1, city_id: 7 }], cities: [{ id: 7 }] });
+  const id = personIn(w, 'technology', 100, { communityId: 1 });
+  const first = infrastructure.technicalSkillIn(w, 7);
+  assert.ok(first > 90, `expected the real engineer reading, got ${first}`);
+
+  // Simulate what trait drift does: an in-place write to current_value
+  // on the SAME entityTraits rows, no push, no splice -- the exact
+  // mutation shape this cache's own header says it does not need to
+  // invalidate on, because it is keyed on the tick, not on the array.
+  for (const row of w.entityTraits) {
+    if (row.entity_id === id) row.current_value = 0;
+  }
+
+  const stillSameTick = infrastructure.technicalSkillIn(w, 7);
+  assert.equal(stillSameTick, first, 'the cached value must survive an in-place trait write within the same tick');
+
+  w.tick += 1;
+  const afterTickAdvance = infrastructure.technicalSkillIn(w, 7);
+  assert.ok(afterTickAdvance < first, `expected the mutated-to-0 value to show up once the tick advanced, got ${afterTickAdvance} vs ${first}`);
+});
+
 test('a city with nobody in it is maintained exactly as recorded', () => {
   const w = bareWorld({ communities: [], cities: [{ id: 7 }] });
   assert.equal(infrastructure.technicalSkillIn(w, 7), 50);

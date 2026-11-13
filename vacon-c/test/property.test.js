@@ -257,6 +257,23 @@ test('two acquisitions in one tick resolve to the one recorded later', () => {
   assert.equal(property.getCurrentOwner(world, home.id).owner_entity_id, 8);
 });
 
+test('the current-owner index invalidates on a new real acquisition, never serving a stale cached owner', () => {
+  const world = freshWorld();
+  const home = property.generateProperty(world, { type: 'residential', value: 100 });
+
+  property.recordOwnership(world, {
+    entityId: home.id, ownerEntityId: 7, ownerType: 'individual', tick: 0,
+  });
+  // Populate the cache with the first owner, same as any real caller.
+  assert.equal(property.getCurrentOwner(world, home.id).owner_entity_id, 7);
+
+  property.recordOwnership(world, {
+    entityId: home.id, ownerEntityId: 9, ownerType: 'individual', tick: 1,
+  });
+  assert.equal(property.getCurrentOwner(world, home.id).owner_entity_id, 9,
+    'a new real acquisition must invalidate the cached index, never read back the old owner');
+});
+
 test('an unowned property has no owner and an empty history', () => {
   const world = freshWorld();
   const home = property.generateProperty(world, { type: 'residential', value: 100 });

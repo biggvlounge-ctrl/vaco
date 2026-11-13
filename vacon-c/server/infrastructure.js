@@ -313,23 +313,60 @@ const TECHNICAL_SKILL_WEIGHT = 0.4;
 //
 // Null-safe and cheap: a city with nobody in it returns 50, which is
 // the neutral value and leaves maintenance exactly as recorded.
+//
+// **Cached per (worldState, cityId, tick) — found hot via `--cpu-prof`
+// during the entityTraits.js fix (the seventy-first standing rule's own
+// profile), 10% of samples.** `advanceInfrastructure` calls
+// `effectiveMaintenance` once per INFRASTRUCTURE ROW, and a city
+// ordinarily has several rows (water, power, schools, ...), so this
+// full NPC scan ran once per row per city per tick instead of once per
+// city per tick — the same shape of redundant-recompute the
+// `entityTraits.js` fix closed one layer down, found again one layer
+// up. A `WeakMap` keyed on `worldState` itself, never a field ON
+// `worldState`, so persistence/migrate/restore never see it — the
+// identical reasoning `entityTraits.js`'s own cache already gives.
+// Invalidated on the tick number changing, not on array identity or
+// length: trait drift runs as its own, separate tick phase, never
+// interleaved with the infrastructure pass that reads this, so the
+// value is genuinely stable for the whole of one tick and genuinely
+// stale the moment the tick advances — a correctness requirement this
+// function has that `entityTraits.js`'s own row-lookup cache does not,
+// because this caches a COMPUTED AGGREGATE (a mean), which an in-place
+// trait write changes without touching any array's length or identity.
+const technicalSkillCache = new WeakMap();
+
 function technicalSkillIn(worldState, cityId) {
+  const tick = worldState.tick ?? 0;
+  let perWorld = technicalSkillCache.get(worldState);
+  if (!perWorld) {
+    perWorld = new Map();
+    technicalSkillCache.set(worldState, perWorld);
+  }
+  const cached = perWorld.get(cityId);
+  if (cached && cached.tick === tick) return cached.value;
+
   const communities = new Set((worldState.communities || [])
     .filter((c) => c.city_id === cityId)
     .map((c) => c.id));
-  if (communities.size === 0) return 50;
 
-  const values = [];
-  for (const npc of worldState.npcs || []) {
-    if (!communities.has(npc.communityId)) continue;
-    const live = getLiveEntity(worldState, npc.id);
-    const tech = live?.traits?.technology;
-    if (!tech) continue;
-    const scores = Object.values(tech).map(Number).filter((v) => Number.isFinite(v));
-    if (scores.length > 0) values.push(scores.reduce((a, b) => a + b, 0) / scores.length);
+  let value;
+  if (communities.size === 0) {
+    value = 50;
+  } else {
+    const values = [];
+    for (const npc of worldState.npcs || []) {
+      if (!communities.has(npc.communityId)) continue;
+      const live = getLiveEntity(worldState, npc.id);
+      const tech = live?.traits?.technology;
+      if (!tech) continue;
+      const scores = Object.values(tech).map(Number).filter((v) => Number.isFinite(v));
+      if (scores.length > 0) values.push(scores.reduce((a, b) => a + b, 0) / scores.length);
+    }
+    value = values.length === 0 ? 50 : values.reduce((a, b) => a + b, 0) / values.length;
   }
-  if (values.length === 0) return 50;
-  return values.reduce((a, b) => a + b, 0) / values.length;
+
+  perWorld.set(cityId, { tick, value });
+  return value;
 }
 
 // What a piece of infrastructure is effectively maintained at: what is

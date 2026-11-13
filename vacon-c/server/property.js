@@ -318,16 +318,50 @@ function recordOwnership(worldState, options = {}) {
   return record;
 }
 
+// A per-worldState index of every property's own current owner, built
+// in one real pass over `ownershipRecords` instead of the O(records)
+// rescan `getCurrentOwner` used to do for every single call. Found hot
+// alongside `technicalSkillIn` during the entityTraits.js profile
+// (`economy.ownedPropertyValue`, which calls this once per property in
+// the whole world for a SINGLE entity's net worth, was 7% of samples) —
+// the same shape of redundant full-array rescan, one layer further
+// down the call stack. A `WeakMap` keyed on `worldState` itself, never
+// a field ON `worldState`, the identical reasoning `entityTraits.js`'s
+// own cache already gives. Invalidated on `ownershipRecords`' own
+// array identity or length changing — append-only everywhere in this
+// engine (the only writer is this file's own ownership-recording code,
+// confirmed via `grep -rn "ownershipRecords" server/*.js`: one real
+// `.push`, no splice or reassignment anywhere), so a length check alone
+// catches every real mutation, the same safe precondition
+// `entityTraits.js`'s row-lookup cache relies on. Unlike
+// `technicalSkillIn`'s cache, this one does NOT need tick-based
+// invalidation: an ownership record is a point-in-time fact that is
+// never edited in place once written, so there is no in-place mutation
+// this index could ever miss.
+const ownerIndexCache = new WeakMap();
+
+function getOwnerIndex(worldState) {
+  const records = rows(worldState, 'ownershipRecords');
+  const cached = ownerIndexCache.get(worldState);
+  if (cached && cached.arrayRef === records && cached.length === records.length) {
+    return cached.currentByPropertyId;
+  }
+  const currentByPropertyId = new Map();
+  for (const record of records) {
+    const current = currentByPropertyId.get(record.entity_id);
+    if (!current || record.acquired_tick >= current.acquired_tick) {
+      currentByPropertyId.set(record.entity_id, record);
+    }
+  }
+  ownerIndexCache.set(worldState, { arrayRef: records, length: records.length, currentByPropertyId });
+  return currentByPropertyId;
+}
+
 // The current owner is the most recent acquisition, which is what
 // append-only history means. Ties on tick resolve to the later row,
 // since two acquisitions in one tick happened in the order recorded.
 function getCurrentOwner(worldState, entityId) {
-  let current = null;
-  for (const record of rows(worldState, 'ownershipRecords')) {
-    if (record.entity_id !== entityId) continue;
-    if (!current || record.acquired_tick >= current.acquired_tick) current = record;
-  }
-  return current;
+  return getOwnerIndex(worldState).get(entityId) ?? null;
 }
 
 function getOwnershipHistory(worldState, entityId) {
