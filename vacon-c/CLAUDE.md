@@ -4144,6 +4144,76 @@ Full suite, this round's own final run: 2048 tests, 2024 pass, 0 fail,
 7 cancelled (the pre-existing `worldgen.test.js` hang and its
 downstream collateral timeouts, unrelated to this round), 17 skipped.
 
+**A sixty-seventh, covering two further `COUNTRY_PROFILES` rounds
+together -- forty-one more real countries, `countryPacks.js`'s own
+eighteenth and nineteenth rounds -- committed as one batch rather than
+two, since both landed in the same working session before either was
+pushed.** Same discipline throughout: real WebSearched figures only,
+confidence-flagged where secondary, honest `null` where nothing
+citable was found. `COUNTRY_PROFILES` now carries 79 real entries,
+up from the seventeenth round's 38.
+
+**Eighteenth round, twenty-three countries**: Belgium, Austria,
+Denmark, Finland, Romania, Bulgaria, Serbia, Croatia, Moldova,
+Belarus, Libya, Tunisia, New Zealand, Singapore, Uruguay, Paraguay,
+Bolivia, Jordan, Lebanon, Qatar, Kuwait, Bahrain, Oman. Three real,
+confirmed, fully-sourced oil/gas figures, not sparse placeholders:
+Kuwait's real 2024 production (5th-largest OPEC producer, 2.415M bpd
+in July, 2.44M bpd wellhead output in December), Oman's real
+full-year 2024 total from its own National Centre for Statistics
+(363.3M barrels produced, 308.4M barrels exported), and Libya's real,
+volatile 2024 picture kept as a range rather than smoothed into one
+number (~1.18M bpd in July, a real ~700,000 bpd drop in August's armed
+shutdown crisis, recovery above 1M bpd by October). Qatar's real LNG
+export leadership is reported as a status, not forced into a daily-
+barrels figure that would misrepresent a gas-exporting economy as an
+oil one. Libya is `localized-conflict` with a `governmentType` that
+states its real divided statehood directly (rival Tripoli/Tobruk
+governments); Moldova is `localized-conflict` for the real, frozen
+Transnistria dispute, the same treatment Morocco's Western Sahara
+entry already set a precedent for. Four regimeType/regimeScore splits,
+each for a different real reason: Belarus (`authoritarian-regime`,
+confirmed qualitatively via the EIU's own new "closed regime"
+category, but no exact score found), Uruguay (`full-democracy`,
+confirmed as "the only full democracy in South America," but the one
+score found was explicitly the 2023 citation and not reused), Paraguay
+and Bolivia (both `hybrid-regime`, confirmed via a real, named 2024
+EIU category list, but their only numeric scores carried no stated
+year). Jordan's `upper-middle-income` is the one upgrade this round
+actually confirmed against a primary-adjacent table (the World Bank's
+own FY2027 release names it directly as one of six economies that
+moved up that cycle), not carried over from general knowledge.
+
+**Nineteenth round, eighteen countries**: Switzerland, Iceland,
+Luxembourg, Malta, Cyprus, Botswana, Namibia, Malawi, Zambia,
+Zimbabwe, Rwanda, Burundi, Mongolia, Uzbekistan, Laos, Mali, Burkina
+Faso, Niger. Mali, Burkina Faso and Niger are `active-armed-conflict`
+on the clearest evidence in this whole file: all three are real,
+current military juntas that jointly withdrew from ECOWAS, and all
+three are named directly in the real 2025 Global Terrorism Index
+(covering 2024 data) among the world's most terrorism-affected
+countries -- the Sahel accounted for 51% of all global terrorism
+deaths that year, Burkina Faso ranked #1 in the world for the second
+year running (1,532 deaths), Mali recorded 604 deaths from 201
+attacks, and Niger's ranking climbed from 10th to 5th-worst. None of
+the three has a found EIU score; `governmentType` states the real
+junta/ECOWAS fact directly rather than describing a government
+structure that does not functionally exist right now. Cyprus is
+`localized-conflict` for the real, unresolved 1974 Green Line division
+-- the same treatment as Moldova's Transnistria and Morocco's Western
+Sahara. Zimbabwe's regimeType/regimeScore are deliberately `null`,
+the same wrong-year discipline the seventeenth round already applied
+to Uganda and Tanzania -- the only figure found is explicitly flagged
+as likely the 2023 edition under a February 2024 dateline. Namibia's
+`lower-middle-income` is confirmed directly as the one country whose
+classification moved DOWNWARD (from upper-middle) in the prior World
+Bank cycle, a real, notable direction against this file's own usual
+upward-mobility framing.
+
+Full suite, this round's own final run: 2051 tests, 2026 pass, 0 fail,
+8 cancelled (the pre-existing `worldgen.test.js` hang and its
+downstream collateral timeouts, unrelated to this round), 17 skipped.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

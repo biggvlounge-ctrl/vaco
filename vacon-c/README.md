@@ -430,6 +430,27 @@ of an invented production volume. North Korea's missing military
 figure is flagged with its real structural reason (SIPRI excludes it)
 rather than left as an unresearched-looking gap.
 
+## Forty-one more real countries (countryPacks.js's eighteenth and nineteenth rounds, sixty-seventh standing rule)
+See `CLAUDE.md`'s own sixty-seventh standing rule for the full
+account. Two rounds committed together: `COUNTRY_PROFILES` now
+carries 79 real entries, up from 38. **Eighteenth round (23
+countries)**: Belgium, Austria, Denmark, Finland, Romania, Bulgaria,
+Serbia, Croatia, Moldova, Belarus, Libya, Tunisia, New Zealand,
+Singapore, Uruguay, Paraguay, Bolivia, Jordan, Lebanon, Qatar, Kuwait,
+Bahrain, Oman — three real, confirmed 2024 energy figures (Kuwait,
+Oman, Libya's real volatility kept as a range), Qatar's real LNG
+status reported instead of a forced crude figure, and four real
+regimeType/regimeScore splits each for a different stated reason.
+**Nineteenth round (18 countries)**: Switzerland, Iceland, Luxembourg,
+Malta, Cyprus, Botswana, Namibia, Malawi, Zambia, Zimbabwe, Rwanda,
+Burundi, Mongolia, Uzbekistan, Laos, Mali, Burkina Faso, Niger — Mali/
+Burkina Faso/Niger at `active-armed-conflict` on the clearest evidence
+in this file (all three real, current military juntas named directly
+in the 2025 Global Terrorism Index among the world's most terrorism-
+affected countries), Cyprus at `localized-conflict` for the real 1974
+division, and Zimbabwe's regime figures honestly null for the same
+wrong-year reason Uganda/Tanzania's were in the seventeenth round.
+
 ## Bluffing and its exposure
 See `CLAUDE.md`'s own fifty-second standing rule for the full design.
 `server/bluff.js` models the gap between what `weapons

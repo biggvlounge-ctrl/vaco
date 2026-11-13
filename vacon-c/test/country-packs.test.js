@@ -564,12 +564,12 @@ test('Latin America is a real, classified region, and now has a real overview (f
 });
 
 test('regionalContextFor is honest about a key it has never classified at all', () => {
-  // `brazil` (ninth round), `peru` (fourteenth), then `ecuador`
-  // (fifteenth) each served as this example and then got a real
-  // COUNTRY_PROFILES entry and region classification of their own.
-  // `paraguay` is the still-genuinely-unclassified stand-in now, not
-  // a re-pick made to dodge the point.
-  const ctx = countryPacks.regionalContextFor('paraguay');
+  // `brazil` (ninth round), `peru` (fourteenth), `ecuador` (fifteenth),
+  // then `paraguay` (seventeenth) each served as this example and then
+  // got a real COUNTRY_PROFILES entry and region classification of
+  // their own. `panama` is the still-genuinely-unclassified stand-in
+  // now, not a re-pick made to dodge the point.
+  const ctx = countryPacks.regionalContextFor('panama');
   assert.equal(ctx.dedicatedEntry, null);
   assert.equal(ctx.profileEntry, null);
   assert.equal(ctx.standaloneEntry, null);
@@ -1228,7 +1228,10 @@ test('the seventeenth round adds fourteen more real countries plus Yemen, all re
     'united-arab-emirates', 'nepal', 'sri-lanka', 'kazakhstan', 'cambodia',
     'ecuador', 'angola', 'mozambique', 'yemen',
   ];
-  assert.equal(Object.keys(countryPacks.COUNTRY_PROFILES).length, 38, 'ten (14th round) + twelve (15th) + india (16th, global incarceration round) + fifteen (this, 17th)');
+  // Not rigidly 38: the eighteenth round added twenty-three more on
+  // top of this round's fifteen, and its own test asserts the real
+  // running total, so this one just checks the floor.
+  assert.ok(Object.keys(countryPacks.COUNTRY_PROFILES).length >= 38, 'at least the 14th/15th/16th/17th rounds\' ten + twelve + india + fifteen must still be present');
   for (const key of newKeys) {
     assert.equal(countryPacks.countryFor(key), null, `${key} must not also exist in COUNTRIES`);
     const entry = countryPacks.countryProfileFor(key);
@@ -1304,6 +1307,162 @@ test('regionalContextFor resolves every seventeenth-round country through the pr
     'north-korea': 'asia', taiwan: 'asia', 'united-arab-emirates': 'middle-east',
     nepal: 'asia', 'sri-lanka': 'asia', kazakhstan: 'asia', cambodia: 'asia',
     ecuador: 'latin-america', angola: 'africa', mozambique: 'africa',
+  };
+  for (const [key, region] of Object.entries(expectations)) {
+    const ctx = countryPacks.regionalContextFor(key);
+    assert.ok(ctx.profileEntry, `${key} should resolve through profileEntry`);
+    assert.equal(ctx.region, region, `${key} should classify as ${region}`);
+  }
+});
+
+// ---------------------------------------------------------------------
+// Eighteenth round: twenty-three more real countries
+// ---------------------------------------------------------------------
+
+test('the eighteenth round adds twenty-three more real countries, all resolvable and well-formed', () => {
+  const newKeys = [
+    'belgium', 'austria', 'denmark', 'finland', 'romania', 'bulgaria', 'serbia',
+    'croatia', 'moldova', 'belarus', 'libya', 'tunisia', 'new-zealand', 'singapore',
+    'uruguay', 'paraguay', 'bolivia', 'jordan', 'lebanon', 'qatar', 'kuwait', 'bahrain', 'oman',
+  ];
+  assert.equal(newKeys.length, 23);
+  // Not rigidly 61: the nineteenth round added eighteen more on top of
+  // this round's twenty-three, and its own test asserts the real
+  // running total, so this one just checks the floor.
+  assert.ok(Object.keys(countryPacks.COUNTRY_PROFILES).length >= 61, 'at least the 14th-18th rounds\' running total must still be present');
+  for (const key of newKeys) {
+    assert.equal(countryPacks.countryFor(key), null, `${key} must not also exist in COUNTRIES`);
+    const entry = countryPacks.countryProfileFor(key);
+    assert.ok(entry, `${key} should be a real COUNTRY_PROFILES entry`);
+    assert.ok(countryPacks.INCOME_LEVELS.includes(entry.incomeLevel), `${key}: incomeLevel must be real`);
+    assert.ok(countryPacks.CONFLICT_LEVELS.includes(entry.conflictLevel), `${key}: conflictLevel must be real`);
+    assert.ok(typeof entry.governmentType === 'string' && entry.governmentType.length > 0, `${key}: governmentType must be stated`);
+    assert.ok(entry.regimeType === null || countryPacks.REGIME_TYPES.includes(entry.regimeType), `${key}: regimeType must be null or a real published band`);
+    assert.ok('globalIndicators2026' in entry, `${key}: globalIndicators2026 must be present`);
+  }
+});
+
+test('Libya and Moldova carry real, non-default conflict/statehood classifications, not a forced no-active-conflict', () => {
+  const libya = countryPacks.countryProfileFor('libya');
+  assert.equal(libya.conflictLevel, 'localized-conflict');
+  assert.match(libya.governmentType, /divided|Tripoli|Tobruk/);
+
+  const moldova = countryPacks.countryProfileFor('moldova');
+  assert.equal(moldova.conflictLevel, 'localized-conflict');
+});
+
+test('Belarus, Uruguay, Paraguay and Bolivia each split regimeType (confirmed) from regimeScore (honestly null), for different real reasons', () => {
+  const belarus = countryPacks.countryProfileFor('belarus');
+  assert.equal(belarus.regimeType, 'authoritarian-regime');
+  assert.equal(belarus.regimeScore, null);
+
+  const uruguay = countryPacks.countryProfileFor('uruguay');
+  assert.equal(uruguay.regimeType, 'full-democracy');
+  assert.equal(uruguay.regimeScore, null);
+
+  for (const key of ['paraguay', 'bolivia']) {
+    const entry = countryPacks.countryProfileFor(key);
+    assert.equal(entry.regimeType, 'hybrid-regime', `${key} should be confirmed hybrid-regime`);
+    assert.equal(entry.regimeScore, null, `${key} should have a null score (no stated year)`);
+  }
+});
+
+test('Jordan is upper-middle-income on a real, dated World Bank FY2027 upgrade found this round, not carried over from general knowledge', () => {
+  assert.equal(countryPacks.countryProfileFor('jordan').incomeLevel, 'upper-middle-income');
+});
+
+test('Qatar, Kuwait and Oman each report a real, confirmed 2024 energy fact -- Qatar\'s as an LNG status, not a forced crude-barrels number', () => {
+  const qatar = countryPacks.countryProfileFor('qatar');
+  assert.equal(qatar.oilProducer.status, 'worlds-leading-lng-exporter-not-primarily-a-crude-producer');
+  assert.equal(qatar.oilProducer.dailyProductionBbl, null);
+
+  const kuwait = countryPacks.countryProfileFor('kuwait');
+  assert.equal(kuwait.oilProducer.year, 2024);
+  assert.ok(kuwait.oilProducer.dailyProductionBblJuly > 0);
+
+  const oman = countryPacks.countryProfileFor('oman');
+  assert.equal(oman.oilProducer.year, 2024);
+  assert.ok(oman.oilProducer.annualProductionBbl2024 > 0);
+});
+
+test('Libya\'s oilProducer entry reports its real 2024 volatility as a range, not one smoothed-over number', () => {
+  const libya = countryPacks.countryProfileFor('libya');
+  assert.ok(libya.oilProducer.dailyProductionBblJuly > libya.oilProducer.dailyProductionBblOctoberRecovery
+    || libya.oilProducer.dailyProductionBblJuly !== libya.oilProducer.dailyProductionBblOctoberRecovery);
+});
+
+test('regionalContextFor resolves every eighteenth-round country through the profileEntry tier with a real region', () => {
+  const expectations = {
+    belgium: 'europe', austria: 'europe', denmark: 'europe', finland: 'europe',
+    romania: 'europe', bulgaria: 'europe', serbia: 'europe', croatia: 'europe',
+    moldova: 'europe', belarus: 'europe', libya: 'africa', tunisia: 'africa',
+    'new-zealand': 'oceania', singapore: 'asia', uruguay: 'latin-america',
+    paraguay: 'latin-america', bolivia: 'latin-america', jordan: 'middle-east',
+    lebanon: 'middle-east', qatar: 'middle-east', kuwait: 'middle-east',
+    bahrain: 'middle-east', oman: 'middle-east',
+  };
+  for (const [key, region] of Object.entries(expectations)) {
+    const ctx = countryPacks.regionalContextFor(key);
+    assert.ok(ctx.profileEntry, `${key} should resolve through profileEntry`);
+    assert.equal(ctx.region, region, `${key} should classify as ${region}`);
+  }
+});
+
+// ---------------------------------------------------------------------
+// Nineteenth round: eighteen more real countries
+// ---------------------------------------------------------------------
+
+test('the nineteenth round adds eighteen more real countries, all resolvable and well-formed', () => {
+  const newKeys = [
+    'switzerland', 'iceland', 'luxembourg', 'malta', 'cyprus', 'botswana',
+    'namibia', 'malawi', 'zambia', 'zimbabwe', 'rwanda', 'burundi', 'mongolia',
+    'uzbekistan', 'laos', 'mali', 'burkina-faso', 'niger',
+  ];
+  assert.equal(newKeys.length, 18);
+  assert.equal(Object.keys(countryPacks.COUNTRY_PROFILES).length, 79, '14th(10)+15th(12)+16th(india,1)+17th(15)+18th(23)+19th(18)');
+  for (const key of newKeys) {
+    assert.equal(countryPacks.countryFor(key), null, `${key} must not also exist in COUNTRIES`);
+    const entry = countryPacks.countryProfileFor(key);
+    assert.ok(entry, `${key} should be a real COUNTRY_PROFILES entry`);
+    assert.ok(countryPacks.INCOME_LEVELS.includes(entry.incomeLevel), `${key}: incomeLevel must be real`);
+    assert.ok(countryPacks.CONFLICT_LEVELS.includes(entry.conflictLevel), `${key}: conflictLevel must be real`);
+    assert.ok(typeof entry.governmentType === 'string' && entry.governmentType.length > 0, `${key}: governmentType must be stated`);
+    assert.ok(entry.regimeType === null || countryPacks.REGIME_TYPES.includes(entry.regimeType), `${key}: regimeType must be null or a real published band`);
+    assert.ok('globalIndicators2026' in entry, `${key}: globalIndicators2026 must be present`);
+  }
+});
+
+test('Mali, Burkina Faso and Niger are all active-armed-conflict with a real, stated junta/ECOWAS-withdrawal governmentType, and no EIU score forced onto any of them', () => {
+  for (const key of ['mali', 'burkina-faso', 'niger']) {
+    const entry = countryPacks.countryProfileFor(key);
+    assert.equal(entry.conflictLevel, 'active-armed-conflict', `${key} should be active-armed-conflict`);
+    assert.match(entry.governmentType, /junta|ECOWAS/, `${key}: governmentType should state the real junta/ECOWAS fact`);
+    assert.equal(entry.regimeType, null, `${key}: no EIU score was found, so regimeType stays null`);
+  }
+});
+
+test('Cyprus is localized-conflict for the real, frozen 1974 division, same treatment as Morocco\'s Western Sahara and Moldova\'s Transnistria', () => {
+  assert.equal(countryPacks.countryProfileFor('cyprus').conflictLevel, 'localized-conflict');
+});
+
+test('Zimbabwe honestly nulls its regimeType/regimeScore rather than reuse a likely-wrong-year figure, same discipline as Uganda/Tanzania in the seventeenth round', () => {
+  const zimbabwe = countryPacks.countryProfileFor('zimbabwe');
+  assert.equal(zimbabwe.regimeType, null);
+  assert.equal(zimbabwe.regimeScore, null);
+});
+
+test('Namibia, Zambia and Uzbekistan each carry an incomeLevel confirmed against a real, dated World Bank list found this round', () => {
+  assert.equal(countryPacks.countryProfileFor('namibia').incomeLevel, 'lower-middle-income');
+  assert.equal(countryPacks.countryProfileFor('zambia').incomeLevel, 'lower-middle-income');
+  assert.equal(countryPacks.countryProfileFor('uzbekistan').incomeLevel, 'lower-middle-income');
+});
+
+test('regionalContextFor resolves every nineteenth-round country through the profileEntry tier with a real region', () => {
+  const expectations = {
+    switzerland: 'europe', iceland: 'europe', luxembourg: 'europe', malta: 'europe', cyprus: 'europe',
+    botswana: 'africa', namibia: 'africa', malawi: 'africa', zambia: 'africa', zimbabwe: 'africa',
+    rwanda: 'africa', burundi: 'africa', mali: 'africa', 'burkina-faso': 'africa', niger: 'africa',
+    mongolia: 'asia', uzbekistan: 'asia', laos: 'asia',
   };
   for (const [key, region] of Object.entries(expectations)) {
     const ctx = countryPacks.regionalContextFor(key);
