@@ -147,6 +147,16 @@ curl http://localhost:8792/api/franchise-list/1
   ownership shape as creating the hunt itself), `POST .../mystery/team`,
   `GET .../mystery/status`, `GET .../mystery/known-facts/:userId`, and
   `POST .../mystery/accusation`.
+
+  **Correction, checked directly against `server.js` rather than
+  trusted from this entry's own count (13 Nov 2026): this lists six
+  routes, not five.** `solution`, `mystery-clue`, `team`, `status`,
+  `known-facts`, and `accusation` are six distinct routes
+  (`grep -c` over `server.js`'s own mystery-prefixed routes confirms
+  it); the original count simply miscounted its own list. All six are
+  real and covered by `test/mysteryHunt.test.js`, unaffected by this
+  correction. Left in place rather than deleted, per this repo's own
+  rule that a correction is appended, never a silent rewrite.
 - `public/index.html` — the Mystery Hunts backend above had no
   frontend surface at all until a new **Mystery** tab, added
   30 Oct 2026 right after it. Loads a hunt by id, shows its real
@@ -261,8 +271,47 @@ curl http://localhost:8792/api/franchise-list/1
   anywhere in this ecosystem yet, and §18's own text ("network size
   alone must NOT automatically guarantee revenue") is itself a warning
   against synthesizing a number with no real source.
+- `lib/training.js` — Business Owner Training ("Hunts Academy"),
+  undocumented here until this correction even though the module,
+  its six routes (`GET /api/training/courses`,
+  `GET /api/training/courses/:courseId`, `POST /api/training/enroll`,
+  `POST /api/training/complete`, `GET /api/training/progress/:businessId`,
+  `GET /api/training/recommended/:businessId`) and a full **Training**
+  frontend tab ("Hunts Academy") were already real and tested
+  (`test/training.test.js`). A real catalog of
+  five courses (self-paced online, in-app, live virtual, recorded
+  virtual, and one named in-person-city session) teaching this app's
+  own real mechanics — every number quoted in a course's summary is
+  interpolated directly from `digitalTwin.js`'s and `participation.js`'s
+  real constants (`LEVEL_2_LOCATION_THRESHOLD`, `LEVEL_3_LOCATION_THRESHOLD`,
+  `REFERENCE_FEE_FOR_FULL_SHARE`), never retyped, so a future threshold
+  change can't leave a course teaching a stale figure silently.
+  `getRecommendedCourses` computes real, state-based recommendations
+  (below Digital Twin Level 2, past Level 2 but not yet streaming-
+  unlocked, or no participation registered yet) rather than a static
+  "take everything" list.
 - `server.js` — a real Express API (CommonJS) wrapping all fourteen
   modules.
+
+**Correction, checked directly against the real code rather than
+trusted from this file's own prior count (13 Nov 2026): "fourteen
+modules" was always an undercount, and `lib/training.js` above was
+missing from this list entirely.** `server.js` actually `require`s
+sixteen business-logic modules under `lib/` (plus the auth/infra
+`.cjs` files and `storeBackend.js`/`seedDemoData.js`, which this
+section has never counted as "modules" in this sense) —
+`revenueStack`, `participation`, `drea`, `adPricing`, `digitalTwin`,
+`neighborProgram`, `cvnvoPlacement`, `hunts`, `mysteryHunt`,
+`explore`, `adReview`, `screenAnalytics`, `training`,
+`networkConnections`, `revenueShareAgreements`, and `networkAnalytics`
+— sixteen, not fourteen. `lib/training.js` was added in commit
+`d53bbdb` (a commit whose own message was about the VENVS Marketplace
+backend, not training) and was never given its own bullet above or
+counted in this tally until now. Confirmed by `grep -c "require('./lib"
+server.js` and a direct read of `lib/training.js`; `test/training.test.js`
+already passes and is unaffected. Left in place rather than deleted,
+per this repo's own rule that a correction is appended, never a silent
+rewrite.
 
 ## Verified
 102 plain-Node checks across all eleven modules (including a 20-check
