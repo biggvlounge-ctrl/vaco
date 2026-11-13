@@ -55,3 +55,12 @@ confirmed by both isolated middleware tests and a live end-to-end
 pass, and the README's own "Not yet built" list no longer names this
 gap (replaced by the narrower, honestly-scoped identity-matching
 follow-up).
+
+## Filename correction (13 Nov 2026 reconciliation pass)
+Every `shieldAuth.js` reference above (and in `tasks.md`) names a file
+that was never actually `.js`: the real module has always been
+`lib/shieldAuth.cjs` once it existed — `server.js`'s own `require`
+line confirms it, and `serviceAuth`/`shieldAuth` are synced as `.cjs`
+ecosystem-wide, deliberately, per `../../sync-shared-runtime.sh`'s own
+header. Left the body text as written rather than rewriting history;
+flagged here instead.

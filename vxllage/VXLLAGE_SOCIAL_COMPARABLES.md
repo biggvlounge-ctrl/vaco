@@ -51,3 +51,14 @@ users rather than at some later scale.
 Feed, threads, villages, profiles, follows, search, avatar cosmetics
 with real purchases settling through V3, and a VDP village district.
 19 modules, 64 routes, persisted.
+
+**Correction (13 Nov 2026 reconciliation pass): the module/route count
+is stale.** `lib/` now holds 24 real modules and `server.js` now
+mounts 70 routes, not 19/64 — `communities.js` (Community/thread
+support) and the Phase 9 persistence set landed after this count was
+written, and 64 was itself already a dated snapshot (see README.md's
+own "Frontend coverage pass (30 Oct 2026)" note, which used the same
+figure for the same reason). The qualitative claim — a genuinely built
+feed/threads/villages/profiles/follows/search/cosmetics/VDP-district
+stack, not a mock — still holds; only the totals were never updated
+after later phases shipped.

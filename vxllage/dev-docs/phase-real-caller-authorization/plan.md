@@ -24,3 +24,17 @@ session, claiming `boosterId: "carol"`, was rejected 403 — the exact
 gap this file's own header described, now closed. Confirmed
 `requireSession()`'s own pre-existing behavior (401 with no token at
 all) is unchanged.
+
+## Superseded (13 Nov 2026 reconciliation pass)
+`requireOwnAccount(bodyField)` does not exist in the real
+`lib/shieldAuth.cjs` today (checked its exports directly). This
+plan's narrow fix — scoped to just `boostVillage`/`purchaseCosmetic`
+— was superseded by a broader pass: every mutating route now sits
+behind either `requireActor(field)` or one of four ownership-lookup
+guards (`requireVillageMember`, `requireVillageOwner`,
+`requireArticleAuthor`, `requireSourceSurfaceOwner`) defined directly
+in `server.js`, not a new `shieldAuth` export. See README.md's "Real
+per-route identity matching..." section (1 Nov 2026) and the repo
+root's `dev-docs/AUTH_HARDENING.md` §4 for the fix that actually
+shipped. The underlying impersonation gap this plan identified real
+and is closed — just not by the mechanism described above.

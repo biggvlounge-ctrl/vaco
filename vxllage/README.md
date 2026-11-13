@@ -67,10 +67,13 @@ deep first; Villages/Live/Call are deliberately built lighter and
 later, not deleted or ignored.
 
 ## Run
-Three processes — the shared V3 ledger, Vavlt Stvdios (needed for real
-paywalled-article access checks), and this service:
+Four processes — the real V3 ledger, the real Shield session service
+(this app's own `.env.example` points `V3_API_URL`/`SHIELD_API_URL` at
+these, not at `venvs-mock-backend`'s combined stand-in), Vavlt Stvdios
+(needed for real paywalled-article access checks), and this service:
 ```
-cd ../venvs-mock-backend && npm install && npm start   # localhost:8791
+cd ../v3 && npm install && npm start                     # localhost:8811
+cd ../shield && npm install && npm start                 # localhost:8812
 cd ../vavlt-stvdios && npm install && npm start          # localhost:8808
 cd vxllage && npm install && npm start                   # localhost:8796
 ```
@@ -210,7 +213,7 @@ curl -X POST http://localhost:8796/api/villages/1/boost -H "Content-Type: applic
   same proactive fix already made once live this session for HVNTZ/
   Vavlt Stvdios' `authorId` — caught here during this build's own test
   pass, before it ever shipped.
-- `lib/shieldAuth.js` — **real Shield session auth (Phase 3)**, closing
+- `lib/shieldAuth.cjs` — **real Shield session auth (Phase 3)**, closing
   this project's own previously-flagged gap: "should trust Shell's
   unified session... not yet wired." `requireSession()` is a real
   Express middleware — every one of this app's 31 mutating routes now
@@ -472,3 +475,33 @@ against real spawned Shield + this server: created a community and a
 thread, linked a post to it as the thread's own author (201), and
 confirmed a different signed-in user attempting the same link gets a
 real 403.
+
+## Doc reconciliation pass (13 Nov 2026)
+
+Checked this file's own concrete claims against the real current code
+rather than assuming earlier writing stayed accurate:
+
+- **`lib/shieldAuth.js` was never a real filename here.** The module
+  is, and has always been, `lib/shieldAuth.cjs` (`server.js`'s own
+  `require('./lib/shieldAuth.cjs')` line) — `serviceAuth`/`shieldAuth`
+  are synced as `.cjs` ecosystem-wide, deliberately, per
+  `../sync-shared-runtime.sh`'s own header. Fixed above and in the
+  bullet; `VXLLAGE_CLAUDE.md` and this app's own `dev-docs/` carried
+  the same stale spelling and are corrected too.
+- **The "Run" section pointed at the wrong ledger/session stand-in.**
+  It told the reader to boot `venvs-mock-backend` on :8791 — a
+  combined V3+Shield mock built early, before this ecosystem had
+  standalone `v3`/`shield` apps. This app's own `.env.example` has for
+  some time defaulted `V3_API_URL` to `http://localhost:8811` and
+  `SHIELD_API_URL` to `http://localhost:8812` — the real `../v3/` and
+  `../shield/` services, not the mock. Following the old instructions
+  literally left both clients pointed at ports nothing was listening
+  on. Fixed above to boot the real services this app actually talks
+  to by default.
+- **The module/route counts quoted in this project's other `.md`
+  files were stale, not this file's own.** This file lists each
+  `lib/*.js`/`*.cjs` module by name above and never stated a running
+  total, so nothing here needed correcting on that count — see
+  `VXLLAGE_CLAUDE.md` and `VXLLAGE_SOCIAL_COMPARABLES.md` for the
+  actual stale "nineteen modules"/"64 routes" claims and their
+  corrections.

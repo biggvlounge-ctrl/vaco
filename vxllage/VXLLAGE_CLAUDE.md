@@ -251,7 +251,7 @@ app.
 | 1 | Produce the missing Replit-deployable zip | **Superseded** — Docker Compose + nginx replaced the Replit path ecosystem-wide |
 | 2 | Backend + real posting | **Closed** — `posts.js`, `feed.js` |
 | 3 | VCoin/VASH reconciliation with V3 as canonical ledger | **Closed** — `v3Client.js`; no per-app ledger remains |
-| 4 | Auth trusting Shell's unified session | **Closed** — `shieldAuth.js` |
+| 4 | Auth trusting Shell's unified session | **Closed** — `shieldAuth.cjs` |
 | 5 | Real audio/video for Live/Calls | **Still open** — no WebRTC or media infrastructure anywhere |
 | 6 | Real search | **Closed** — `vxllageSearch.js` |
 | 7 | Split the single file into modules | **Closed** — nineteen modules |
@@ -282,3 +282,25 @@ secondary registers) is a good description of the product and worth
 keeping. The frontend details — Tailwind, lucide-react, single tab
 state, localStorage persistence — describe a prototype that does not
 live in this repo; VXLLAGE's visible surface is VDP's district.
+
+---
+
+## Doc correction (13 Nov 2026 reconciliation pass)
+
+Two concrete numbers above were checked against the real code and no
+longer hold:
+
+- **"Nineteen backend modules" is stale.** `lib/` now holds 24 real
+  modules (21 `.js` plus `shieldAuth.cjs`/`mediaClient.cjs`/
+  `tracing.cjs`), not 19 — `communities.js` (Community/thread support,
+  1 Nov 2026) and the Phase 9 persistence set
+  (`persistence.js`/`persistencePg.js`/`store.js`/`storeBackend.js`)
+  landed after this count was written. The architectural point this
+  section makes — Home/X's core is four modules, Villages another
+  four, neither dominates — still holds; only the total was never
+  updated.
+- **`shieldAuth.js` in the table above is also a stale spelling.**
+  The real file has always been `lib/shieldAuth.cjs` once it existed
+  (`serviceAuth`/`shieldAuth` are synced as `.cjs` ecosystem-wide,
+  per `../sync-shared-runtime.sh`'s own header) — fixed in the table
+  row itself since it is a plain filename, not a reversed claim.

@@ -83,6 +83,19 @@ publishing, newsletter-style delivery, and the cross-publication
 recommendation system — everything else deliberately reuses existing
 infrastructure rather than duplicating it.
 
+**Correction — the "Podcasts" line above was false (recorded here 13
+Nov 2026 reconciliation pass, originally found during the VXLLAGE
+build itself).** `lib/vavltStvdiosClient.js`'s own header already
+flags this: "the full ecosystem status audit found zero real Pods
+code anywhere" at the time this architecture doc's claim was checked,
+so VXLLAGE never actually relied on it. That gap has since been
+closed for real, separately: `vulture-pods/` ("Vvltvre Pods") is now a
+real, built division — its own README names this exact line as "one
+already-debunked false claim" and builds the real thing instead of
+assuming it existed. Not VXLLAGE's own gap to close (this app never
+needed podcasts), but this doc's own claim was wrong when written and
+is corrected here rather than left standing.
+
 ## Information architecture — one primary surface, distinct secondary experiences, fluent connections
 
 A real, explicit principle worth locking in for how all of VXLLAGE's

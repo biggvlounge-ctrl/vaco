@@ -28,3 +28,8 @@ Real per-route identity matching (session `userId` vs. each route's
 own acting-user body field) remains a real, separate, more careful
 follow-up -- not attempted here, flagged directly in both the README
 and `lib/shieldAuth.js`'s own header.
+
+## Filename correction (13 Nov 2026 reconciliation pass)
+Every `shieldAuth.js` above is a stale spelling -- the real module has
+always been `lib/shieldAuth.cjs`. See `plan.md`'s own correction note
+for the detail; not rewriting the checklist itself.
