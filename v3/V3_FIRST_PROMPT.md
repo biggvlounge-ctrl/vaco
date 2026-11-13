@@ -107,6 +107,25 @@ through.** The real fix is a trusted-service allowlist so only known
 internal callers may skip the check — that is a genuine remaining gap,
 recorded rather than claimed as solved.
 
+**Correction, 13 Nov 2026 — doc-vs-code reconciliation.** The gap
+above is closed, and `optionalOwnAccount` itself is gone, not just
+superseded. Checked directly against `lib/shieldAuth.cjs` and
+`server.js`: `optionalOwnAccount` now throws at call time ("has been
+removed... Use requireActor(field) instead"), and every money-moving
+route in `server.js` is mounted behind `actorOrService(requireActor(...))`
+— a verified Shield session matching the named actor field, **or**
+a verified internal service credential — never neither. The trusted-
+service allowlist this paragraph called "a genuine remaining gap" is
+`lib/serviceAuth.cjs`, which exists, is mounted app-wide in
+`server.js`, and whose own header says its default is now `enforce`
+(unauthenticated mutating calls rejected 401), with the earlier
+`observe` migration mode kept only as a deliberate debugging
+step-backward. So the honest status is now the inverse of what this
+section says: **a caller with no token and no service credential is
+rejected**, closing exactly the curl-based wallet-drain this file's own
+`server.js` comment (above the `serviceAuth` mount) still shows as a
+historical example of what *used* to work.
+
 **2. Real persistence — done, but not Postgres.** `lib/persistence.js`
 implements a recursive-Proxy-backed store that debounce-flushes to
 `data/store.json` on every mutation and flushes synchronously on
@@ -121,6 +140,27 @@ writes are adjacent, but that is a property of the current
 implementation, not a guarantee. **Postgres remains genuinely
 unstarted and genuinely worth doing** — it is the single highest-value
 item still open on V3.
+
+**Correction, 13 Nov 2026 — doc-vs-code reconciliation.** Postgres is
+built, not unstarted. `lib/ledgerPg.js`, `lib/persistencePg.js`, and
+`lib/idempotencyPg.js` all exist and are real, and `server.js`/
+`lib/ledger.js`/`lib/storeBackend.js` wire them in behind one check —
+`DATABASE_URL` set means rows, unset means the same JSON document as
+before, and every route calls `ledger.transfer(...)`/`ledger.cashout(...)`
+without branching on which backend it got. The atomicity this
+paragraph flagged as missing is real on the Postgres path: `transfer`,
+`cashout`, and `settle` in `lib/ledgerPg.js` each run inside one SQL
+transaction (`BEGIN` ... `COMMIT`, with `ROLLBACK` on error), so the
+two-sequential-statements crash window described above does not exist
+when `DATABASE_URL` is set. What is still true: the in-memory/JSON
+path remains the default with no transactional guarantee of its own
+(by design — see `lib/ledger.js`'s own header on why the file path
+stays), so a deployment that never sets `DATABASE_URL` keeps exactly
+the risk this paragraph describes. "Highest-value item still open" is
+the part that no longer holds; Postgres is a real, selectable backend
+today, confirmed with `npm test` passing both the in-memory suite and
+the Postgres-backed suite (which skips rather than fails without a
+reachable database).
 
 **3. Idempotency — built since this was written, corrected here rather
 than left stale.** `lib/idempotency.js` (in-memory) and
@@ -182,3 +222,18 @@ definition of done for the architecture that actually exists:
 5. Second user's data isolated → **passes** for token-bearing callers,
    via `optionalOwnAccount`. Not enforced for tokenless
    server-to-server callers, per task 1 above.
+
+**Correction, 13 Nov 2026 — doc-vs-code reconciliation.** Points 4 and
+5 are stale for the same reasons given above. Point 4: cashout's
+atomicity is real whenever `DATABASE_URL` is set — `lib/ledgerPg.js`'s
+`cashout` runs inside one `BEGIN`/`COMMIT` transaction, not two
+sequential statements. "Blocked on Postgres" no longer applies;
+Postgres exists. Point 5: `optionalOwnAccount` has been deleted (it
+throws if called), and tokenless server-to-server callers are now
+checked too, just against a different credential — `lib/serviceAuth.cjs`,
+defaulting to `enforce`, requires a matching `X-Service-Name`/
+`X-Service-Token` pair for any mutating caller with no Shield session.
+Second-user isolation now passes for both kinds of legitimate caller
+(a session-bearing user acting on their own account, or a named
+internal service), and rejects the third kind (neither) that this
+point originally described as passing through.

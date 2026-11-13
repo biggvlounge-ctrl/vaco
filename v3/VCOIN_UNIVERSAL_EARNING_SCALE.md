@@ -113,5 +113,21 @@ that Postgres would provide (task 2). Building the earning scale
 before those exist would mean building a third money route with the
 same two known defects. Sequence accordingly.
 
-**Not started, not blocked** — this is genuinely buildable work, just
-work that is cheaper and safer after Postgres and idempotency land.
+**Correction, 13 Nov 2026 — doc-vs-code reconciliation.** Both of
+those blockers have since landed — checked directly, not assumed from
+this document's own earlier claim. `lib/idempotency.js`/
+`lib/idempotencyPg.js` exist and wrap every current money-moving route
+via `server.js`'s `idempotentFor(...)`, and `lib/ledgerPg.js` provides
+real transactional atomicity (`BEGIN`/`COMMIT` around `transfer`/
+`cashout`/`settle`) whenever `DATABASE_URL` is set. A new earning
+route built today would inherit both for free by routing through
+`ledger.transfer(...)` the same way every existing route does — it
+would not need to invent either. The sequencing advice no longer
+applies; what is still true, and still the real reason this is
+unbuilt, is everything above this paragraph: no earning engine, no
+rate table, no cap logic, and eighteen-plus apps each deciding their
+own transfer amounts independently.
+
+**Not started, not blocked** — this is genuinely buildable work. The
+"cheaper and safer after Postgres and idempotency land" framing is
+now moot since both have landed; the work is simply not started.

@@ -100,6 +100,19 @@ files and `.env.example`) across all 15 real callers: `voken`,
 by setting the env var explicitly (e.g. back at the mock, or a future
 V3 deployment) — only the *default* changed.
 
+**Correction, 13 Nov 2026 — doc-vs-code reconciliation.** "All 15 real
+callers" undercounts the current ecosystem; it was accurate for the
+cutover performed at the time but seven more real callers exist now,
+all already defaulting to this service's `8811` (grep-confirmed, not
+assumed from the lower count carrying forward): `dreams`, `vex`,
+`vulture-studios`, `vaco-assistant` (two call sites, `lib/explore.js`
+and `lib/personalAssistant.js`), `vaco-passport`, `vaco-shell`
+(`lib/v3Client.js`), and `vash-tap`. None of these needed a cutover of
+their own — each was built after this section was written and already
+points at the real service by default, never at the mock — so this is
+a documentation gap, not an unfinished cutover. The real current count
+of apps reading `V3_API_URL`/`VITE_V3_API_URL` is at least 22, not 15.
+
 **Re-verified against the new default, not an override**: VAGO started
 with no `V3_API_URL` set at all — a real casino session
 (`POST /api/casino/sessions`, `stakeAmount: 50`) placed a real stake
@@ -114,6 +127,39 @@ the transaction ledger now survive a restart. Live-verified: moved
 real VCoin between two users, killed the running process, restarted
 it, and confirmed both real balances came back unchanged from a real
 GET. See `dev-docs/phase-3-real-persistence/`.
+
+## Added coverage (13 Nov 2026) — real features this README never documented
+Found during a doc-vs-code reconciliation pass: three real, already-
+shipped pieces of V3 had no mention anywhere in this file. Documenting
+them here, not building anything new.
+
+- **Optional Postgres-backed ledger.** Set `DATABASE_URL` and V3's
+  routes run against real rows instead of `data/store.json` —
+  `lib/ledgerPg.js`, `lib/idempotencyPg.js`, and `lib/persistencePg.js`
+  implement the same contract as the in-memory/JSON path
+  (`lib/ledger.js` builds whichever one a given deployment is
+  configured for, and every route calls the same `ledger.*` methods
+  either way). `transfer`, `cashout`, and `settle` each run inside one
+  SQL transaction on this path, which is real transactional atomicity
+  the JSON path cannot offer. Unset, nothing changes — same JSON file,
+  same guarantees as before. `GET /api/health`'s `ledger` field
+  reports which one a running instance is actually on (`"rows"` or
+  `"document"`).
+- **Caller authorization, enforced by default.** Every money-moving
+  route requires either a verified Shield session matching the acting
+  user (`lib/shieldAuth.cjs`'s `requireActor`) or a verified internal
+  service credential (`lib/serviceAuth.cjs`, `X-Service-Name`/
+  `X-Service-Token`) — never neither (`actorOrService(...)` in
+  `server.js`). `serviceAuth` defaults to `enforce`; an unauthenticated
+  mutating call is rejected 401. `GET /api/health`'s `serviceAuth`
+  field reports the live mode.
+- **Idempotency on every money-moving route.** An `Idempotency-Key`
+  header or `idempotencyKey` body field makes a retried
+  `POST /api/vcoin/transfer` (and every other mutating route wrapped
+  in `idempotentFor(...)` in `server.js`) replay the first response
+  instead of re-executing. See `V3_FIRST_PROMPT.md`'s task-3 section
+  for the fuller writeup; recorded here too since this README never
+  mentioned it at all.
 
 ## Frontend coverage pass (31 Oct 2026)
 An audit found `public/index.html` making real calls against only 6 of

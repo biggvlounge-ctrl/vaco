@@ -50,6 +50,20 @@ converting VCoin to VASH at a fixed rate. There is no account, no
 IBAN, no card, no payment rail, no external money movement of any
 kind. VASH balances are numbers in a JSON file.
 
+**Correction, 13 Nov 2026 — doc-vs-code reconciliation.** The line
+count and storage claims are both stale, checked directly against the
+current file. `v3/lib/vash.js` is 82 lines now, not 47 — the growth is
+a real tamper-evident integrity hash attached to every cashout
+transaction (`hashPayload` from `lib/cryptoAgility.js`), not a feature
+this document's "single operation" framing missed; `cashout` is still
+the only mutating operation, with `getVashBalance` the one read. The
+bigger correction: VASH balances are not always "numbers in a JSON
+file" anymore. With `DATABASE_URL` set, V3 runs on `lib/ledgerPg.js`
+and balances are rows in Postgres instead; see `V3_FIRST_PROMPT.md`'s
+task-2 correction. Everything else in this paragraph — no account, no
+IBAN, no card, no payment rail, no external money movement — remains
+true on both backends.
+
 That is not a criticism; it is the honest scale of the gap between
 this document and the code. Everything the BaaS section describes —
 multi-currency accounts, card issuance, real-time rails — is the
