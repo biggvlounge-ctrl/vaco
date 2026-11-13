@@ -169,6 +169,13 @@
 //   destination, not a US ancestry source). None of the six is wired
 //   into `generateRegion` -- there is no `countryKey` to attach any of
 //   them to.
+//   **Superseded for four of these six by the thirteenth round,
+//   below** -- Venezuela, Cuba, Colombia and the Dominican Republic
+//   each got a real ancestryPacks.GROUPS key and a real `COUNTRIES`
+//   entry once a real Census code was actually found for each (two
+//   different real tables, not one -- see that round's own comment).
+//   Canada's reasoning above still holds as stated; Africa is not a
+//   single country and was never in scope for this gate either way.
 // - **`AFRICA_MIGRATION_OVERVIEW_2026` explicitly declares its own
 //   scope rather than faking continent-wide coverage.** Africa has 54
 //   countries; this reports the handful of real, large-scale current
@@ -218,6 +225,11 @@
 // - `YEMEN_CONFLICT_2026`: standalone, same reason as Iran/Spain/
 //   Venezuela/Cuba/Colombia/the Dominican Republic above -- no
 //   "yemeni" ancestryPacks.GROUPS key exists.
+//   **Re-checked directly in the thirteenth round below, not just
+//   assumed still true**: B04006's own Arab breakdown is a closed,
+//   confirmed list (Egyptian, Iraqi, Jordanian, Lebanese, Moroccan,
+//   Palestinian, Syrian, Arab, Other Arab) with no separate Yemeni
+//   row, so this stays correct -- a real finding, not a shortcut.
 // - `PUERTO_RICO_2026`, `CAPE_VERDE_2026`, `VIRGIN_ISLANDS_2026`,
 //   `CARIBBEAN_CRUISE_TOURISM_2026`: standalone. **Explicitly bounded,
 //   not literally every Caribbean island** -- roughly 13 sovereign
@@ -474,6 +486,14 @@
 //   code the way that addition did -- a separate piece of real
 //   research this round's tooling could not do with confidence, not a
 //   shortcut worth taking to look more global.
+//   **Revisited in the thirteenth round, below.** The gap named here
+//   was confidence, not a checked absence -- re-run directly, Egypt
+//   has a real code (B04006_007E, "Arab: Egyptian") and now has both
+//   the ancestryPacks.GROUPS entry and the COUNTRIES entry this round
+//   declined. Saudi Arabia does not -- B04006's own Arab breakdown has
+//   no Saudi Arabian row -- and stays declined, the same real finding
+//   as before, just independently confirmed rather than assumed. Spain
+//   was not re-checked this round and remains open.
 //
 // Same report-only posture as every other field here: nothing in
 // `server/` reads `globalIndicators2026` to decide an outcome.
@@ -1612,9 +1632,9 @@ const COUNTRIES = {
       currentStatus: 'stalled talks as of Oct 2026 despite a June 2026 US-Iran memorandum of understanding; the US says it is enforcing a naval blockade on Iranian shipping; Iran claims control of the Strait of Hormuz and continued attacks on shipping there (a maritime monitor counted at least 10 vessels attacked in the week before one report)',
       plannedEscalation: 'Israeli and US sources say joint strikes on Iran are planned to resume, likely after the 3 Nov 2026 US midterm elections',
       note: 'distinct from Israel\'s separate, longer-running Gaza war -- both are real and ongoing as of this round. '
-        + 'Iran itself has no entry in this table: no "iranian" ancestryPacks.GROUPS entry exists yet, the same '
-        + 'structural gap this israeli entry itself closed for Israel -- adding one would need the same '
-        + 'ancestry-expansion work, not just a countryPacks.js line.',
+        + 'Iran now has its own entry below (the "iranian" ancestryPacks.GROUPS gap this note used to '
+        + 'describe is closed -- B04006_048E is a real, confirmed code) -- see `iranian.warStatusRef` there '
+        + 'rather than this note, which is kept for the history.',
       // The real "lands in between" effect this war reaches through:
       // global oil prices, not a direct conflict. No source this round
       // named a specific UAE/Dubai/India effect -- that gap is stated,
@@ -1650,6 +1670,162 @@ const COUNTRIES = {
       confidence: 'durable-structural-fact-coalition-composition-can-shift',
     },
   },
+
+  // -----------------------------------------------------------------
+  // Thirteenth round: Iran, Venezuela, Cuba, Colombia and the
+  // Dominican Republic -- the five of seven countries this round's
+  // ancestry-code check actually found a real code for. See
+  // `ancestryPacks.GROUPS`'s own header and `world-layer/imports/
+  // ancestryImport.js`'s for the full source-by-source finding,
+  // including Canada and Yemen (which real codes exist for and were
+  // checked, but which stay unblocked -- Canada by `countryPacks.js`'s
+  // own prior decision above, Yemen because B04006 has no distinct
+  // Yemeni row at all).
+  // -----------------------------------------------------------------
+  iranian: {
+    country: 'Iran', incomeLevel: 'upper-middle-income', conflictLevel: 'active-armed-conflict',
+    // Islamic Republic: an elected president and parliament sit below
+    // an unelected Supreme Leader who holds final authority over the
+    // military, judiciary and broadcast media -- a real, distinct
+    // government form, not a generic "republic".
+    governmentType: 'Islamic republic (Supreme Leader holds authority above the elected president)',
+    regimeType: 'authoritarian-regime', regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: {
+      status: 'exporter',
+      dailyProductionBbl: { opecCrudeOnly2025: 3261000, eiaCrudePlusCondensate2025: 4190000 },
+      note: 'OPEC counts crude only, EIA includes condensate -- the two bases are not comparable, not reconciled '
+        + 'into one number. Relies on China as effectively its only crude buyer: Kpler puts 2025 deliveries to '
+        + 'China at ~1.38M bbl/day, down ~7% versus 2024.',
+      confidence: 'secondary-estimate',
+    },
+    globalIndicators2026: { homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null },
+    // The real war is already told in full on `israeli.warStatus` --
+    // standing rule 3: this does not duplicate that object, it points
+    // to it.
+    warStatusRef: 'see israeli.warStatus for the real, dated Israel-Iran war narrative this entry shares',
+    source: 'world-bank-income-classification-fy2026; eiu-democracy-index-2024-regional-summary; opec-2025; eia-2025; kpler-via-spglobal-2025',
+    confidence: 'income-classification-and-oil-figures-sourced-regime-score-and-military-spend-pct-gdp-not-found-this-round',
+  },
+  venezuelan: {
+    country: 'Venezuela', incomeLevel: 'lower-middle-income',
+    // World Bank moved Venezuela from "unclassified" (no reliable GNI
+    // data since FY21) to lower-middle-income for FY27 -- the
+    // classification itself is new information, not a guess.
+    conflictLevel: 'high-nonstate-violence',
+    governmentType: 'federal presidential republic',
+    regimeType: 'authoritarian-regime', regimeScore: null,
+    militaryExpenditurePctGDP: { value: 5.2, year: 2019, confidence: 'secondary-estimate', note: 'CIA World Factbook figure, dated 2019 -- no more recent %GDP figure found' },
+    oilProducer: {
+      status: 'exporter', dailyProductionBbl: 1120000, year: 'late 2025',
+      note: 'holds the world\'s largest proven oil reserves (OPEC), but sanctions-driven swings are large and '
+        + 'sources disagree sharply across 2025: ship-tracking/PDVSA-sourced reporting gives exports as low as '
+        + '~498,000 bpd (Dec 2025) and as high as ~1.25M bpd (May 2026) -- not reconciled into one figure.',
+      confidence: 'secondary-estimate-high-volatility',
+    },
+    // `VENEZUELA_SITUATION_2026` already tells the real political-
+    // crisis story (Maduro's capture, the US-run transition) in full;
+    // this entry's own fields are the structural facts that story sits
+    // on top of, not a second copy of it.
+    globalIndicators2026: { homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null },
+    situationRef: 'see VENEZUELA_SITUATION_2026 for the real, dated political-crisis narrative',
+    source: 'world-bank-country-and-lending-groups-fy27; eiu-democracy-index-2024-regional-summary; cia-world-factbook; reuters-via-boereport-2026; spglobal-2025',
+    confidence: 'income-reclassification-and-eiu-regime-category-confirmed-exact-regime-score-and-current-pctgdp-not-found-this-round',
+  },
+  cuban: {
+    country: 'Cuba', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict',
+    // The Communist Party of Cuba is constitutionally the country's
+    // only legal party -- a real, structural fact, not a
+    // characterisation.
+    governmentType: 'one-party socialist republic',
+    regimeType: 'authoritarian-regime', regimeScore: null,
+    militaryExpenditurePctGDP: null,
+    oilProducer: null,
+    // `CUBA_CRISIS_2026` already tells the real, current electricity-
+    // grid crisis in full; not duplicated here.
+    globalIndicators2026: { homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null },
+    crisisRef: 'see CUBA_CRISIS_2026 for the real, dated electricity-grid-crisis narrative',
+    source: 'world-bank-country-and-lending-groups-fy26; eiu-democracy-index-2024-regional-summary',
+    confidence: 'income-classification-and-eiu-regime-category-confirmed-exact-regime-score-military-spend-and-oil-not-found-this-round',
+  },
+  colombian: {
+    country: 'Colombia', incomeLevel: 'upper-middle-income',
+    // Same real UCDP-adjacent category Mexico already carries in this
+    // table: ELN/Gulf Clan/FARC-dissident violence documented on
+    // `COLOMBIA_CRIME_2026` below is non-state, not a UCDP state-based
+    // conflict, though Colombia has carried a state-based conflict
+    // designation in other years -- not independently re-checked this
+    // round, so this is the conservative, already-established category.
+    conflictLevel: 'high-nonstate-violence',
+    governmentType: 'unitary presidential republic',
+    regimeType: 'flawed-democracy', regimeScore: 6.35,
+    militaryExpenditurePctGDP: { value: 2.9, year: 2023, confidence: 'secondary-estimate' },
+    oilProducer: {
+      status: 'exporter', dailyProductionBbl: 760000, year: 2024,
+      note: 'sources range 747,000-773,000 bpd for 2024 (Rystad Energy vs. BP Statistical Review) -- not '
+        + 'reconciled into one figure. Ecopetrol is the national producer; oil is Colombia\'s largest single '
+        + 'export category.',
+      confidence: 'secondary-estimate',
+    },
+    // `COLOMBIA_CRIME_2026` already tells the real, current
+    // crime/armed-group/political story in full; not duplicated here.
+    // Colombia's homicide rate IS a real, found figure -- already on
+    // `COLOMBIA_CRIME_2026.homicideRate2025` with real sources
+    // disagreeing (25.8/23.08/open-data-count). Not duplicated into a
+    // second `globalIndicators2026` figure here; that object stays
+    // null and points there, same `crimeRef` pattern as the rest of
+    // this entry.
+    globalIndicators2026: { homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null },
+    crimeRef: 'see COLOMBIA_CRIME_2026 for the real, dated crime and armed-group narrative',
+    source: 'world-bank-country-and-lending-groups; eiu-democracy-index-2024; cia-world-factbook-2023; rystad-energy-2024; bp-statistical-review-2024',
+    confidence: 'regime-score-and-oil-production-both-directly-sourced-military-spend-pct-gdp-is-a-third-party-estimate',
+  },
+  dominican: {
+    country: 'Dominican Republic', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'unitary presidential republic',
+    regimeType: 'flawed-democracy', regimeScore: 6.62,
+    militaryExpenditurePctGDP: {
+      value: 0.6, year: 2023, confidence: 'secondary-estimate',
+      note: 'a second source (World Bank/SIPRI data via a third-party compilation) gives 0.8% for 2024 instead -- both reported, not reconciled',
+    },
+    oilProducer: null,
+    // `DOMINICAN_REPUBLIC_2026` already tells the real, current
+    // Haitian-migration-enforcement story in full; not duplicated here.
+    globalIndicators2026: { homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null },
+    migrationRef: 'see DOMINICAN_REPUBLIC_2026 for the real, dated Haitian-migration-enforcement narrative',
+    source: 'world-bank-country-and-lending-groups; eiu-democracy-index-2024; cia-world-factbook-2023; statisticsoftheworld-2024',
+    confidence: 'regime-score-directly-sourced-military-spend-pct-gdp-disagrees-across-two-secondary-sources',
+  },
+  // Egypt: declined last round for lack of confidence doing this exact
+  // check, not because no code exists -- see the comment near this
+  // module's Egypt/Saudi-Arabia decline above. Added now that the
+  // check has a real answer (B04006_007E).
+  egyptian: {
+    country: 'Egypt', incomeLevel: 'lower-middle-income',
+    // The Sinai insurgency (ISIL-Sinai Province), real and long-
+    // running since 2011, but reclassified "low impact" in the Global
+    // Terrorism Index published March 2026 after years of declining
+    // activity -- persistent and localized, not nationwide, which is
+    // UCDP's own distinction between "localized" and "active-armed".
+    conflictLevel: 'localized-conflict',
+    governmentType: 'presidential republic',
+    regimeType: 'authoritarian-regime', regimeScore: null,
+    militaryExpenditurePctGDP: { value: 0.67, year: 2024, confidence: 'secondary-estimate', note: 'down from 0.81% in 2023, per SIPRI data reported via a third party; among the lowest ratios of any Arab state in 2025 per the same source' },
+    // A real, non-obvious finding, not a simple "exporter" label: Egypt
+    // still produces oil and gas domestically but reversed from gas
+    // EXPORTER to net LNG IMPORTER by mid-2024 as the offshore Zohr
+    // field's output fell roughly 30% from 2021-2024 -- the honest
+    // current state, not the older "Egypt is a gas exporter" fact.
+    oilProducer: {
+      status: 'domestic-producer-net-gas-importer',
+      dailyProductionBbl: { total2024: 569000, crudeOnly2024: 476000, note: 'sources disagree by basis (total liquids vs. crude alone); crude-only figure is the lowest since the late 1970s' },
+      gasNote: 'local gas output fell to a roughly eight-year low in 2024 and Egypt returned to net LNG imports by mid-2024; the government has said it hopes to return to net gas exports around 2027',
+      confidence: 'secondary-estimate',
+    },
+    globalIndicators2026: { homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null },
+    source: 'world-bank-country-and-lending-groups-fy2026; ahram-online-2026-gti; sipri-via-theglobaleconomy-2024; enterpriseam-mees-2025; spglobal-2025',
+    confidence: 'income-classification-and-oil-gas-reversal-well-sourced-exact-eiu-regime-score-not-found-this-round',
+  },
 };
 
 // Real, bloc-wide 2025/2026 EU asylum figures (Eurostat) -- "all of
@@ -1671,7 +1847,8 @@ const EU_MIGRATION_OVERVIEW_2025 = {
     { country: 'Spain', value: 3590 }, { country: 'Germany', value: 3075 },
   ],
   note: 'Spain is a real top-4 EU migration destination with no dedicated countryPacks.js entry -- no "spanish" '
-    + 'ancestryPacks.GROUPS key exists yet, the same structural gap noted on the israeli/Iran entry above',
+    + 'ancestryPacks.GROUPS key exists yet, the same structural gap the israeli/Iran entries once named before '
+    + 'the thirteenth round\'s ancestry-code check closed Iran\'s',
   methodologyCaveat: 'from July 2026 Eurostat uses an amended methodology under the EU Pact on Migration and Asylum; figures spanning that boundary are not directly comparable',
   source: 'eurostat-asylum-applications-monthly-and-annual-statistics',
   confidence: 'official-eurostat',

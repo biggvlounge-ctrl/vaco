@@ -55,9 +55,15 @@ const SOC_GROUP_BY_OCCUPATION = {
   // major group 11 as `manager`/`logistician`/`diplomat`.
   manager: '11', logistician: '11', diplomat: '11', politician: '11',
   trader: '13', financier: '13',
-  engineer: '17', architect: '17', plumber: '17', electrician: '17',
+  // `programmer` is SOC major group 15 (Computer and Mathematical
+  // Occupations) — real BLS group, previously mapped to by nothing.
+  programmer: '15',
+  engineer: '17', architect: '17',
   scientist: '19', researcher: '19', polymath: '19', agronomist: '19', linguist: '19',
   preacher: '21',
+  // `lawyer` is SOC 23-1011 "Lawyers", major group 23 (Legal) — real
+  // BLS group, previously mapped to by nothing.
+  lawyer: '23',
   teacher: '25', librarian: '25',
   // `entertainer` (SOC 27-2000 "Entertainers and Performers, Sports
   // and Media") and `influencer` (closest real BLS category is the
@@ -69,8 +75,25 @@ const SOC_GROUP_BY_OCCUPATION = {
   orderly: '31',
   officer: '33', enforcer: '33',
   cook: '35',
+  // `custodian` is major group 37 (Building and Grounds Cleaning and
+  // Maintenance) — real BLS group, previously mapped to by nothing.
+  custodian: '37',
+  // `stylist` is major group 39 (Personal Care and Service) — real BLS
+  // group, previously mapped to by nothing.
+  stylist: '39',
+  // `salesperson` is major group 41 (Sales and Related) — real BLS
+  // group, previously mapped to by nothing.
+  salesperson: '41',
+  // `clerk` is major group 43 (Office and Administrative Support) —
+  // real BLS group, previously mapped to by nothing.
+  clerk: '43',
   farmer: '45', fisher: '45', hunter: '45',
-  labourer: '47', carpenter: '47',
+  // `plumber` (47-2152 "Plumbers, Pipefitters, and Steamfitters") and
+  // `electrician` (47-2111 "Electricians") are both real BLS major
+  // group 47 (Construction and Extraction) — they were miscoded here
+  // as 17 (Architecture and Engineering) alongside `engineer`/
+  // `architect`, which are a different real major group.
+  labourer: '47', carpenter: '47', plumber: '47', electrician: '47',
   mechanic: '49',
   tailor: '51', preserver: '51',
   navigator: '53',

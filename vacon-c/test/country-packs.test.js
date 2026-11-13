@@ -352,12 +352,18 @@ test('Russia and Ukraine share the same current war-status object, flagged as fa
   assert.ok(russia.warStatus.confidence.includes('staleness'));
 });
 
-test('Israel carries the real, distinct Israel-Iran war, and explicitly notes Iran has no entry here', () => {
+test('Israel carries the real, distinct Israel-Iran war, and Iran now has its own entry', () => {
   const israel = countryPacks.countryFor('israeli');
   assert.equal(israel.warStatus.name, 'israel-iran-war');
   assert.equal(israel.warStatus.startDate, '2026-02-28');
-  assert.ok(israel.warStatus.note.includes('no "iranian"'),
-    'the real structural gap (no Iran entry without a new ancestry group) must be stated, not silently skipped');
+  // The structural gap this note used to state (no Iran entry without
+  // a new ancestry group) was closed this round — `iranian` is real
+  // now, so the note says that instead of the old, now-false claim.
+  assert.ok(israel.warStatus.note.includes('iranian'),
+    'the Iran cross-reference must still be named, even though the gap itself is closed');
+  const iran = countryPacks.countryFor('iranian');
+  assert.ok(iran, 'iranian should now be a real COUNTRIES entry');
+  assert.equal(iran.country, 'Iran');
   // conflictLevel was already active-armed-conflict before this round
   // (for the Gaza war) and must stay that way — this is a second real
   // reason for the same existing value, not a change to it.
@@ -853,4 +859,53 @@ test('this round did not add a conflict-event figure, an eating-conditions field
 test('occupations needed no new building this round -- enforcer/officer are already ungated by ethnicity or nationality', () => {
   const occupations = require('../server/occupations.js');
   assert.ok(occupations.OCCUPATIONS.enforcer, 'enforcer must already exist and be available to any NPC regardless of ancestry/nationality context');
+});
+
+// ---------------------------------------------------------------------
+// Thirteenth round: six of the seven countries this round's ancestry-
+// code check actually found a real code for (plus Egypt, revisited)
+// ---------------------------------------------------------------------
+
+test('iranian, venezuelan, cuban, colombian, dominican and egyptian are real COUNTRIES entries now', () => {
+  const added = {
+    iranian: 'Iran', venezuelan: 'Venezuela', cuban: 'Cuba',
+    colombian: 'Colombia', dominican: 'Dominican Republic', egyptian: 'Egypt',
+  };
+  for (const [key, country] of Object.entries(added)) {
+    const entry = countryPacks.countryFor(key);
+    assert.ok(entry, `${key} should be a real COUNTRIES entry`);
+    assert.equal(entry.country, country);
+    assert.ok(countryPacks.INCOME_LEVELS.includes(entry.incomeLevel), `${key}: incomeLevel must be real`);
+    assert.ok(countryPacks.CONFLICT_LEVELS.includes(entry.conflictLevel), `${key}: conflictLevel must be real`);
+    assert.ok(ancestryPacks.GROUPS.includes(key), `${key} must have a matching ancestryPacks.GROUPS entry`);
+  }
+});
+
+test('canadian and yemeni are real Census codes but were not added -- checked and declined for a stated reason, not skipped', () => {
+  // Neither is a `countryPacks.js` key -- Canada by this module's own
+  // prior "destination, not source" decision, Yemen because B04006
+  // has no distinct Yemeni row at all.
+  assert.equal(countryPacks.countryFor('canadian'), null);
+  assert.equal(countryPacks.countryFor('yemeni'), null);
+  assert.ok(!ancestryPacks.GROUPS.includes('canadian'), 'canadian was found real but deliberately not wired into ancestryPacks.GROUPS');
+  assert.ok(!ancestryPacks.GROUPS.includes('yemeni'), 'yemeni has no real B04006 row and stays out');
+});
+
+test('saudi arabian stays declined -- re-checked directly, not just assumed still true', () => {
+  assert.ok(!ancestryPacks.GROUPS.includes('saudi-arabian'));
+  assert.equal(countryPacks.countryFor('saudi-arabian'), null);
+});
+
+test('Egypt\'s oil/gas entry reports the real, non-obvious current state -- a net LNG importer, not a simple exporter label', () => {
+  const egypt = countryPacks.countryFor('egyptian');
+  assert.equal(egypt.oilProducer.status, 'domestic-producer-net-gas-importer');
+  assert.ok(egypt.oilProducer.dailyProductionBbl.total2024 > 0);
+});
+
+test('the six new entries all carry a present-but-null globalIndicators2026, same discipline as every other entry', () => {
+  for (const key of ['iranian', 'venezuelan', 'cuban', 'colombian', 'dominican', 'egyptian']) {
+    const entry = countryPacks.countryFor(key);
+    assert.ok('globalIndicators2026' in entry, `${key}: globalIndicators2026 must be present`);
+    assert.equal(entry.globalIndicators2026.homicideRatePer100k, null);
+  }
 });

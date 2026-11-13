@@ -23,7 +23,10 @@ const occupations = require('../server/occupations.js');
 const engine = require('../server/engine.js');
 const worldgen = require('../server/worldgen.js');
 
-const ALL_GROUPS = ['11', '13', '17', '19', '21', '25', '27', '29', '31', '33', '35', '45', '47', '49', '51', '53'];
+const ALL_GROUPS = [
+  '11', '13', '15', '17', '19', '21', '23', '25', '27', '29', '31', '33', '35',
+  '37', '39', '41', '43', '45', '47', '49', '51', '53',
+];
 
 // Every real SOC group this engine maps to, all paid the same real
 // wage — so a test does not need to know which occupation a seeded

@@ -240,12 +240,42 @@ everywhere else.
 event data (UCDP/ACLED) beyond the existing `conflictLevel` band, FAO
 Food Balance Sheets (eating conditions), IUCN Red List wildlife status
 and FAO livestock head-counts (animals), new `COUNTRIES` entries for
-Spain/Egypt/Saudi Arabia, and — declined outright, not deferred —
-Hofstede/World Values Survey cultural dimensions, whose licensing
-terms a prior research pass found unclean. Occupations needed no
-building at all: `occupations.js`'s `enforcer`/`officer` are already
-ungated by ethnicity or nationality, so this table's own occupation
-coverage was already global by construction.
+Spain/Egypt/Saudi Arabia (**Egypt was revisited and built in the
+thirteenth round below — see CLAUDE.md's sixtieth standing rule**),
+and — declined outright, not deferred — Hofstede/World Values Survey
+cultural dimensions, whose licensing terms a prior research pass found
+unclean. Occupations needed no building at all: `occupations.js`'s
+`enforcer`/`officer` are already ungated by ethnicity or nationality,
+so this table's own occupation coverage was already global by
+construction.
+
+## Global occupation/demographic completeness (thirteenth round)
+See `CLAUDE.md`'s own sixtieth standing rule for the full account.
+Four parts: (1) a real BLS SOC major-group audit found six groups
+with zero `occupations.js` entry mapped to them in `labourPacks.js` —
+`programmer`, `lawyer`, `custodian`, `stylist`, `salesperson`, `clerk`
+close SOC 15/23/37/39/41/43, and the same audit found `plumber`/
+`electrician` really are SOC 47 (Construction/Extraction), not 17
+(Architecture/Engineering) as both had been coded. (2) Six named
+countries' real ancestry-code status was checked directly: Iranian/
+Egyptian are real B04006 codes, confirmed against the Census API's
+own variable metadata (Egypt's own prior decline revisited and
+reversed on that basis); Venezuelan/Cuban/Colombian/Dominican are real
+codes too, in a different real table (B03001, Hispanic or Latino by
+Specific Origin) than the one this registry's existing Latin-American
+entries cite; Canadian is real but stays unwired for a reason that
+predates this check (a destination, not a US ancestry source); Yemeni
+and Saudi Arabian have no real code at all. Five new `COUNTRIES`
+entries plus Egypt's revisited one. (3) `server/nativityPacks.js`
+closes CLAUDE.md's own thirty-third standing rule's nativity/
+citizenship half — real Census ACS table B05001, a new `npc.nativity`
+field, the identical §9 firewall every demographic field here holds.
+(4) Measured a real world with all seven independently opt-in
+demographic packs supplied at once: every adult gets a full seven-
+field joint profile, every field that applies to any age is set for
+every resident, and the only "partial" profiles are children correctly
+missing the two fields ACS itself only measures for adults — working
+as designed, not a bug.
 
 ## Bluffing and its exposure
 See `CLAUDE.md`'s own fifty-second standing rule for the full design.

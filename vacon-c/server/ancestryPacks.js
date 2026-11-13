@@ -70,7 +70,31 @@ const GROUPS = [
   'arab', 'somali', 'bosnian', 'nigerian', 'ethiopian', 'ghanaian',
   'kenyan', 'subsaharan-african', 'west-indian', 'jamaican', 'haitian',
   'vietnamese', 'chinese', 'filipino', 'asian-indian', 'mexican',
-  'guatemalan', 'honduran', 'salvadoran', 'israeli', 'american', 'other',
+  'guatemalan', 'honduran', 'salvadoran', 'israeli',
+  // Added for `countryPacks.js`'s Venezuela/Cuba/Colombia/Dominican-
+  // Republic/Iran gap. `cuban`, `dominican`, `colombian` and
+  // `venezuelan` are real, specific detailed-origin categories
+  // Census publishes in table B03001 ("Hispanic or Latino Origin by
+  // Specific Origin") — the same real government source family
+  // `mexican`/`guatemalan`/`honduran`/`salvadoran` already draw their
+  // group names from, confirmed by direct variable lookup for
+  // `cuban` (B03001_006E). `iranian` is a real B04006 ("People
+  // Reporting Ancestry") code instead, confirmed the same way
+  // `israeli` was — variable B04006_048E, present across every ACS
+  // vintage checked from 2005 through 2024. See
+  // `world-layer/imports/ancestryImport.js`'s header for the full
+  // finding, including which of the seven countries this round
+  // considered have NO real code and stay out.
+  'cuban', 'dominican', 'colombian', 'venezuelan', 'iranian',
+  // `egyptian` is the real B04006 code for the Arab-group row this
+  // module's own prior round declined to add "this round too" for
+  // lack of confidence in the research, not for lack of a real code
+  // — B04006_007E, confirmed the same way `israeli`/`iranian` were.
+  // See `countryPacks.js`'s own comment near its Egypt/Saudi-Arabia
+  // decline for the full re-check; Saudi Arabian stays declined, no
+  // matching B04006 row exists for it.
+  'egyptian',
+  'american', 'other',
 ];
 
 //: `ancestryImport.js`'s own `UNSPECIFIED` — its own value, not a

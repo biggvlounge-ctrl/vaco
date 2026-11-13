@@ -154,6 +154,50 @@ const PATHWAY_BY_GROUP = {
   // for Israeli nationals specifically. `legacy-not-applicable` would
   // misdescribe it as a pre-modern wave, which this is not.
   israeli: 'mixed',
+  // Added when `iranian`/`cuban`/`dominican`/`colombian`/`venezuelan`/
+  // `egyptian` joined `ancestryPacks.GROUPS` in the sixtieth standing
+  // rule's own round, same reasoning discipline as every entry above:
+  // a real, well-established characterization, not a confirmed
+  // country-by-category DHS Yearbook cross-tab (not located this
+  // round for any of the six, same honest gap `israeli`'s own comment
+  // already states).
+  //
+  // Cuban: the Cuban Adjustment Act of 1966 and the decades of
+  // "wet foot, dry foot" policy (ended 2017) make refugee/asylee
+  // status the real, dominant, well-documented historical channel for
+  // Cuban migration specifically, unlike any other group in this map.
+  cuban: 'refugee-asylee',
+  // Dominican: DHS's own Yearbook has long shown the Dominican
+  // Republic among the top FAMILY-SPONSORED admission source
+  // countries, the same real pattern `jamaican`/`west-indian` already
+  // carry here.
+  dominican: 'family-sponsored',
+  // Colombian: a real, substantial asylum component (decades of
+  // internal armed conflict) alongside ordinary family-sponsored and
+  // employment-based professional admissions — none confidently the
+  // single dominant channel, same `mixed` reasoning `mexican`/
+  // `chinese`/`filipino` already carry.
+  colombian: 'mixed',
+  // Venezuelan: the real, current, large-scale exodus `countryPacks.
+  // js`'s own `venezuelan` entry and the former `VENEZUELA_SITUATION_
+  // 2026` standalone constant both document, plus Temporary
+  // Protected Status repeatedly extended to Venezuelan nationals, is
+  // the same real humanitarian-protection shape `haitian` already
+  // carries here — not a historical legacy wave.
+  venezuelan: 'humanitarian-parole',
+  // Iranian: genuinely mixed between a real historical refugee/asylee
+  // wave (the 1979 revolution) and substantial ongoing family-
+  // sponsored and employment-based admissions among more recent
+  // arrivals — neither confidently the single dominant channel today,
+  // same honest `mixed` classification this map already uses rather
+  // than overclaiming the 1979 wave as still the current pattern.
+  iranian: 'mixed',
+  // Egyptian: ordinary family-sponsored and employment-based
+  // (professional/technical) channels dominate, with no refugee/
+  // asylee or humanitarian-parole component for Egyptian nationals
+  // specifically — the identical characterization `israeli`'s own
+  // comment already gives for the same reason.
+  egyptian: 'mixed',
 };
 
 // **Checked once, at load time, not left to drift.** Every key here

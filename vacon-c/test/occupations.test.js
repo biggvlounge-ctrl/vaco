@@ -438,3 +438,41 @@ test('a worldState is optional and its absence changes nothing', () => {
     occupations.drawOccupation({ npc, worldState: null, organizationType: 'business', seed: 'none' }),
   );
 });
+
+// ---------------------------------------------------------------------
+// The BLS SOC major-group gap, closed
+// ---------------------------------------------------------------------
+// Six real SOC major groups — 15, 23, 37, 39, 41, 43 — had no
+// occupation mapped to them at all in `labourPacks.js`, so a real
+// labour pack reporting real employment and wage figures in those
+// groups had nobody here to draw into them. One occupation per group,
+// named by `labourPacks.SOC_GROUP_BY_OCCUPATION` rather than invented
+// loose from this file.
+
+const labourPacks = require('../server/labourPacks.js');
+
+test('the six previously-unmapped SOC major groups each have exactly one real occupation now', () => {
+  const closedGroup = { programmer: '15', lawyer: '23', custodian: '37', stylist: '39', salesperson: '41', clerk: '43' };
+  for (const [name, group] of Object.entries(closedGroup)) {
+    assert.ok(occupations.OCCUPATIONS[name], `${name} should be a real occupation`);
+    assert.equal(labourPacks.SOC_GROUP_BY_OCCUPATION[name], group, `${name} should map to SOC group ${group}`);
+  }
+});
+
+test('plumber and electrician sit in SOC 47 (Construction/Extraction), not 17 (Architecture/Engineering)', () => {
+  // 47-2152 "Plumbers, Pipefitters, and Steamfitters" and 47-2111
+  // "Electricians" are both real BLS codes under major group 47 — they
+  // were miscoded as 17 alongside `engineer`/`architect` before this.
+  assert.equal(labourPacks.SOC_GROUP_BY_OCCUPATION.plumber, '47');
+  assert.equal(labourPacks.SOC_GROUP_BY_OCCUPATION.electrician, '47');
+});
+
+test('every new occupation can actually be drawn at a real employer of it', () => {
+  const byEmployer = {
+    programmer: 'business', lawyer: 'government', custodian: 'school',
+    stylist: 'club', salesperson: 'business', clerk: 'business',
+  };
+  for (const [name, orgType] of Object.entries(byEmployer)) {
+    assert.ok(occupations.occupationsFor(orgType).includes(name), `${name} should be drawable at a ${orgType}`);
+  }
+});

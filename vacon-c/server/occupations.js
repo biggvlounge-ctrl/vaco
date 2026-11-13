@@ -43,6 +43,14 @@
 // them is the point — "we checked, and this one is not in the document"
 // is exactly the knowledge that evaporates.
 //
+// **A fourth source, added after a real BLS SOC major-group audit of
+// `labourPacks.js`'s own `SOC_GROUP_BY_OCCUPATION`**: six of the
+// twenty-two real major groups had zero occupation mapped to them —
+// `programmer`, `lawyer`, `custodian`, `stylist`, `salesperson`,
+// `clerk`, each named by its own real SOC group rather than a §25
+// subject or an `organizations.type`. See that block's own comment,
+// near the end of `OCCUPATIONS`, for the full reasoning.
+//
 // ---------------------------------------------------------------------
 // It attaches to a skill, because the skills family was already there
 // ---------------------------------------------------------------------
@@ -317,6 +325,44 @@ const OCCUPATIONS = {
   politician: {
     tier: 5, skill: 'Leadership', source: 'organizations.type government',
     employers: ['government'],
+  },
+
+  // ---- outside §25 and outside this file's other two sources -----------
+  //: A fourth, real source: the U.S. Bureau of Labor Statistics' own SOC
+  //: major-group classification, the same one `labourPacks.js`'s
+  //: `SOC_GROUP_BY_OCCUPATION` already maps every occupation above onto.
+  //: Six of the twenty-two real major groups had zero occupation mapped
+  //: to them — 15 (Computer and Mathematical), 23 (Legal), 37 (Building
+  //: and Grounds Cleaning and Maintenance), 39 (Personal Care and
+  //: Service), 41 (Sales and Related), 43 (Office and Administrative
+  //: Support) — which means a real labour pack reporting real employment
+  //: share and wage in those groups had nobody in this engine to draw
+  //: into them. One occupation each, same grain as the rest of this
+  //: file, naming the real SOC major group rather than a §25 subject or
+  //: an `organizations.type` that does not exist for it.
+  programmer: {
+    tier: 4, skill: 'Technology', source: 'BLS SOC 15 (Computer and Mathematical)',
+    employers: ['business', 'corporation', 'research', 'government'],
+  },
+  lawyer: {
+    tier: 5, skill: 'Communication', source: 'BLS SOC 23 (Legal)',
+    employers: ['government', 'business', 'corporation'],
+  },
+  custodian: {
+    tier: 1, skill: 'Construction', source: 'BLS SOC 37 (Building/Grounds Maintenance)',
+    employers: ['business', 'government', 'school', 'hospital', 'corporation'],
+  },
+  stylist: {
+    tier: 2, skill: 'Crafting', source: 'BLS SOC 39 (Personal Care/Service)',
+    employers: ['business', 'club'],
+  },
+  salesperson: {
+    tier: 2, skill: 'Business', source: 'BLS SOC 41 (Sales and Related)',
+    employers: ['business', 'corporation'],
+  },
+  clerk: {
+    tier: 2, skill: 'Management', source: 'BLS SOC 43 (Office/Administrative Support)',
+    employers: ['business', 'government', 'corporation', 'school', 'hospital'],
   },
 };
 

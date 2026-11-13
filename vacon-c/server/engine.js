@@ -500,6 +500,11 @@ function generateNPC(options = {}) {
     // a child or a caller who supplies none, same posture
     // `maritalStatus` takes.
     veteranStatus: options.veteranStatus ?? null,
+    // A real Census ACS nativity/citizenship-status category (table
+    // B05001) — see `nativityPacks.js`'s own header. Null unless a
+    // caller supplies one, same posture `race` takes: applies at any
+    // age, no invented vocabulary to fall back to.
+    nativity: options.nativity ?? null,
     traits: traitsToSheet(traitRows),
     createdTick: WorldState.tick,
     updatedTick: WorldState.tick,

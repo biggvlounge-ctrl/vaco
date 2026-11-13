@@ -124,6 +124,7 @@ const landCoverPacks = require('./landCoverPacks.js');
 const nightLightsPacks = require('./nightLightsPacks.js');
 const terrainPacks = require('./terrainPacks.js');
 const racePacks = require('./racePacks.js');
+const nativityPacks = require('./nativityPacks.js');
 const maritalStatusPacks = require('./maritalStatusPacks.js');
 const disabilityPacks = require('./disabilityPacks.js');
 const veteranPacks = require('./veteranPacks.js');
@@ -470,6 +471,11 @@ function generateWorld(options = {}) {
     w.veteranPack = veteranPacks.assertPack(config.veteranPack);
   } else if (w.veteranPack) {
     veteranPacks.assertPack(w.veteranPack);
+  }
+  if (config.nativityPack) {
+    w.nativityPack = nativityPacks.assertPack(config.nativityPack);
+  } else if (w.nativityPack) {
+    nativityPacks.assertPack(w.nativityPack);
   }
   if (config.buildingPack) {
     w.buildingPack = buildingPacks.assertPack(config.buildingPack);
@@ -1048,6 +1054,12 @@ function generateWorld(options = {}) {
       const maritalStatusTract = maritalStatusPacks.tractFor(w.maritalStatusPack, tractPosition);
       const disabilityTract = disabilityPacks.tractFor(w.disabilityPack, tractPosition);
       const veteranTract = veteranPacks.tractFor(w.veteranPack, tractPosition);
+      // A fifth real tract, same position, same reason — nativity/
+      // citizenship status (table B05001), its own new per-NPC field.
+      // See `nativityPacks.js`'s own header for why this is CLAUDE.md's
+      // thirty-third standing rule's nativity/citizenship half, built
+      // alongside ancestry rather than before it.
+      const nativityTract = nativityPacks.tractFor(w.nativityPack, tractPosition);
       const residents = [];
       for (let p = 0; p < config.populationPerCommunity; p += 1) {
         //: An age structure rather than a uniform draw: weighting the
@@ -1124,6 +1136,11 @@ function generateWorld(options = {}) {
           // applies at any age, unlike marital status and veteran
           // status below.
           disability: disabilityPacks.hasDisabilityFor(disabilityTract, random.unit('disability-real', c, b, p)),
+          // A real Census ACS nativity/citizenship-status category,
+          // drawn the same way — applies at any age, same as `race`
+          // and `disability` above, unlike marital status and veteran
+          // status below.
+          nativity: nativityPacks.nativityFor(nativityTract, random.unit('nativity-real', c, b, p)),
           maritalStatus: null,   // set below, but only for adults — ACS covers 15+
           veteranStatus: null,   // set below, but only for adults — ACS covers 18+
           traitValueFor: (def) => Math.round(

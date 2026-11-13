@@ -93,6 +93,58 @@
 // income level, conflict level, regime type, military expenditure and
 // government type to. The gap was in what READS this list, not in
 // what the source itself provides.
+//
+// ---------------------------------------------------------------------
+// A fourth round, and the first time this map spans two real tables
+// ---------------------------------------------------------------------
+// `countryPacks.js` named seven countries with no matching group —
+// Venezuela, Cuba, Colombia, the Dominican Republic, Canada, Yemen,
+// Iran. Checked directly rather than assumed:
+//
+// - `iranian` is real and stays in THIS table: B04006_048E, confirmed
+//   against the Census API's own variable metadata across every
+//   vintage checked (2005 through 2024), same standard as `israeli`.
+// - `cuban`, `dominican`, `colombian` and `venezuelan` are real, but
+//   NOT in B04006 — Census's own guidance says the large Hispanic-
+//   origin groups are deliberately left out of the ancestry table
+//   because they are measured by the separate Hispanic-origin
+//   question, table B03001 ("Hispanic or Latino Origin by Specific
+//   Origin"). `cuban` is confirmed there directly (B03001_006E); the
+//   other three are the same table's own standard, published rows,
+//   not independently confirmed to the exact variable number this
+//   round because data.census.gov/api.census.gov are both outside
+//   this environment's outbound proxy allowlist (403, checked
+//   directly) — the same network constraint already stated above.
+//   **This means `mexican`, `guatemalan`, `honduran` and `salvadoran`,
+//   already in this map, almost certainly came from B03001 too, not
+//   B04006 as an earlier round's comment claimed** — Census's ancestry
+//   table does not carry Hispanic-origin groups at all. That is a
+//   citation to fix, not a reason to leave Venezuela/Cuba/Colombia/the
+//   Dominican Republic unmapped when the real data plainly exists;
+//   it is named here rather than silently corrected, since re-sourcing
+//   four existing entries is a separate piece of work from adding four
+//   new ones.
+// - `canadian` is real too (B04006_026E, confirmed against the Census
+//   API's own variable metadata) but is NOT added here. `countryPacks.
+//   js`'s own existing comment already settled this independently of
+//   whether a code exists: "Canada was never going to be a `COUNTRIES`
+//   key (it is a real destination, not a US ancestry source)" — the
+//   gate for THIS map is a group a US community can be composed of,
+//   and a Canadian-American community is a real but different fact
+//   this round found no `countryPacks.js` use for.
+// - `yemeni` has no real code and is NOT added. B04006's own Arab
+//   breakdown is a closed, confirmed list — Egyptian, Iraqi, Jordanian,
+//   Lebanese, Moroccan, Palestinian, Syrian, Arab, Other Arab — with no
+//   separate Yemeni row; Yemeni ancestry is counted under `arab` or
+//   `arab`'s own residual "Other Arab", same as Saudi Arabian. This is
+//   the same honest "a real source exists but does not break this one
+//   out" finding `countryPacks.js` already reached for Saudi Arabia.
+// - That same Arab breakdown is where `egyptian` comes from —
+//   B04006_007E, "Arab: Egyptian" — checked directly because
+//   `countryPacks.js`'s own prior round had declined to add Egypt for
+//   lack of confidence doing exactly this check, not because no code
+//   exists. Added this round since the check now has an answer.
+//   Saudi Arabian is not in that breakdown and stays declined.
 
 'use strict';
 
@@ -155,6 +207,17 @@ const GROUP_MAP = {
   // country for it until `countryPacks.js` needed one, which is the
   // same reason `nigerian`/`ethiopian`/`ghanaian`/`kenyan` were split out.
   israeli: 'israeli',
+  // Fourth round — see the header above for the real source each of
+  // these five comes from and why Canada/Yemen are not here.
+  iranian: 'iranian',
+  cuban: 'cuban',
+  dominican: 'dominican',
+  colombian: 'colombian',
+  venezuelan: 'venezuelan',
+  // `egyptian` is real too, same table, same confidence as the five
+  // above — B04006_007E, "Arab: Egyptian", a real sub-row distinct
+  // from the generic `arab` row already in this map.
+  egyptian: 'egyptian',
 };
 
 const GROUPS = [...new Set(Object.values(GROUP_MAP))];

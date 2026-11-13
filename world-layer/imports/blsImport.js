@@ -58,12 +58,16 @@ const SOC_GROUP_BY_OCCUPATION = {
   manager: '11', logistician: '11', diplomat: '11', politician: '11',
   // 13-0000 Business and financial
   trader: '13', financier: '13',
+  // 15-0000 Computer and mathematical
+  programmer: '15',
   // 17-0000 Architecture and engineering
-  engineer: '17', architect: '17', plumber: '17', electrician: '17',
+  engineer: '17', architect: '17',
   // 19-0000 Life, physical and social science
   scientist: '19', researcher: '19', polymath: '19', agronomist: '19', linguist: '19',
   // 21-0000 Community and social service
   preacher: '21',
+  // 23-0000 Legal (`lawyer` is SOC 23-1011 "Lawyers")
+  lawyer: '23',
   // 25-0000 Educational instruction and library
   teacher: '25', librarian: '25',
   // 27-0000 Arts, design, entertainment, sports and media (`influencer`
@@ -78,10 +82,20 @@ const SOC_GROUP_BY_OCCUPATION = {
   officer: '33', enforcer: '33',
   // 35-0000 Food preparation and serving
   cook: '35',
+  // 37-0000 Building and grounds cleaning and maintenance
+  custodian: '37',
+  // 39-0000 Personal care and service
+  stylist: '39',
+  // 41-0000 Sales and related
+  salesperson: '41',
+  // 43-0000 Office and administrative support
+  clerk: '43',
   // 45-0000 Farming, fishing and forestry
   farmer: '45', fisher: '45', hunter: '45',
-  // 47-0000 Construction and extraction
-  labourer: '47', carpenter: '47',
+  // 47-0000 Construction and extraction (`plumber`, SOC 47-2152, and
+  // `electrician`, SOC 47-2111, belong here, not in 17-0000 alongside
+  // `engineer`/`architect` — both were miscoded until this round)
+  labourer: '47', carpenter: '47', plumber: '47', electrician: '47',
   // 49-0000 Installation, maintenance and repair
   mechanic: '49',
   // 51-0000 Production
@@ -91,30 +105,40 @@ const SOC_GROUP_BY_OCCUPATION = {
 };
 
 //: The SOC major groups this engine's occupations actually land in,
-//: with their published names. Groups SOC defines and nothing here maps
-//: to — legal, office administration, personal care, computing,
-//: cleaning — are absent on purpose: a collapsed world has no
-//: paralegals, and listing an empty group would imply the engine models
-//: something it does not.
+//: with their published names.
 //:
 //: **The first version of this map was written from memory of the
 //: occupation list rather than from the list**, and carried ten
-//: occupations that do not exist (`banker`, `programmer`, `nurse`,
-//: `smith`, `miner`...) while leaving seven real ones unmapped. It was
-//: caught by the test below, which is why that test compares against
+//: occupations that do not exist (`banker`, `nurse`, `smith`, `miner`
+//: and others) while leaving seven real ones unmapped. It was caught by
+//: the test below, which is why that test compares against
 //: `occupations.OCCUPATION_NAMES` rather than against a count.
+//:
+//: **A later audit found six more real major groups with nothing
+//: mapped to them at all** — 15, 23, 37, 39, 41, 43, listed below
+//: alongside the sixteen that were already here — and added one real
+//: occupation to each rather than leaving a real BLS group permanently
+//: empty. `programmer` is one of them: the first version's list above
+//: invented it with no SOC group at all, and this round gave it a real
+//: one, 15 (Computer and Mathematical).
 const SOC_GROUP_NAMES = {
   11: 'Management',
   13: 'Business and Financial Operations',
+  15: 'Computer and Mathematical',
   17: 'Architecture and Engineering',
   19: 'Life, Physical, and Social Science',
   21: 'Community and Social Service',
+  23: 'Legal',
   25: 'Educational Instruction and Library',
   27: 'Arts, Design, Entertainment, Sports, and Media',
   29: 'Healthcare Practitioners and Technical',
   31: 'Healthcare Support',
   33: 'Protective Service',
   35: 'Food Preparation and Serving Related',
+  37: 'Building and Grounds Cleaning and Maintenance',
+  39: 'Personal Care and Service',
+  41: 'Sales and Related',
+  43: 'Office and Administrative Support',
   45: 'Farming, Fishing, and Forestry',
   47: 'Construction and Extraction',
   49: 'Installation, Maintenance, and Repair',

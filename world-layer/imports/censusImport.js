@@ -91,6 +91,19 @@ const RACE_CATEGORIES = [
 //: `vacon-c/server/maritalStatusPacks.js`'s own test.
 const MARITAL_STATUS_CATEGORIES = ['never-married', 'now-married', 'separated', 'widowed', 'divorced'];
 
+//: ACS table B05001's own five nativity/citizenship-status categories
+//: (the sixth row, total population, is the universe, not a
+//: category), duplicated for the same reason, cross-checked by
+//: `vacon-c/server/nativityPacks.js`'s own test. CLAUDE.md's thirty-
+//: third standing rule approved this source; see `nativityPacks.js`'s
+//: header for why nativity and citizenship status are one real table
+//: and one new field rather than two, and why year-of-entry (a real,
+//: separate table, B05005) is not built this round.
+const NATIVITY_CATEGORIES = [
+  'us-born', 'born-in-territory', 'born-abroad-american-parent',
+  'naturalized-citizen', 'non-citizen',
+];
+
 function shareOf(counts, total) {
   if (!total) return null;
   return Math.round((counts / total) * 10000) / 10000;
@@ -173,6 +186,12 @@ function importAcsTract(worldLayer, locationId, record = {}) {
     )
     : null;
 
+  // **A fifth real shape, added this round, same posture as the four
+  // above.** `record.nativityCounts` (table B05001) is multi-category,
+  // so it goes through the same `toDistribution` the race and marital-
+  // status shares above use.
+  const nativityShares = record.nativityCounts ? toDistribution(record.nativityCounts) : null;
+
   setLocationData(worldLayer, locationId, 'populationData', {
     source: 'us-census-acs',
     tractId: record.tractId,
@@ -188,6 +207,7 @@ function importAcsTract(worldLayer, locationId, record = {}) {
     maritalStatusShares,
     disabilityShare,
     veteranShare,
+    nativityShares,
     // **No per-person anything.** See the §9 note in the header: this
     // produces shapes, never people, and nothing here is readable as a
     // trait.
@@ -223,7 +243,7 @@ function describeAcsCoverage(worldLayer) {
     .filter((l) => l.populationData?.source === 'us-census-acs');
   const missing = {
     ageBands: [], householdSizes: [], attainment: [], income: [],
-    race: [], maritalStatus: [], disability: [], veteranStatus: [],
+    race: [], maritalStatus: [], disability: [], veteranStatus: [], nativity: [],
   };
   for (const location of withAcs) {
     if (!location.populationData.ageBands) missing.ageBands.push(location.name);
@@ -234,6 +254,7 @@ function describeAcsCoverage(worldLayer) {
     if (!location.populationData.maritalStatusShares) missing.maritalStatus.push(location.name);
     if (location.populationData.disabilityShare == null) missing.disability.push(location.name);
     if (location.populationData.veteranShare == null) missing.veteranStatus.push(location.name);
+    if (!location.populationData.nativityShares) missing.nativity.push(location.name);
   }
   return {
     tracts: withAcs.length,
@@ -251,9 +272,9 @@ function fetchAcsTracts() {
     + 'path is the Census Data API — `/data/2022/acs/acs5?get=GROUP(B01001)&for=tract:*&in='
     + 'state:29` and the corresponding tables for household size (B11016), educational '
     + 'attainment (B15003), income (B19013), race (B02001), marital status (B12001, '
-    + 'population 15+), disability status (B18101) and veteran status (B21001, civilian '
-    + 'population 18+) — which needs a free API key. Pass the rows to '
-    + 'importAcsTract(worldLayer, locationId, record).',
+    + 'population 15+), disability status (B18101), veteran status (B21001, civilian '
+    + 'population 18+) and nativity/citizenship status (B05001) — which needs a free API '
+    + 'key. Pass the rows to importAcsTract(worldLayer, locationId, record).',
   );
 }
 
@@ -263,6 +284,7 @@ module.exports = {
   AGE_BANDS,
   RACE_CATEGORIES,
   MARITAL_STATUS_CATEGORIES,
+  NATIVITY_CATEGORIES,
   toDistribution,
   attainmentDistribution,
   importAcsTract,

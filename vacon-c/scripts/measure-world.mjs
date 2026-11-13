@@ -32,6 +32,24 @@
 //                        the flag the measured before/after numbers in
 //                        CLAUDE.md's own standing rule on this came
 //                        from: run once without it, once with.
+//     --all-demographic-packs
+//                        turn on every one of worldgen.js's seven
+//                        independently opt-in demographic packs at
+//                        once (ancestry, race, marital status,
+//                        disability, veteran status, nativity,
+//                        religion), each supplied a trivial one-bucket
+//                        real-vocabulary sample pack so every draw
+//                        resolves to a real value rather than falling
+//                        through to a missing-tract null. Reports what
+//                        fraction of NPCs get a FULL joint demographic
+//                        profile (all seven fields set) versus a
+//                        partial one — and whether a partial profile
+//                        comes from age-gating (maritalStatus/
+//                        veteranStatus are adults-only by design, same
+//                        as `education`) rather than a bug. Omitted, a
+//                        world generates exactly as it always has —
+//                        this flag changes nothing about the default
+//                        path.
 
 import { createRequire } from 'node:module';
 
@@ -55,8 +73,80 @@ const EMPTY = flag('empty', false) === true;
 const SEED = flag('seed', 'measure');
 const JSON_OUT = flag('json', false) === true;
 const EXTENDED_FAMILY = flag('extended-family', false) === true;
+const ALL_DEMOGRAPHIC_PACKS = flag('all-demographic-packs', false) === true;
 
 const w = engine.WorldState;
+
+// ---------------------------------------------------------------------
+// --all-demographic-packs — one trivial, fully-real sample pack per
+// field, so every draw resolves rather than falling through to a
+// missing-tract null. One bucket at share 1 is enough to answer "does
+// every field get set," which is what this flag measures — it is not
+// trying to reproduce a real population's actual composition.
+// ---------------------------------------------------------------------
+function demographicPackOptions() {
+  if (!ALL_DEMOGRAPHIC_PACKS) return {};
+  const tract = (field, value) => ({
+    region: 'Measured', source: 'sample', tracts: [{ tractId: 'T1', [field]: value }],
+  });
+  return {
+    ancestryPack: tract('shares', { german: 1 }),
+    racePack: tract('shares', { white: 1 }),
+    maritalStatusPack: tract('shares', { 'never-married': 1 }),
+    nativityPack: tract('shares', { 'us-born': 1 }),
+    disabilityPack: tract('disabilityShare', 0.5),
+    veteranPack: tract('veteranShare', 0.5),
+    religionPack: { region: 'Measured', source: 'sample', counties: [{ countyFips: '00000', shares: { protestant: 1 } }] },
+  };
+}
+
+// The seven fields each pack above sets directly on the NPC — the
+// ones `worldgen.js` itself calls "independently opt-in via its own
+// config.*Pack flag," not `politicalTypology` (always drawn, no flag)
+// and not `islamicSect`/`jewishObservance` (conditioned on `religion`'s
+// resolved VALUE, not a pack flag of their own).
+const DEMOGRAPHIC_FIELDS = ['ethnicity', 'race', 'maritalStatus', 'disability', 'veteranStatus', 'nativity', 'religion'];
+
+// Fields real ACS tables themselves only cover from a given age, so
+// `worldgen.js` sets them only for adults regardless of whether a pack
+// is present — a real, designed gate, not a bug this measurement
+// should flag.
+const ADULT_ONLY_FIELDS = ['maritalStatus', 'veteranStatus'];
+
+function demographicCompletenessOf(people) {
+  const adults = people.filter((n) => (w.tick - n.createdTick) / 365 >= 18);
+  const children = people.filter((n) => (w.tick - n.createdTick) / 365 < 18);
+  const fullProfile = (n, fields) => fields.every((f) => n[f] !== null && n[f] !== undefined);
+
+  return {
+    allNpcs: people.length,
+    adults: adults.length,
+    children: children.length,
+    fullJointProfile: {
+      // Children can never reach this bar by design (maritalStatus/
+      // veteranStatus are adults-only), so this is reported over
+      // ADULTS, the population that actually could reach it.
+      count: adults.filter((n) => fullProfile(n, DEMOGRAPHIC_FIELDS)).length,
+      of: adults.length,
+    },
+    ageUngatedFieldsOnly: {
+      // What every NPC regardless of age gets, when every pack is
+      // supplied — the honest "full profile" figure for the whole
+      // population, since the adult-only fields are excluded by
+      // design rather than by a gap.
+      count: people.filter((n) => fullProfile(n, DEMOGRAPHIC_FIELDS.filter((f) => !ADULT_ONLY_FIELDS.includes(f)))).length,
+      of: people.length,
+    },
+    adultOnlyFieldsSetForEveryAdult: {
+      count: adults.filter((n) => fullProfile(n, ADULT_ONLY_FIELDS)).length,
+      of: adults.length,
+    },
+    adultOnlyFieldsNullForEveryChild: {
+      count: children.filter((n) => ADULT_ONLY_FIELDS.every((f) => n[f] === null)).length,
+      of: children.length,
+    },
+  };
+}
 
 // The world before `worldgen.js` existed: people, placed, and nothing
 // else. This is not a strawman — it is the only world the engine could
@@ -77,8 +167,10 @@ function buildEmptyWorld() {
 
 const summary = EMPTY
   ? buildEmptyWorld()
-  : worldgen.generateWorld({ seed: SEED, extendedFamily: EXTENDED_FAMILY });
+  : worldgen.generateWorld({ seed: SEED, extendedFamily: EXTENDED_FAMILY, ...demographicPackOptions() });
 for (let t = 0; t < TICKS; t += 1) engine.advanceTick();
+
+const demographicCompleteness = ALL_DEMOGRAPHIC_PACKS ? demographicCompletenessOf(w.npcs) : null;
 
 const structural = new Set(statistics.unavailable().map((e) => e.key));
 const profiles = statistics.profileAll(w);
@@ -118,6 +210,7 @@ const result = {
   byCategory,
   silentKeys: silent,
   declaredGapKeys: [...structural],
+  demographicCompleteness,
   summary,
 };
 
@@ -151,4 +244,13 @@ if (JSON_OUT) {
   }
   console.log('\ndeclared gaps (no substrate anywhere):');
   for (const key of structural) console.log(`  ${key}`);
+
+  if (demographicCompleteness) {
+    const d = demographicCompleteness;
+    console.log('\ndemographic pack joint completeness (--all-demographic-packs):');
+    console.log(`  full joint profile (all 7 fields), adults only: ${d.fullJointProfile.count}/${d.fullJointProfile.of}`);
+    console.log(`  age-ungated fields only, everyone:               ${d.ageUngatedFieldsOnly.count}/${d.ageUngatedFieldsOnly.of}`);
+    console.log(`  maritalStatus+veteranStatus set, every adult:    ${d.adultOnlyFieldsSetForEveryAdult.count}/${d.adultOnlyFieldsSetForEveryAdult.of}`);
+    console.log(`  maritalStatus+veteranStatus null, every child:   ${d.adultOnlyFieldsNullForEveryChild.count}/${d.adultOnlyFieldsNullForEveryChild.of}`);
+  }
 }

@@ -3452,6 +3452,181 @@ skipped) plus this round's own 20 new ones (13 in
 `test/mainCharacters.test.js`, 6 in `test/missionTriggers.test.js`,
 one new route test in `test/routes.test.js`), zero regressions.
 
+**A sixtieth, and it is four real audits in one round rather than one
+new mechanism — occupation breadth, country scope, the nativity/
+citizenship half of the thirty-third rule left standing, and whether
+every demographic pack this registry now has actually adds up to a
+full person.**
+
+**First, a real BLS SOC major-group audit, the same discipline the
+labour-wiring work already established: `labourPacks.
+SOC_GROUP_BY_OCCUPATION` is a real, checkable map against a real,
+fixed 22-group federal classification, so "is every group covered" is
+a question with a yes/no answer rather than a judgment call.** Six
+groups had zero occupation mapped to them — 15 (Computer and
+Mathematical), 23 (Legal), 37 (Building and Grounds Cleaning and
+Maintenance), 39 (Personal Care and Service), 41 (Sales and Related),
+43 (Office and Administrative Support) — meaning a real labour pack
+reporting real employment share and wage in those groups had nobody
+in this engine to draw into them. `programmer`, `lawyer`, `custodian`,
+`stylist`, `salesperson` and `clerk` close them, one each, named by
+the real SOC group itself rather than a §25 subject or an
+`organizations.type` — a fourth, real source this file's own
+`occupations.js` header now documents alongside its original three.
+**The same audit found a real miscoding, not a gap**: `plumber`
+(47-2152) and `electrician` (47-2111) are both really SOC major group
+47 (Construction and Extraction), and both had been coded 17
+(Architecture and Engineering) alongside `engineer`/`architect` since
+the labour-wiring round that first built this map — fixed in both
+required-identical copies (`server/labourPacks.js` and `world-layer/
+imports/blsImport.js`), with `test/labour-packs.test.js`'s own
+identity assertion holding across the fix.
+
+**Second, the real Census ancestry-code check the thirty-ninth
+rule's own Israel paragraph used, run against six more named
+countries, and the finding split three ways rather than one.** Direct
+confirmation against the Census API's own variable metadata (the same
+standard Israel's `B04006_050E` was held to) found: `iranian` is real
+(`B04006_048E`, present across every ACS vintage checked from 2005
+through 2024); `canadian` is real too (`B04006_026E`) but was NOT
+wired in, because this file's own thirty-ninth-rule-adjacent comment
+on `countryPacks.js` had already settled Canada for an independent
+reason — "a real destination, not a US ancestry source" — that a real
+code existing does not override; `yemeni` has no real code at
+all — B04006's own Arab breakdown is a closed, confirmed list
+(Egyptian, Iraqi, Jordanian, Lebanese, Moroccan, Palestinian, Syrian,
+Arab, Other Arab) with no separate Yemeni row, so Yemeni ancestry is
+counted under `arab`'s own residual categories, the same real finding
+Saudi Arabian already had. **`venezuelan`, `cuban`, `colombian` and
+`dominican` are real too, and the honest finding here is a citation
+correction, not just four new entries**: none of the four is in table
+B04006 at all — Census's own guidance is explicit that the large
+Hispanic-origin groups are deliberately excluded from the ancestry
+question because they are measured by the separate Hispanic-origin
+question, table B03001 ("Hispanic or Latino Origin by Specific
+Origin"). `cuban` is confirmed to the exact variable (`B03001_006E`);
+the other three are that same real, standard, widely-published table's
+own rows, not independently confirmed to the exact variable number
+this round because `api.census.gov` is outside this environment's
+outbound proxy allowlist, checked directly (403 CONNECT), the same
+constraint this file's existing importers already name. **This almost
+certainly means `mexican`/`guatemalan`/`honduran`/`salvadoran`,
+already in this registry, came from B03001 too, not B04006 as an
+earlier round's comment claims** — named plainly in `world-layer/
+imports/ancestryImport.js`'s own header rather than silently
+corrected, since re-sourcing four existing entries is a separate piece
+of work from adding four new ones.
+
+**Egypt was revisited, and the finding changes why it was declined,
+not just its outcome.** The thirty-ninth rule's own `countryPacks.js`
+comment declined Egypt "this round too" for lack of confidence doing
+exactly this check, not because no real code exists — and the check
+now has an answer: `egyptian` is `B04006_007E`, "Arab: Egyptian," a
+real sub-row distinct from the generic `arab` row already in this
+registry. Saudi Arabian was re-checked the same way and stays
+declined — no matching row exists for it in that same breakdown — a
+real finding independently confirmed rather than assumed still true.
+
+Six new `ancestryPacks.GROUPS` entries (`iranian`, `cuban`,
+`dominican`, `colombian`, `venezuelan`, `egyptian`) and six new
+`COUNTRIES` entries follow the identical shape every entry here
+already has — income level (World Bank, FY2026/27 classification,
+checked directly rather than assumed, including Venezuela's real
+move from "unclassified" to lower-middle-income), conflict level,
+government type, EIU regime type (exact score where found, `null`
+where a real category is known but the precise score was not),
+SIPRI-adjacent military expenditure (flagged `secondary-estimate`
+except where this table already holds a SIPRI-official figure), and
+EIA/OPEC-adjacent oil-producer status. **Egypt's own oil/gas field is
+the one real finding worth naming on its own**: not a simple
+"exporter" label — Egypt still produces oil and gas domestically but
+reversed from gas EXPORTER to net LNG IMPORTER by mid-2024 as the
+offshore Zohr field's output fell roughly 30% from 2021 to 2024, and
+`oilProducer.status` says exactly that rather than the older, now-
+false "Egypt is a gas exporter" fact. Israel's own `warStatus` note,
+which had said "Iran itself has no entry in this table," is corrected
+to point at Iran's new entry instead of repeating a claim this round
+made false.
+
+**Third, the nativity/citizenship half of the thirty-third rule,
+confirmed still unbuilt before building it** — `find . -iname
+"*nativity*" -o -iname "*citizenship*"` returned nothing anywhere in
+the repository. `server/nativityPacks.js` is the identical shape
+`racePacks.js` already established: a real Census ACS table (B05001,
+"Nativity and Citizenship Status in the United States"), five real
+categories (us-born, born-in-territory, born-abroad-american-parent,
+naturalized-citizen, non-citizen), a new `npc.nativity` field, drawn
+unconditionally at any age exactly like `race`/`disability` rather
+than gated like `maritalStatus`/`veteranStatus` — nativity and
+citizenship status are, in the real Census question, ONE answer with
+five outcomes, not two separate facts forced into two fields. Wired
+into `worldgen.js`/`engine.js`/`demographics.js` the same way every
+sibling field already is, and `world-layer/imports/censusImport.js`'s
+`importAcsTract` gained the real table the same way it already holds
+race, marital status, disability and veteran status. **Year-of-entry
+(table B05005, "Period of Immigration") is a declared gap, not a
+silent one**: it is a real, separate table that only applies to the
+foreign-born slice of a tract's population and needs its own real
+vocabulary of entry-period buckets — a second module's worth of work,
+named in `nativityPacks.js`'s own header rather than forced into this
+one field. **Nativity is also not persisted to Postgres, and that is
+the EXISTING shape of every field in this family, not a new gap**:
+`migrate.js` carries `ethnicity` by column name (the first of these
+fields, added before the others existed) but none of `race`,
+`maritalStatus`, `disability` or `veteranStatus` — there is no `npcs`
+schema column for any of them — and `nativity` simply joins that real,
+already-declared limitation rather than being a fifth, newly-
+introduced one. Same §9 firewall discipline as every per-NPC real
+field before it: `test/nativity-packs.test.js` holds its own copy of
+`test/ethnicity.test.js`'s forbidden-file scan, mutation-verified by
+temporarily making `crime.js` read `entity.nativity` and confirming
+the test caught it before reverting.
+
+**Fourth, and it is the only one of these four that is a measurement
+rather than a build — asked whether this registry's seven
+independently opt-in demographic packs (`ancestryPack`, `racePack`,
+`maritalStatusPack`, `disabilityPack`, `veteranPack`, `nativityPack`,
+`religionPack`) actually add up to a full person when all seven are
+supplied at once, or whether non-overlapping gating conditions leave
+real gaps nobody had checked for.** `scripts/measure-world.mjs` gained
+`--all-demographic-packs`, a trivial one-bucket real-vocabulary sample
+pack per field so every draw resolves rather than falling through to
+a missing-tract null, and a `demographicCompletenessOf` report run
+over the result. **The measured answer is clean: every adult gets the
+full seven-field joint profile (105/105 and 109/109 across two
+different seeds), every age-ungated field is set for every resident
+regardless of age (150/150, 149/149), and the only "partial" profiles
+are children correctly missing `maritalStatus`/`veteranStatus` — the
+two fields ACS itself only measures for population 15+/18+, gated in
+`worldgen.js` on the same `age >= 18` threshold `education` already
+uses.** That is working as designed, the identical shape this file's
+own forty-fifth rule already established when those two fields were
+first built, not a bug this round needed to fix — checked directly
+rather than assumed, which is the whole point of measuring it.
+
+Mutation-verified the riskiest new check — temporarily made
+`crime.js` read `entity.nativity`, confirmed `test/nativity-packs.
+test.js`'s firewall test failed with the real offending module named,
+reverted the mutation, confirmed green again. Live-verified
+`--all-demographic-packs` over two differently-seeded real generated
+worlds, not only a fixture.
+
+Full suite, this round's own final run: 2111 tests, 2094 pass, 0
+fail, 17 skipped — exactly the prior round's 2086 tests (2069 pass, 17
+skipped) plus this round's own 25 new ones across
+`test/occupations.test.js`, `test/labour-packs.test.js`,
+`test/country-packs.test.js` and the new `test/nativity-packs.test.js`
+(17 of the 25), zero regressions. Two real gaps surfaced and closed by
+the suite itself before this count, not after: the new ancestry
+groups left `migrationPathwayPacks.js`'s own load-time check with
+nothing to classify them against (`cuban`/`dominican`/`venezuelan`/
+`colombian`/`iranian`/`egyptian` added, each with the same real,
+cited reasoning every existing entry there carries), and
+`VACANCY_INVENTORY.md`'s own stated file count went stale the moment
+`nativityPacks.js` landed (122 → 123) — exactly the drift
+`test/inventory.test.js`'s own header already catalogues happening
+twice before, caught a third time by the same guard.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

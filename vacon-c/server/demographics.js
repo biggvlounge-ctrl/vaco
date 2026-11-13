@@ -238,6 +238,9 @@ function compositionOf(worldState, residents) {
   const maritalStatus = distributionOf(residents, (n) => n.maritalStatus ?? null);
   const disability = distributionOf(residents, (n) => n.disability ?? null);
   const veteranStatus = distributionOf(residents, (n) => n.veteranStatus ?? null);
+  // A fifth real Census ACS dimension, added this round, same shape as
+  // the four above — `nativityPacks.js`'s own header.
+  const nativity = distributionOf(residents, (n) => n.nativity ?? null);
 
   return {
     language: {
@@ -374,6 +377,14 @@ function compositionOf(worldState, residents) {
       distribution: veteranStatus,
       diversity: diversityOf(veteranStatus),
       dominantShare: dominantShareOf(veteranStatus),
+    },
+    // A fifth real Census ACS dimension, added this round, same §9
+    // firewall discipline as the four above — `nativityPacks.js`'s
+    // own header and its own copy of the forbidden-file scan.
+    nativity: {
+      distribution: nativity,
+      diversity: diversityOf(nativity),
+      dominantShare: dominantShareOf(nativity),
     },
   };
 }
