@@ -75,6 +75,56 @@ function traitsToSheet(rows) {
   return sheet;
 }
 
+// **Indexed once per world, not filtered per call.** `traitDrift.js`
+// found this exact shape once already — "four lookups per NPC per
+// tick, against 17,000 rows and 150 people, which is ten million
+// comparisons a tick" — and fixed it locally with its own
+// `indexRows`/`rowsFor`. It never reached here, the canonical
+// definition every OTHER caller across the engine actually uses (111
+// call sites in 31 files via `getLiveEntity`/`getEntityTraitsForEntity`
+// directly) — so the same unindexed `.filter()`/`.find()` over the
+// WHOLE `entity_traits` array, on every single call, stayed the real
+// cost everywhere else. `test/worldgen.test.js` genuinely hung (100%+
+// CPU, never completing) rather than just slowing down, because this
+// one file accumulates a module-global world across every test with no
+// reset between them (by design — see its own header) and one test
+// runs 60 real ticks over it: by the time that test starts, the
+// accumulated world already held 300 NPCs and 38,000+ trait rows, and
+// `advanceTick` calls `getLiveEntity` per entity per phase — tracked
+// down with `--cpu-prof`, not guessed: `getLiveEntity` alone was 29% of
+// samples, `getEntityTraitsForEntity` another 8%.
+//
+// The cache is a `WeakMap` keyed on the `worldState` object itself —
+// never a field ON `worldState`, so persistence/migrate/restore never
+// see it and can't accidentally serialize or restore a stale one.
+// Invalidated on EITHER the array's identity changing (a full
+// `entityTraits` replacement, e.g. after a restore) or its length
+// changing (an ordinary append) — `entity_traits` rows are append-only
+// everywhere in this engine (`grep -rn "entityTraits\.push"` finds
+// every real writer: `births.js` and three sites in `engine.js`;
+// nothing splices or reassigns a single row out of the array), so a
+// length check alone is enough to detect every real mutation, and rows
+// already in the index are the SAME object references the flat array
+// holds — an in-place write to `row.current_value` elsewhere needs no
+// invalidation at all, because the index never copied the row.
+const traitIndexCache = new WeakMap();
+
+function getTraitIndex(worldState) {
+  const rows = worldState.entityTraits || [];
+  const cached = traitIndexCache.get(worldState);
+  if (cached && cached.arrayRef === rows && cached.length === rows.length) {
+    return cached.byEntity;
+  }
+  const byEntity = new Map();
+  for (const row of rows) {
+    const existing = byEntity.get(row.entity_id);
+    if (existing) existing.push(row);
+    else byEntity.set(row.entity_id, [row]);
+  }
+  traitIndexCache.set(worldState, { arrayRef: rows, length: rows.length, byEntity });
+  return byEntity;
+}
+
 // entity_traits rows for one entity — mirrors a
 // `SELECT * FROM entity_traits WHERE entity_id = ?` query. Works for
 // any tier since it only filters by id.
@@ -84,14 +134,13 @@ function traitsToSheet(rows) {
 // every caller to guard the array itself, which is how one of them ends
 // up not doing it.
 function getEntityTraitsForEntity(worldState, entityId) {
-  return (worldState.entityTraits || []).filter((row) => row.entity_id === entityId);
+  return getTraitIndex(worldState).get(entityId) || [];
 }
 
 function findEntityTraitRow(worldState, entityId, family, name) {
   const traitId = getTraitId(family, name);
-  return worldState.entityTraits.find(
-    (row) => row.entity_id === entityId && row.trait_id === traitId
-  );
+  const rows = getTraitIndex(worldState).get(entityId) || [];
+  return rows.find((row) => row.trait_id === traitId);
 }
 
 // The "World state" leg of a Key's three-way write-back (Section 4.3).

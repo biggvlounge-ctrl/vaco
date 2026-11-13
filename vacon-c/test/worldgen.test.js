@@ -282,6 +282,20 @@ test('a generated world answers most of the catalogue, where an empty one answer
   // which is the answerable question. Closing this needs a resource
   // whose stock changes by discovery and loss rather than by production
   // and consumption, which is a different model and not a missing line.
+  //
+  // **Briefly 10, not 9, between two concurrent rounds landing in the
+  // same session — recorded here because it was observed live, not
+  // because it is the final state.** The prison-street/recruitment
+  // round declared a tenth gap, `tribe_family_recruitment_growth`
+  // (real gang membership growth scaled off `crime.dangerByCommunity`,
+  // deliberately scoped to gangs only). A second, concurrent round
+  // closed that same gap in the same working directory before either
+  // side committed — see `recruitment.js`'s and `statistics.js`'s own
+  // headers for the real mechanism that answers it. Net count: 9,
+  // unchanged, because the gap that opened and the gap that closed
+  // were the same one. This assertion was also masked behind
+  // `test/worldgen.test.js`'s own pre-existing hang for both rounds —
+  // see `entityTraits.js`'s own header for that fix.
   assert.equal(structural.size, 9, 'the declared-gap count moved without this test being updated');
 });
 
