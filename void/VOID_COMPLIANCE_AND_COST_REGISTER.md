@@ -7,6 +7,18 @@ deliberately rather than a surprise discovered after launch.
 Nothing in this document blocks the code that exists. All 25 verticals
 are built and running. These are the things that gate *operating* them.
 
+**13 Nov 2026 correction (doc-vs-code reconciliation pass):** checked
+directly against `lib/verticals.js` — the registry now holds **26**,
+not 25; `voidDrop` (Phase 18, after this document was written) is the
+one not counted here or in "twenty-five regulatory surfaces" below.
+Not rewriting every "25"/"twenty-five" in this document — they are all
+this same one fact. VOID DROP's own regulatory surface is a different
+kind from the 25 below (no licensing gate; `assessEligibility` in
+`lib/voidDropBooking.js` gates on real, checkable site facts — road
+access, weight limits — not a licence), so it does not mechanically
+add a 26th row to the tables below, but the headline counts should
+still read 26.
+
 ---
 
 ## 1. Blocks launch in that vertical

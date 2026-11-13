@@ -5,6 +5,21 @@ all 25 verticals to the standard of the best app in each category?
 
 This is the honest version, including the parts that are large.
 
+**13 Nov 2026 correction (doc-vs-code reconciliation pass):** checked
+directly against `lib/verticals.js` — the registry now holds **26**,
+not 25. The archetype breakdown below actually only ever buckets
+**23** of them by name (counted directly: 7+4+5+4 across the four
+archetypes, minus 2 verticals — `freightMoving`, `eventPlanning` —
+each named in two archetypes) plus the 2 licensing-gated verticals
+this document never names (`cannabisDelivery`,
+`medicalTransportation`, kept out of the archetype framing for a
+different, deliberate reason — see `CLAUDE.md`'s "Decisions" section)
+= 25, which was accurate when written. `voidDrop` (Phase 18, after
+this document was written) is the 26th and is not in that count at
+all — a real registered vertical, but a structurally different one
+(asset rental/deployment, not a person-to-person booking), which is
+why it doesn't fit the archetype framing either.
+
 ## The finding that came out of asking
 
 Auditing the verticals against their comparables surfaced something
@@ -125,15 +140,23 @@ remaining" after the fix landed, which this correction fixes.
 
 ## What I would do next, in order
 
-1. **Join domain bookings to marketplace jobs and V3 settlement.**
+~~1. **Join domain bookings to marketplace jobs and V3 settlement.**
    Contained, and it turns everything already built into a working
-   business. Nothing else should come first.
-2. **Second Archetype A module — cleaning or landscaping.** Proves the
+   business. Nothing else should come first.~~ — **done** (see
+   "The three things that block" section above, corrected 13 Nov
+   2026: both named reference modules settle through V3 via
+   `settlement.js`'s `settleJob`). This item was left at the top of
+   this list after that fix landed — this same reconciliation pass
+   corrects it here too, not just above.
+1. **Second Archetype A module — cleaning or landscaping.** Proves the
    primitives generalise and makes modules 3–7 cheap.
-3. **A provider frontend, service day first.** One screen: today's
-   plan, earnings, what a new skill would add.
-4. **The remaining 13 domain modules**, cheapest archetype first.
-5. **Real road routing** — a vendor decision, not a code one.
+~~2. **A provider frontend, service day first.** One screen: today's
+   plan, earnings, what a new skill would add.~~ — **done**, same as
+   item 1 of "The three things that block" above: the service-day plan
+   is the first screen at `localhost:8793`. Also left stale here after
+   that fix landed; corrected in this same pass.
+2. **The remaining 13 domain modules**, cheapest archetype first.
+3. **Real road routing** — a vendor decision, not a code one.
 
 ## What "at par" honestly means
 

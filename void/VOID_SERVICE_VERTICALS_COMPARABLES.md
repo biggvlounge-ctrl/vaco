@@ -198,6 +198,21 @@ gap and one false alarm, both recorded below.
 opening paragraph says "24 unrelated pricing schemes"). The code now
 defines 25. Two were never covered here:
 
+**13 Nov 2026 correction (doc-vs-code reconciliation pass):** checked
+directly against `lib/verticals.js` again — the registry now defines
+**26**, not 25. `voidDrop` (VOID DROP, Phase 18, added after this audit
+was written) is the one not accounted for above. It is a deliberately
+different shape from the other 25 — asset rental/deployment rather
+than a person-to-person service booking, eligibility-gated per
+booking/location in `lib/voidDropBooking.js` rather than a blanket
+`licensingGated` category flag — which is almost certainly why it
+wasn't folded into this comparables audit the way `foodDelivery` was.
+It is still a real registered vertical and the "25"/"26" headline
+counts below and in `README.md`/`CLAUDE.md`/
+`VOID_SERVICE_APPS_AND_THE_WORKDAY.md`/`VOID_SERVICE_APP_ROADMAP.md`/
+`VOID_COMPLIANCE_AND_COST_REGISTER.md`/`VOID_MEITUAN_MODEL_INTEGRATION.md`
+should be read as 26 going forward, not 25.
+
 | Vertical | Status found |
 |---|---|
 | `realEstateMedia` | **False alarm.** Genuinely covered, in a different file — `VOID_MOVING_REAL_ESTATE_MEDIA.md` names **HomeJab** as the real comparable, with automated match rather than bidding. It was simply never cross-referenced from here, so an audit of this file alone reports it missing. Cross-referenced now. |

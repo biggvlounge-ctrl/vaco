@@ -77,11 +77,17 @@ curl http://localhost:8793/api/network-density/downtown-stl
   orders that can never fit any drone reported as unassigned rather
   than crashing the batch.
 - `lib/verticals.js` — the **Service Marketplace registry (Phase 3)**:
-  23 real named verticals, five with deep-researched real numbers
-  straight from the source doc (Laundry's real per-pound pricing and
-  75%-worker-payout split; Fiverr's real flat 20% commission for
-  Freelance, deliberately avoiding Upwork's pay-to-bid model), the
-  rest on the doc's own explicitly-authorized ~20%-take-rate fallback.
+  ~~23 real named verticals~~ (**13 Nov 2026 correction, doc-vs-code
+  reconciliation pass**: checked directly against the code — the
+  registry now holds **26**, not 23; `foodDelivery` (Phase 9),
+  `realEstateMedia` (Phase 10), and `voidDrop` (Phase 18) were added
+  in later phases documented further down this same file without this
+  earlier headline count being updated), five with deep-researched
+  real numbers straight from the source doc (Laundry's real per-pound
+  pricing and 75%-worker-payout split; Fiverr's real flat 20%
+  commission for Freelance, deliberately avoiding Upwork's pay-to-bid
+  model), the rest on the doc's own explicitly-authorized
+  ~20%-take-rate fallback.
 - `lib/marketplace.js` — the actual request → match → accept →
   complete → pay → rate loop the doc says every vertical shares.
   `completeJob()` performs two real transfers (provider payout +

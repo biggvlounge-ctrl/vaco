@@ -337,7 +337,9 @@ not a gap discovered later, a scope line drawn now:
 VACAY: `GET /api/bookings/drop-stays/search` ·
 `POST /api/bookings/drop-stays`.
 
-See `void/test/voidDrop.test.js` (31 tests: the full lifecycle with
-real drivers and a DREAMS screen, a failed-inspection path, the
-no-double-booking check, hub-derived homing, the nearby search) and
-`vacay/test/dropStays.test.js` for the real, exercised behavior.
+See `void/test/voidDrop.test.js` (~~31~~ **32** tests — corrected
+13 Nov 2026, doc-vs-code reconciliation pass, counted directly against
+the real suite: the full lifecycle with real drivers and a DREAMS
+screen, a failed-inspection path, the no-double-booking check,
+hub-derived homing, the nearby search) and `vacay/test/dropStays.test.js`
+for the real, exercised behavior.

@@ -61,7 +61,10 @@ that genuinely batch through the real routing engine.
   nearest-neighbour + 2-opt), `sequencing.js`.
 - **Marketplace core** — `marketplace.js` (the one shared
   request→match→accept→complete→pay→rate loop every vertical runs
-  through), `verticals.js` (25 registered verticals).
+  through), `verticals.js` (~~25~~ **26** registered verticals —
+  corrected 13 Nov 2026, doc-vs-code reconciliation pass: checked
+  directly against the code; `voidDrop`, added in Phase 18, was the
+  one not counted here).
 - **Scheduling, four surfaces on one engine** — `reserveBooking.js`
   (90-day advance, 60-min free cancellation), `commuteScheduling.js`
   (batch match + real backup on-demand guarantee),

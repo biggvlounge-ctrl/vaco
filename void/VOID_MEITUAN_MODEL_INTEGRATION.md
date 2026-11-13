@@ -85,8 +85,10 @@ All three concrete additions are real:
 2. **Transparent kitchen** — `lib/foodTrust.js`:
    `registerKitchenStream` / `getKitchenTrustStatus`, the Raccoon
    Canteen mechanic tied to real business trust signals.
-3. **Vertical expansion** — `lib/verticals.js` now carries 25
-   registered verticals.
+3. **Vertical expansion** — `lib/verticals.js` now carries ~~25~~
+   **26** registered verticals (corrected 13 Nov 2026, doc-vs-code
+   reconciliation pass: checked directly against the code; `voidDrop`,
+   added in a later phase than this count, was the one not included).
 
 **Real sourcing correction recorded elsewhere**: `VOID_STATION_NAMING_CONVENTION.md`
 notes that research could *not* confirm Meituan documents dual-bay or

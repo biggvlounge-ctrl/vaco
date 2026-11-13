@@ -3,6 +3,17 @@
 The document that explains why VOID is shaped the way it is: twenty-five
 service apps, one provider, one day.
 
+**13 Nov 2026 correction (doc-vs-code reconciliation pass):** checked
+directly against `lib/verticals.js` — the registry this document calls
+"twenty-five verticals" throughout now holds **26**. `voidDrop` (VOID
+DROP, added in Phase 18, after this document was written) is the one
+not counted in "twenty-five" below; it is a real registered vertical,
+just a structurally different one (asset rental/deployment, not a
+person-to-person service booking), which is almost certainly why it
+was never folded into this document's "twenty-five" framing the way
+`foodDelivery`/`realEstateMedia` were. Not rewriting every "twenty-five"
+below — they are all this same one fact, corrected once here.
+
 ## The idea
 
 Every gig platform makes you one thing. Rover makes you a dog walker.
@@ -240,9 +251,15 @@ Stated plainly rather than left to be discovered:
 ## Where the comparables fit
 
 Each vertical's comparables document is the specification for what its
-service app needs — `dev-docs/COMPARABLES_INDEX.md` maps all of them.
-Rover tells you what pet care needs. Rinse tells you what laundry
-needs. LawnStarter tells you what landscaping needs.
+service app needs — ~~`dev-docs/COMPARABLES_INDEX.md` maps all of
+them.~~ **Corrected 13 Nov 2026 (doc-vs-code reconciliation pass):**
+no file named `dev-docs/COMPARABLES_INDEX.md` exists anywhere in this
+repo (checked directly — zero matches). The real document is
+`VOID_SERVICE_VERTICALS_COMPARABLES.md`, at this app's own root (not
+under `dev-docs/`), and its own "Coverage audit" section is what
+actually maps verticals to their comparables. Rover tells you what pet
+care needs. Rinse tells you what laundry needs. LawnStarter tells you
+what landscaping needs.
 
 That is why the comparables were worth writing: not as competitive
 analysis, but as twenty-five product specs already in the repo.
