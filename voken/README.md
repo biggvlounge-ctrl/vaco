@@ -78,6 +78,25 @@ VOKEN's own card API (`GET /api/card/:id`, `POST
 every other real cross-app client in this ecosystem, not a shared
 in-process module. See `../vex/README.md` and this repo's own
 `dev-docs/phase-16-vex-extracted-to-standalone-app/`.
+**Correction (13 Nov 2026): that client call is not actually
+authenticated any more, and it will 401 against this server's current
+default.** `lib/serviceAuth.cjs`'s global middleware (mounted in
+`server.js`, see below) defaults to `enforce` and rejects any mutating
+request with no Shield session and no matching `X-Service-Name`/
+`X-Service-Token` pair — confirmed live by booting this server and
+POSTing to `/api/card/:id/edition` and `/api/card/:id/transfer` with
+no headers at all, the exact shape `../vex/lib/vokenClient.js`'s
+`mintAdditionalEdition`/`transferEditionOwnership` send today: both
+get a real 401 (`"serviceAuth: this route requires either a user
+session ... or a trusted-service credential"`), not the success this
+paragraph describes. `../vex/lib/vokenClient.js` attaches no
+`X-Service-Name`/`X-Service-Token` headers on any of its calls into
+VOKEN, unlike `../vex/lib/operatorAuth.cjs` and
+`../vex/lib/decisionLog.cjs`, which already do this correctly for
+VEX's *other* outbound calls. This is a real integration gap on VEX's
+side of the boundary (not touched here, since it is VEX's own file,
+read-only per this session's own scope) — filed rather than silently
+left to look like working documentation.
 
 ## Run
 ```
@@ -766,6 +785,14 @@ curl http://localhost:8794/api/explore/historic
   VADO fractional ownership; now only guards fractional ownership,
   since VEX's own `vex-brokerage` gate moved out with the rest of VEX
   (Phase 16, see above) rather than each module inventing its own flag.
+  **Correction (13 Nov 2026): this is no longer the whole story.**
+  `GATES` in `lib/complianceGate.js` now holds a second, unrelated real
+  gate, `influencer-culture-card-rewards` (held pending a founder
+  decision on paying influencers in Cvltvre Card value — see
+  `VOKEN_ARCHITECTURE.md`'s own compliance table, which already
+  documents both gates correctly). This paragraph's "now only guards
+  fractional ownership" was accurate right after the VEX extraction but
+  is stale now that a second gate exists.
 - `lib/platformAccount.js` — `VOKEN_PLATFORM_ACCOUNT`, split into its
   own module in Phase 16 when `lib/vex.js` (where it originally lived)
   was deleted; `lib/cardPacks.js` and `lib/referralGrowth.js` both
@@ -1040,6 +1067,25 @@ restart. Live-verified: created a real Cvltvre Card, killed the running
 process, restarted it, and confirmed the same real state came back from a
 real GET. See `dev-docs/phase-12-real-persistence/`.
 
+**Undocumented until now (13 Nov 2026): a real Postgres-backed option
+also exists.** `server.js` no longer calls `lib/persistence.js`
+directly — it calls `attachStore()` (`lib/storeBackend.js`), the
+same ecosystem-wide store-boot helper other apps use. With no
+`DATABASE_URL` set, `attachStore()` behaves exactly as this section
+already describes (the real file-backed store above, unchanged). With
+`DATABASE_URL` set, it instead builds the store on `lib/persistencePg.js`
+— the same store kept in Postgres, safe for more than one process,
+with a versioned row that refuses a second writer's stale write rather
+than silently overwriting it. Checked directly against this repo's own
+`docker-compose.yml`, not assumed: it sets `DATABASE_URL` for the
+`voken` service, so **VOKEN actually runs Postgres-backed, not
+file-backed, under this repo's own compose setup** — the file-backed
+path above is real and is what a plain `npm start` with no
+`DATABASE_URL` gets, but it is no longer the deployed default. VOKEN's
+own `.env.example` does not document `DATABASE_URL` at all, which is
+the one real gap here: a developer reading only `.env.example` would
+not know this variable exists or that compose already sets it.
+
 ## Real metrics feed (Phase 13)
 Every real fractional-shares purchase pushes a real
 `resale_trade_volume` metric to VACO Analytics (fail-soft — a real
@@ -1076,6 +1122,13 @@ Vavlt Stvdios' own build of this feature (1/3/5/10 referrals →
 10/25/50/150 VCoin + 1/1/2/3 spins). Bonus/prize payouts reuse the
 existing `VOKEN_PLATFORM_ACCOUNT` (from `lib/vex.js`) rather than
 inventing a second platform account.
+**Correction (13 Nov 2026): `lib/vex.js` no longer exists.** This
+paragraph predates Phase 16 (above): `VOKEN_PLATFORM_ACCOUNT` now
+lives in `lib/platformAccount.js`, split out when `lib/vex.js` was
+deleted as part of extracting VEX into its own standalone app — see
+"What's here" above, which already names the current location. Left
+here rather than silently rewritten, per this repo's own documentation
+discipline.
 
 **Spin-to-win reuses VAGO's own provably-fair scheme verbatim**
 (`lib/provablyFair.js`, copied, not reinvented).

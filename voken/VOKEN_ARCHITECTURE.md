@@ -16,6 +16,8 @@ restructuring into buildable specs.
 CultureCard {  // the VDAS core asset type
   id, ownerId, category: string  // one of 10 (placeholder names, see
     // VOKEN_MASTER_SPEC_PROGRESS.md — confirm real labels before launch)
+    // Correction (13 Nov 2026): the real CATEGORIES is 11 now, not 10
+    // -- see the "Still open" note at the bottom of this document.
   rarityTier: string  // one of 7 (placeholder: Common..1/1)
   tokenizationType: "physical" | "digital" | "tokenized" | "avatar"
   formats: [string]  // subset of the above
@@ -104,6 +106,15 @@ fractional ownership. The gate is wired and defaults closed, so the
 code path can be built and demonstrated without the question being
 answered first. It should not be opened by anyone but Deskins.
 
+**Correction (13 Nov 2026): `lib/resale.js` does not exist.** There is
+no single resale module — a card's own real secondary market is
+`lib/auctions.js`'s resale royalty mechanic
+(`SECONDARY_SALE_ROYALTY_RATE` in `lib/cultureCards.js`) plus real
+peer-to-peer swaps in `lib/trading.js`; fractional shares have their
+own separate secondary market in `lib/fractionalOwnership.js` (Phase
+10/11 above). The citation above was wrong when checked against the
+real file tree, not just renamed.
+
 **Stale in the API map**: `POST /voken/vex/orders` and the shared
 `VDP VEX/VADO district` entry point. VDP's `VexView` was repointed to
 the standalone `vex/` app; `VadoView` still points at VOKEN. Two
@@ -114,3 +125,10 @@ consequence of the extraction.
 and 7 rarity tiers are explicitly placeholders here and remain
 unconfirmed. Worth resolving before launch, since they are
 user-visible and expensive to rename once cards exist under them.
+
+**Correction (13 Nov 2026): it is 11 categories now, not 10.**
+`lib/cardTypes.js`'s real `CATEGORIES` gained an 11th entry, `historic`,
+for the real, fixed Historic Register (`lib/historicRegistry.js`,
+documented at length in `README.md`) — a real category added after
+this document was written, not a placeholder-label change. The 7
+rarity tiers are still accurate and unchanged.

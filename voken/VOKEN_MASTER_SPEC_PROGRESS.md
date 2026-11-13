@@ -108,6 +108,14 @@ Mythic → 1/1 — inferred from the real design tokens showing distinct
 Replace both lists with the real labels the moment they're available;
 don't treat these as final.
 
+**Correction (13 Nov 2026): a real 11th category, `historic`, was
+added since this count was written** (`lib/cardTypes.js`), for the
+real, fixed Historic Register (`lib/historicRegistry.js`) — places,
+monuments, homes, people, inventions, and books. The 10 listed above
+are still exactly the first 10 real `CATEGORIES` entries; `historic`
+is a genuine 11th, not a renamed catch-all. The 7 rarity tiers are
+still accurate and unchanged.
+
 Fractional ownership of real estate, vehicles, and other high-value
 physical assets is securities-adjacent in most jurisdictions. No real
 money-movement on top of `shares` purchasing, Power Buy pools, or
