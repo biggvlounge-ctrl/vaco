@@ -1598,7 +1598,27 @@ persists, not fixed here.** `migrate.js`'s `INSERT INTO npcs` names
 on every single NPC, which is likely why it has never been caught —
 Postgres has been unreachable from this environment for the life of
 this project, the same condition `restore.js`'s own header already
-names for a different defect. Flagged rather than fixed: `islamicSect`
+names for a different defect.
+
+**Correction, checked directly rather than trusted from this entry's
+own words (13 Nov 2026): this claim is stale and the real defect it
+describes does not exist.** Both columns are real, confirmed directly
+by reading the file rather than assumed from this note:
+`server/schema-extensions.sql` (NOT the locked base schema,
+`VACANCY_POSTGRESQL_SCHEMA.sql`, which this entry correctly says has
+neither) adds `ALTER TABLE npcs ADD COLUMN IF NOT EXISTS name TEXT;`
+and, separately, `ALTER TABLE npcs ADD COLUMN IF NOT EXISTS ethnicity
+TEXT;` — both already real when this correction was written, not
+added by it. `test/migrate.test.js`'s own structural assertion ("every
+column `schema-extensions.sql` adds is written by the migration")
+and `test/restore.test.js`'s real round-trip check both already pass.
+The error here was mine, not the code's: checking only
+`VACANCY_POSTGRESQL_SCHEMA.sql` at the repo root and missing
+`server/schema-extensions.sql` in the subdirectory entirely — the
+exact "citation is not presence" lesson this file opened with, aimed
+at my own re-reading of an old entry instead of at the code. Left in
+place rather than deleted, per this file's own rule that a correction
+is appended, never a silent rewrite. Flagged rather than fixed: `islamicSect`
 was deliberately NOT added to this same broken INSERT, so it doesn't
 compound this, and it stays in-memory-only, the same documented
 posture `npc.ethnicity` already has.
