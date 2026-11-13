@@ -277,6 +277,35 @@ every resident, and the only "partial" profiles are children correctly
 missing the two fields ACS itself only measures for adults — working
 as designed, not a bug.
 
+## Decoupling country coverage from the ancestry-code gate (fourteenth round)
+See `CLAUDE.md`'s own sixty-first standing rule for the full account.
+`countryPacks.js`'s `COUNTRIES` table has required a matching real
+`ancestryPacks.GROUPS` code since round one — the real reason Saudi
+Arabia, Spain, Japan, Brazil and dozens of other significant real
+countries stayed out despite real World Bank/EIU/SIPRI/EIA data about
+each of them existing. That gate was never a property of the real
+country-level data — it is an artifact of `COUNTRIES`'s first
+consumer, `migration.generateRegion`'s own US-ancestry-linked
+`countryKey`. `COUNTRY_PROFILES` is a second, additive real path: the
+identical field shape, keyed directly on a hyphenated country name,
+no ancestry code required. Ten real countries this round — Japan,
+South Korea, Brazil, Argentina, Indonesia, Saudi Arabia, Turkey,
+Spain, Australia, South Africa — prioritised by population and G20
+membership. Spain and Canada are the two gaps this file had already
+named by name in two separate prior rounds (`EU_MIGRATION_OVERVIEW_
+2025`'s own note on Spain; the thirty-ninth standing rule's "a
+destination, not a source" on Canada, restated rather than
+overridden — Canada deliberately stays on its existing standalone
+path). `GET /api/country-packs/:key`'s 404 condition was missing the
+new tier and was found and fixed live, over a real spawned server,
+not left for the fixture suite. Honest about this round's own real
+ceiling: ten countries against ~195 real sovereign states is genuine
+progress, not comprehensive coverage, and several figures (Brazil's
+`regimeScore`, Japan's and Saudi Arabia's edition-year) are flagged
+rather than guessed where this round's WebSearch-only tooling could
+not reach a primary table — the same ceiling the fifty-first standing
+rule already named once before.
+
 ## Bluffing and its exposure
 See `CLAUDE.md`'s own fifty-second standing rule for the full design.
 `server/bluff.js` models the gap between what `weapons

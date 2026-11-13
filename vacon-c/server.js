@@ -735,7 +735,10 @@ app.post('/api/regions', (req, res) => {
 // which is itself real information, not an error.
 app.get('/api/country-packs/:key', (req, res) => {
   const context = countryPacks.regionalContextFor(req.params.key);
-  if (!context.dedicatedEntry && !context.standaloneEntry && !context.region) {
+  // Fourteenth-round addition: `profileEntry` (COUNTRY_PROFILES, no
+  // ancestry code needed) is a real coverage tier too, same as
+  // `dedicatedEntry`/`standaloneEntry`/`region` already were.
+  if (!context.dedicatedEntry && !context.profileEntry && !context.standaloneEntry && !context.region) {
     return res.status(404).json({ error: `no coverage at all for "${req.params.key}"`, ...context });
   }
   return res.json(context);

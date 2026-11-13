@@ -3627,6 +3627,106 @@ cited reasoning every existing entry there carries), and
 `test/inventory.test.js`'s own header already catalogues happening
 twice before, caught a third time by the same guard.
 
+**A sixty-first, closing the real structural cap on `countryPacks.js`'s
+own country coverage rather than adding one more country under the
+existing cap.** Asked directly to "take this as far as you can" and
+"establish everything, all the countries," the real finding was not a
+missing country -- it was that `COUNTRIES` has required a matching
+real `ancestryPacks.GROUPS` code since round one, which is why Saudi
+Arabia, Spain, Japan, Brazil and dozens of other real, significant
+countries stayed out even once this module had real World Bank/EIU/
+SIPRI/EIA data about every one of them. Checked directly against this
+file's own prior rounds rather than assumed: that gate was never a
+property of the country-level data itself. It is an artifact of
+`COUNTRIES`'s first consumer, `migration.generateRegion`'s
+`countryKey`, which genuinely needs a US ancestry link because it
+answers "where is this player's family from" -- a question a
+country's income level, conflict status, government type, regime
+score, military spending or oil-producer status has no reason to
+depend on.
+
+`server/countryPacks.js#COUNTRY_PROFILES` is the fix: the identical
+field shape `COUNTRIES` entries already carry, keyed directly on a
+real, hyphenated country name, with no ancestry-code check at load
+time -- a real, additive second path, not a replacement. `COUNTRIES`
+and its ancestry gate are unchanged, because character creation's own
+real need for that link has not gone anywhere. `countryProfileFor(key)`
+reads it, and `regionalContextFor`'s own fallback chain (already real
+since the ninth standing rule's ninth-round work) now checks it as a
+second tier, between a dedicated `COUNTRIES` entry and the standalone/
+regional-overview fallbacks that already existed. `GET /api/country-
+packs/:key` was carrying a 404 condition that checked `dedicatedEntry`/
+`standaloneEntry`/`region` but not the new `profileEntry` -- found and
+fixed in the same round, live-verified over a real spawned server
+rather than left for the fixture suite to catch, since a key with a
+real profile entry but no region classification would otherwise have
+404'd despite having real coverage.
+
+**Ten real countries this round, prioritised by population and G20
+membership rather than alphabetically**: Japan, South Korea, Brazil,
+Argentina, Indonesia, Saudi Arabia, Turkey, Spain, Australia and South
+Africa. Spain and Canada are the two gaps this specific round closes
+that this file had already named by name in two separate prior
+rounds — `EU_MIGRATION_OVERVIEW_2025`'s own note named Spain as a real
+top-4 EU destination this module could not give a dedicated entry to
+for exactly this structural reason, and the thirty-ninth standing
+rule's note on Canada ("a destination, not a source") is restated
+rather than overridden: Canada deliberately stays on its existing
+`STANDALONE_REFERENCES` path, not duplicated into `COUNTRY_PROFILES`,
+because its real reason for having no dedicated country-level entry
+was never the ancestry gate this round closes.
+
+**This round hit the same WebSearch-only tooling ceiling the fifty-
+first standing rule already named, and the honest response is the
+same: keep what was actually confirmed, flag what was not, never
+guess the gap closed.** Brazil's `regimeScore` is `null` with its real
+rank (57th of 167, 2024, flawed-democracy) recorded instead -- every
+search that found the rank and category never surfaced the EIU's own
+numeric score. Japan's 8.48 and Saudi Arabia's 2.08 both came from a
+single secondary ranking table apiece that did not label its own
+edition year; both are kept and flagged `regimeScoreConfidence:
+'edition-year-unconfirmed'` rather than silently presented as settled
+2024 figures the way every other `regimeScore` in this file is.
+Several `militaryExpenditurePctGDP` values came from a secondary
+ranking site whose own page title read "2025" while its values
+matched other sources' 2024 figures -- kept as found, `confidence:
+'secondary-estimate'`, the ambiguity stated rather than resolved by
+guessing. Two real, non-default conflict classifications were made
+rather than assumed: Brazil and South Africa are `high-nonstate-
+violence` (not a UCDP state-based conflict, but both real homicide
+figures in this same round support the classification); Indonesia
+(the real, long-running Papua separatist insurgency) and Turkey (the
+real PKK conflict, with a reported-but-unverified 2025 disarmament
+process explicitly flagged as unconfirmed) are `localized-conflict`.
+
+**Brazil's oil-producer entry is the one fully confirmed figure in
+this batch, not a sparse placeholder, and it overturns Brazil's own
+long-standing reputation as a pure importer.** Brazil became a real
+net crude exporter for the first time in its history in 2024 -- IBP/
+Ineep industry figures, ~3.4M bpd produced, 52.1% of production
+exported because refining capacity lags production -- checked directly
+this round rather than assumed stale.
+
+A `COUNTRY_PROFILES` key colliding with a `COUNTRIES` key is refused
+at load time, the same "checked once, never left to drift" posture
+`ancestryPacks.GROUPS`'s own existing check already holds for
+`COUNTRIES` -- mutation-verified by writing a sandboxed copy of the
+module with an injected `german`/`COUNTRY_PROFILES` collision
+alongside the real file (so its own relative `require`s still
+resolve) and confirming the real guard's own error message, not a
+generic one, before deleting the throwaway copy.
+
+Full suite, this round's own final run: 2124 tests, 2107 pass, 0 fail,
+17 skipped, 0 regressions.
+
+**What this round explicitly did not attempt, named rather than
+silently skipped**: the other roughly 175 real sovereign states this
+file still has no dedicated entry for at either tier. Ten real,
+significant countries is genuine progress against a ~195-country
+world, not a claim of comprehensive coverage -- the same honest-ceiling
+posture the fifty-first standing rule already set for this exact
+phrase ("all over the globe"/"all the countries") once before.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

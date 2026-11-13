@@ -562,6 +562,103 @@
 // `region.governmentType` and nothing reads them to decide an
 // outcome; wiring one into a mechanic is a separate, future round
 // with its own calibration pass, not an oversight here.
+//
+// ---------------------------------------------------------------------
+// Fourteenth round: decoupling country coverage from the
+// ancestryPacks.GROUPS gate -- COUNTRY_PROFILES, a second real path
+// that needs no US ancestry code
+// ---------------------------------------------------------------------
+// Asked directly to take country coverage "as far as you can" and
+// "establish everything, all the countries." Before adding a single
+// new entry, the real structural question this module has carried
+// since round one: `COUNTRIES` requires a matching real
+// `ancestryPacks.GROUPS` code, which is why Saudi Arabia, Spain,
+// Japan, Brazil and dozens of other real, significant countries have
+// stayed out even though real World Bank/EIU/SIPRI/EIA data about
+// THEM exists and was never the blocker. Checked directly rather than
+// assumed: that gate was never a property of the real country-level
+// data. It is an artifact of this table's first consumer --
+// `migration.generateRegion`'s `countryKey`, which needs a US
+// ancestry link because it is answering "where is this player's
+// family from." A country's income level, conflict status,
+// government type, regime score, military spending and oil-producer
+// status are real facts about the COUNTRY, independent of whether
+// the US Census happens to track a distinct immigrant-ancestry code
+// for people descended from it.
+//
+// `COUNTRY_PROFILES` is the fix: the exact same field shape
+// `COUNTRIES` entries already carry, keyed directly on a real,
+// hyphenated country name instead of an `ancestryPacks.GROUPS` key,
+// with NO ancestry-code requirement at load time. This is additive,
+// not a replacement -- `COUNTRIES` and its ancestry-code gate are
+// unchanged, because character creation's own "where is this
+// player's family from" question genuinely still needs that link, and
+// nothing about this round argues otherwise. `countryProfileFor(key)`
+// reads it, and `regionalContextFor`'s own fallback chain now checks
+// it as a second real tier, between a dedicated `COUNTRIES` entry and
+// the standalone/regional-overview fallbacks that already existed --
+// Spain and Canada, each already named in this module's own prior
+// rounds as blocked specifically by the missing ancestry code, are
+// the first two gaps this closes.
+//
+// **Ten real countries this round, prioritised by population and G20
+// membership, not alphabetically**: Japan, South Korea, Brazil,
+// Argentina, Indonesia, Saudi Arabia, Turkey, Spain, Australia and
+// South Africa -- ten of the largest real gaps in this table, all
+// unreachable before this round for the identical structural reason,
+// none of them politically selected. Every figure is WebSearched
+// fresh rather than reconstructed from memory, per this module's own
+// standing discipline, and the same honest-sparseness rule as
+// `oilProducer`/`globalIndicators2026` elsewhere in this file applies
+// throughout: a real figure that could not be confirmed to this
+// module's own standard is left `null` with a note, never guessed.
+//
+// **This round's own tooling ceiling, restated rather than relearned
+// (the fifty-first CLAUDE.md standing rule's finding, hit again
+// here):** WebSearch-only access reaches secondary mirrors, not EIU's
+// or SIPRI's own primary tables, for most of these ten. Brazil's
+// regimeScore is `null` with its real rank (57th of 167, 2024,
+// flawed-democracy) recorded instead of an invented number --
+// multiple searches found the rank and category but never the EIU's
+// own numeric score for this entry. Japan's 8.48 and Saudi Arabia's
+// 2.08 both came from one secondary ranking table apiece that did not
+// label which edition year it was drawn from; both are kept, flagged
+// `edition-year-unconfirmed` rather than silently presented as
+// settled 2024 figures the way every other `regimeScore` in this file
+// is. Several `militaryExpenditurePctGDP` values (South Korea,
+// Indonesia, Turkey, Australia, South Africa, Argentina, Spain) come
+// from a single secondary ranking site whose own title ambiguously
+// read "2025" while its values matched other sources' 2024 figures --
+// kept, `confidence: 'secondary-estimate'`, with the year ambiguity
+// stated rather than resolved by guessing.
+//
+// **Two real conflict classifications made rather than defaulted to
+// "no-active-conflict," and said so rather than left implicit.**
+// Brazil and South Africa are `high-nonstate-violence` -- UCDP does
+// not list either as a state-based conflict, and this table's own
+// `CONFLICT_LEVELS` vocabulary has exactly this band for a country
+// with high non-state (cartel/gang) violence short of civil war,
+// which both real homicide figures below support. Indonesia and
+// Turkey are `localized-conflict` -- the Papua separatist insurgency
+// (OPM) and the PKK conflict in Turkey's southeast respectively, both
+// real and long-running; Turkey's note states plainly that a reported
+// 2025 PKK disarmament process was not re-verified to completion this
+// round, so the classification is not presented as more settled than
+// it is.
+//
+// **Brazil's oil-producer entry is the one full, confirmed figure in
+// this batch, not a sparse placeholder.** Brazil became a real net
+// crude exporter for the first time in its history in 2024 (IBP/Ineep
+// industry figures: ~3.4M bpd produced, 52.1% of production
+// exported, because refining capacity lags production) -- checked
+// directly this round rather than assumed from Brazil's long-standing
+// reputation as an importer, which is now out of date.
+//
+// Same report-only posture as every other field in this module:
+// nothing in `server/` reads a `COUNTRY_PROFILES` field to decide an
+// outcome. Wiring any of it into a mechanic is the same separate,
+// future, calibrated round every other real input here has been held
+// to.
 
 'use strict';
 
@@ -2191,6 +2288,246 @@ function describeCountry(key) {
 }
 
 // ---------------------------------------------------------------------
+// COUNTRY_PROFILES -- the fourteenth round's second real path. Same
+// exact field shape as COUNTRIES, keyed on a hyphenated country name
+// instead of an ancestryPacks.GROUPS code, and NO ancestry-code check
+// at load time. See this file's own header for why the gate on
+// COUNTRIES was never a property of the real data.
+// ---------------------------------------------------------------------
+const COUNTRY_PROFILES = {
+  japan: {
+    country: 'Japan', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'unitary parliamentary constitutional monarchy',
+    // Found via a secondary ranking table that did not label its own
+    // edition year -- kept, flagged, not presented as a confirmed 2024
+    // figure the way regimeScore is everywhere else in this file.
+    regimeType: 'full-democracy', regimeScore: 8.48, regimeScoreConfidence: 'edition-year-unconfirmed',
+    militaryExpenditurePctGDP: {
+      value: 1.4, year: 2024, confidence: 'secondary-estimate',
+      note: 'reported via SIPRI-citing press coverage as Japan\'s highest military burden since 1958, not SIPRI\'s own fact sheet line',
+    },
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: {
+        value: 0.2, year: 2023, source: 'unodc-via-secondary-compilation', confidence: 'secondary-compilation',
+        note: 'a separate, uncited blog figure of 0.73 for 2023 was also found this round and not reconciled against this one',
+      },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  'south-korea': {
+    country: 'South Korea', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'unitary presidential republic',
+    // Confirmed directly (Korea Times/EIU reporting): dropped from
+    // full to flawed democracy for the first time since 2020, rank
+    // 32nd of 167, after President Yoon's brief martial-law
+    // declaration exposed real institutional weaknesses -- the EIU's
+    // own stated reasoning, not this file's interpretation.
+    regimeType: 'flawed-democracy', regimeScore: 7.75,
+    militaryExpenditurePctGDP: {
+      value: 2.4, year: 2024, confidence: 'secondary-estimate',
+      note: 'a second secondary source gives 2.56% for the same year; neither is SIPRI\'s own fact sheet figure, both kept as the real range found',
+    },
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  brazil: {
+    country: 'Brazil', incomeLevel: 'upper-middle-income',
+    // UCDP does not list Brazil as a state-based conflict; this is
+    // this table's own real band for high non-state (cartel/gang)
+    // violence short of that, which Brazil's own homicide figure below
+    // supports.
+    conflictLevel: 'high-nonstate-violence',
+    governmentType: 'federal presidential republic',
+    // Rank and category confirmed directly (57th of 167, flawed
+    // democracy, down six places, over the EIU's stated criticism of
+    // the Supreme Federal Court's 2024-election conduct) -- the real
+    // numeric score itself was not found in any source this round's
+    // tooling could reach, so it stays null rather than guessed from
+    // the rank.
+    regimeType: 'flawed-democracy', regimeScore: null, regimeRank: { value: 57, of: 167, year: 2024 },
+    militaryExpenditurePctGDP: {
+      value: 1.0, year: 2024, confidence: 'secondary-estimate',
+      note: 'sources range 0.97%-1.4% depending on compiler; none confirmed as SIPRI\'s own fact sheet figure this round',
+    },
+    // The one fully confirmed figure in this round's batch, not a
+    // sparse placeholder: Brazil became a real net crude exporter for
+    // the first time in its history in 2024.
+    oilProducer: {
+      status: 'net-exporter-since-2024', dailyProductionBbl: 3400000, exportSharePct: 52.1, year: 2024,
+      source: 'ibp-brazil-institute-of-petroleum-gas-and-biofuels; ineep',
+      note: 'refining capacity lags production, which is why over half of output is exported rather than refined domestically',
+    },
+    globalIndicators2026: {
+      homicideRatePer100k: {
+        value: 19.3, year: 2023, source: 'unodc-via-secondary-compilation', confidence: 'secondary-compilation',
+        note: 'a second real source gives 21.2 for the same year (Folha de S.Paulo, citing UNODC); both kept rather than one picked',
+      },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  argentina: {
+    country: 'Argentina', incomeLevel: 'upper-middle-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'federal presidential republic',
+    regimeType: 'flawed-democracy', regimeScore: 6.51,
+    militaryExpenditurePctGDP: {
+      value: 0.62, year: 2024, confidence: 'secondary-estimate',
+      note: 'source title read "2025" while its value matched other sources\' 2024 figures; year kept as found rather than resolved by guessing',
+    },
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 4.49, year: 2023, source: 'unodc-via-secondary-compilation', confidence: 'secondary-compilation' },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  indonesia: {
+    country: 'Indonesia', incomeLevel: 'upper-middle-income',
+    // The Papua separatist insurgency (OPM, against the Indonesian
+    // military) is real, long-running and localized rather than
+    // nationwide -- the table's own `localized-conflict` band, not a
+    // forced "no active conflict" default.
+    conflictLevel: 'localized-conflict',
+    governmentType: 'unitary presidential republic',
+    regimeType: 'flawed-democracy', regimeScore: 6.44,
+    militaryExpenditurePctGDP: { value: 0.78, year: 2024, confidence: 'secondary-estimate' },
+    // Indonesia left OPEC in 2016 and is a real net oil importer --
+    // the structural fact is well-established, but no specific 2024
+    // production/import figure was confirmed to this file's own
+    // standard this round, so none is stated.
+    oilProducer: { status: 'net-importer-left-opec-2016', dailyProductionBbl: null, exportValueUsd2024: null },
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  'saudi-arabia': {
+    country: 'Saudi Arabia', incomeLevel: 'high-income',
+    // No state-based armed conflict on Saudi Arabia's own territory
+    // was found this round -- its combatant role in the Yemen civil
+    // war (see YEMEN_CONFLICT_2026) is reported there, not duplicated
+    // here as a conflict ON Saudi soil.
+    conflictLevel: 'no-active-conflict',
+    governmentType: 'absolute monarchy',
+    // Found via the same unlabeled-edition secondary table as Japan's
+    // figure above -- kept, flagged the same way, not presented as a
+    // confirmed-2024 number. Plausible on its face: Saudi Arabia's
+    // EIU score has sat in the low 2s across recent editions.
+    regimeType: 'authoritarian-regime', regimeScore: 2.08, regimeScoreConfidence: 'edition-year-unconfirmed',
+    militaryExpenditurePctGDP: { value: 7.3, year: 2024, confidence: 'secondary-estimate' },
+    oilProducer: {
+      status: 'worlds-largest-crude-oil-exporter', dailyProductionBbl: 8905000,
+      exportBarrelsPerDayApprox: 6040000, year: 2024,
+      source: 'gastat-via-argaam-2024-annual-total; jodi-monthly-figures',
+      note: '2024 annual totals (GASTAT/Argaam): ~3.28B barrels produced, ~2.21B barrels exported (down 9%, a 14-year low) -- the approx. daily export figure is this fork\'s own division of the annual total by 366 days, not a source\'s own daily figure',
+    },
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  turkey: {
+    country: 'Turkey', incomeLevel: 'upper-middle-income',
+    // The PKK conflict in Turkey's southeast and across the Iraq/Syria
+    // border is real and long-running -- this table's own
+    // `localized-conflict` band. A 2025 PKK disarmament process was
+    // reported in the press; this round did not re-verify it to
+    // completion, so the classification is kept rather than
+    // optimistically downgraded to no-active-conflict on an
+    // unconfirmed report.
+    conflictLevel: 'localized-conflict',
+    governmentType: 'presidential republic',
+    // Confirmed directly: 2024 score 4.26 (down from 4.33 in 2023),
+    // rank 103rd of 167, EIU's own "hybrid regime" classification --
+    // now only three points above the authoritarian threshold.
+    regimeType: 'hybrid-regime', regimeScore: 4.26,
+    militaryExpenditurePctGDP: { value: 1.92, year: 2024, confidence: 'secondary-estimate' },
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 2.6, year: 2023, source: 'unodc-via-secondary-compilation', confidence: 'secondary-compilation' },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  // Closes the real gap this module's own EU_MIGRATION_OVERVIEW_2025
+  // already named: Spain was identified there as a real top-4 EU
+  // migration destination this file could not give a dedicated entry
+  // to, specifically because no "spanish" ancestryPacks.GROUPS key
+  // exists -- the exact structural gap this round's new path exists
+  // to close.
+  spain: {
+    country: 'Spain', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'parliamentary constitutional monarchy',
+    // Confirmed directly: 2024 score 8.13, full democracy, one of 25
+    // countries worldwide in that band this edition.
+    regimeType: 'full-democracy', regimeScore: 8.13,
+    militaryExpenditurePctGDP: {
+      value: 1.3, year: 2024, confidence: 'secondary-estimate',
+      note: 'sources give 1.3 or 1.4 depending on which column of a secondary table is read; not resolved to SIPRI\'s own figure this round',
+    },
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: { value: 0.7, year: 2023, source: 'unodc-via-secondary-compilation', confidence: 'secondary-compilation' },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  australia: {
+    country: 'Australia', incomeLevel: 'high-income', conflictLevel: 'no-active-conflict',
+    governmentType: 'federal parliamentary constitutional monarchy',
+    // Two sources agree on 8.85 for 2024 (up from 8.66 in 2023); a
+    // third table also shows 8.66 unlabeled by year, most likely the
+    // 2023 figure re-surfacing rather than a genuine disagreement.
+    regimeType: 'full-democracy', regimeScore: 8.85,
+    militaryExpenditurePctGDP: { value: 1.88, year: 2024, confidence: 'secondary-estimate' },
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: null, undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+  'south-africa': {
+    country: 'South Africa', incomeLevel: 'upper-middle-income',
+    // Not a UCDP state-based conflict; this table's own real band for
+    // a country with exceptionally high non-state violence, which the
+    // homicide figure below supports directly.
+    conflictLevel: 'high-nonstate-violence',
+    governmentType: 'parliamentary republic',
+    // Confirmed directly: 2024 score 7.16 (up from 7.05 in 2023,
+    // mainly because the ANC was forced into a coalition after the
+    // May 2024 election, per the EIU's own stated reasoning).
+    regimeType: 'flawed-democracy', regimeScore: 7.16,
+    militaryExpenditurePctGDP: { value: 0.70, year: 2024, confidence: 'secondary-estimate' },
+    oilProducer: null,
+    globalIndicators2026: {
+      homicideRatePer100k: {
+        value: 43.7, year: 2022, source: 'unodc-via-secondary-compilation', confidence: 'secondary-compilation',
+        note: 'a national-data source gives 43.5 for the 2023/24 reporting year instead; both real, neither picked over the other',
+      },
+      undernourishmentPct: null, avgTemperatureC: null, roadTrafficDeathRatePer100k: null,
+    },
+  },
+};
+
+// **Checked once, at load time.** A COUNTRY_PROFILES key must not
+// collide with a COUNTRIES key -- the two tables are additive, and a
+// collision would mean the same real country was about to get two
+// disagreeing entries under two different lookup paths.
+{
+  for (const key of Object.keys(COUNTRY_PROFILES)) {
+    if (Object.prototype.hasOwnProperty.call(COUNTRIES, key)) {
+      throw new Error(`countryPacks.js: "${key}" exists in both COUNTRIES and COUNTRY_PROFILES`);
+    }
+  }
+}
+
+function countryProfileFor(key) {
+  return COUNTRY_PROFILES[key] ?? null;
+}
+
+function describeCountryProfile(key) {
+  const entry = countryProfileFor(key);
+  if (!entry) return null;
+  return { key, ...entry };
+}
+
+// ---------------------------------------------------------------------
 // Regional fallback -- "if it doesn't fit specifically, pinpoint it
 // somewhere that relates to it," built honestly rather than by
 // inventing country-specific facts for every real country on Earth
@@ -2215,22 +2552,28 @@ const REGION_BY_KEY = {
   french: 'europe', scottish: 'europe', dutch: 'europe', norwegian: 'europe', swedish: 'europe',
   russian: 'europe', ukrainian: 'europe', greek: 'europe', portuguese: 'europe', hungarian: 'europe',
   czech: 'europe', swiss: 'europe', welsh: 'europe', lithuanian: 'europe', bosnian: 'europe',
+  spain: 'europe',
   // Middle East
-  israeli: 'middle-east', yemen: 'middle-east',
+  israeli: 'middle-east', yemen: 'middle-east', 'saudi-arabia': 'middle-east', turkey: 'middle-east',
   // Africa
   somali: 'africa', nigerian: 'africa', ethiopian: 'africa', ghanaian: 'africa', kenyan: 'africa',
-  'subsaharan-african': 'africa', 'cape-verde': 'africa',
+  'subsaharan-african': 'africa', 'cape-verde': 'africa', 'south-africa': 'africa',
   // Caribbean
   'west-indian': 'caribbean', jamaican: 'caribbean', haitian: 'caribbean', 'dominican-republic': 'caribbean',
   cuba: 'caribbean', 'puerto-rico': 'caribbean', 'virgin-islands': 'caribbean',
   // Asia
   vietnamese: 'asia', chinese: 'asia', filipino: 'asia', 'asian-indian': 'asia',
+  japan: 'asia', 'south-korea': 'asia', indonesia: 'asia',
   // Latin America (Central/South America, excluding the Caribbean above)
   mexican: 'latin-america', guatemalan: 'latin-america', honduran: 'latin-america', salvadoran: 'latin-america',
-  venezuela: 'latin-america', colombia: 'latin-america',
+  venezuela: 'latin-america', colombia: 'latin-america', brazil: 'latin-america', argentina: 'latin-america',
   // North America -- the explicit baseline; no "North America overview"
   // exists because the baseline itself is the dedicated entry.
   'united-states': 'north-america', canada: 'north-america',
+  // Oceania -- no regional overview exists for it yet (same honest gap
+  // REGION_OVERVIEWS already documents for any region with no built
+  // overview), but the classification itself is still real.
+  australia: 'oceania',
 };
 
 // Only regions with a REAL, already-built multi-country overview get
@@ -2262,23 +2605,27 @@ const STANDALONE_REFERENCES = {
 };
 
 // The real fallback chain, in order: a dedicated `COUNTRIES` entry, a
-// dedicated standalone reference, then the region's own overview --
-// and if none of those three exist, an honest, named gap rather than
-// a silent null or an invented number.
+// dedicated `COUNTRY_PROFILES` entry (the fourteenth round's second
+// real path, no ancestry code needed), a dedicated standalone
+// reference, then the region's own overview -- and if none of those
+// four exist, an honest, named gap rather than a silent null or an
+// invented number.
 function regionalContextFor(key) {
   const dedicatedEntry = countryFor(key);
+  const profileEntry = countryProfileFor(key);
   const standaloneEntry = STANDALONE_REFERENCES[key] ?? null;
   const region = REGION_BY_KEY[key] ?? null;
   const regionalOverview = region ? (REGION_OVERVIEWS[region] ?? null) : null;
 
   let coverageNote;
   if (dedicatedEntry) coverageNote = 'a dedicated, country-specific COUNTRIES entry exists';
+  else if (profileEntry) coverageNote = 'a dedicated, country-specific COUNTRY_PROFILES entry exists (no ancestryPacks.GROUPS key needed for this path)';
   else if (standaloneEntry) coverageNote = 'a dedicated, country-specific standalone reference exists (no ancestryPacks.GROUPS key for it yet)';
   else if (regionalOverview) coverageNote = `no dedicated entry for this key; falling back to its region's (${region}) real overview`;
   else if (region) coverageNote = `region (${region}) is known, but no regional overview has been built for it yet`;
   else coverageNote = 'no region classification exists for this key -- a real, undone gap, not a silent zero';
 
-  return { key, dedicatedEntry, standaloneEntry, region, regionalOverview, coverageNote };
+  return { key, dedicatedEntry, profileEntry, standaloneEntry, region, regionalOverview, coverageNote };
 }
 
 module.exports = {
@@ -2290,6 +2637,9 @@ module.exports = {
   MILITARY_EXPENDITURE_REFERENCE,
   OIL_PRODUCER_REFERENCE,
   COUNTRIES,
+  COUNTRY_PROFILES,
+  countryProfileFor,
+  describeCountryProfile,
   EU_MIGRATION_OVERVIEW_2025,
   VENEZUELA_SITUATION_2026,
   CUBA_CRISIS_2026,

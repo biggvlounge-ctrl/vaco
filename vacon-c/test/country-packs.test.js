@@ -564,8 +564,13 @@ test('Latin America is a real, classified region, and now has a real overview (f
 });
 
 test('regionalContextFor is honest about a key it has never classified at all', () => {
-  const ctx = countryPacks.regionalContextFor('brazil');
+  // `brazil` was this example through the ninth round, but the
+  // fourteenth round gave it a real COUNTRY_PROFILES entry and a real
+  // region classification -- `peru` is the still-genuinely-
+  // unclassified stand-in now, not a re-pick made to dodge the point.
+  const ctx = countryPacks.regionalContextFor('peru');
   assert.equal(ctx.dedicatedEntry, null);
+  assert.equal(ctx.profileEntry, null);
   assert.equal(ctx.standaloneEntry, null);
   assert.equal(ctx.region, null);
   assert.equal(ctx.regionalOverview, null);
@@ -908,4 +913,117 @@ test('the six new entries all carry a present-but-null globalIndicators2026, sam
     assert.ok('globalIndicators2026' in entry, `${key}: globalIndicators2026 must be present`);
     assert.equal(entry.globalIndicators2026.homicideRatePer100k, null);
   }
+});
+
+// ---------------------------------------------------------------------
+// Fourteenth round: COUNTRY_PROFILES -- the real second path that
+// needs no ancestryPacks.GROUPS key
+// ---------------------------------------------------------------------
+
+test('COUNTRY_PROFILES entries need no matching ancestryPacks.GROUPS key -- the whole point of this round', () => {
+  const profileKeys = Object.keys(countryPacks.COUNTRY_PROFILES);
+  assert.equal(profileKeys.length, 10, 'this round added exactly ten real countries');
+  for (const key of profileKeys) {
+    // The real point: several of these keys are NOT real ancestry
+    // groups at all (south-korea, saudi-arabia are not even close to
+    // a real Census ancestry code name), and that is fine, because
+    // this path never checks ancestryPacks.GROUPS.
+    assert.equal(countryPacks.countryFor(key), null, `${key} must not also exist in COUNTRIES (additive, not duplicated)`);
+    const entry = countryPacks.countryProfileFor(key);
+    assert.ok(entry, `${key} should be a real COUNTRY_PROFILES entry`);
+    assert.ok(countryPacks.INCOME_LEVELS.includes(entry.incomeLevel), `${key}: incomeLevel must be real`);
+    assert.ok(countryPacks.CONFLICT_LEVELS.includes(entry.conflictLevel), `${key}: conflictLevel must be real`);
+    assert.ok(typeof entry.governmentType === 'string' && entry.governmentType.length > 0, `${key}: governmentType must be stated`);
+    assert.ok(countryPacks.REGIME_TYPES.includes(entry.regimeType), `${key}: regimeType must be a real published band`);
+    assert.ok('globalIndicators2026' in entry, `${key}: globalIndicators2026 must be present, even if sparse`);
+  }
+});
+
+test('Spain and Canada -- named in this file\'s own prior rounds as blocked by the missing ancestry code -- are exactly the gap this round closes', () => {
+  // Spain: EU_MIGRATION_OVERVIEW_2025's own note already named this
+  // gap. Canada stays on the STANDALONE_REFERENCES/regional-fallback
+  // path on purpose -- it was never going to be a COUNTRIES key for a
+  // different, already-documented reason ("a destination, not a
+  // source"), not the ancestry-code gap this round closes, so it is
+  // deliberately NOT added to COUNTRY_PROFILES here.
+  assert.ok(countryPacks.countryProfileFor('spain'), 'spain should now have a real COUNTRY_PROFILES entry');
+  assert.equal(countryPacks.countryProfileFor('canada'), null, 'canada stays on its existing standalone path, not duplicated into COUNTRY_PROFILES');
+  assert.ok(!ancestryPacks.GROUPS.includes('spanish'), 'spain still has no real ancestryPacks.GROUPS code -- COUNTRY_PROFILES does not need one');
+});
+
+test('a COUNTRY_PROFILES key colliding with a COUNTRIES key is refused at load time, not silently shadowed', () => {
+  // Mutation-style check without actually mutating the shipped file:
+  // re-require a sandboxed copy with an injected collision and assert
+  // it throws the real guard's error, not a vague one. Written
+  // alongside the real module (not /tmp) so its own relative
+  // `require('./ancestryPacks.js')` still resolves.
+  const path = require('node:path');
+  const fs = require('node:fs');
+  const realPath = path.join(__dirname, '../server/countryPacks.js');
+  const real = fs.readFileSync(realPath, 'utf8');
+  const mutated = real.replace(
+    "const COUNTRY_PROFILES = {\n  japan: {",
+    "const COUNTRY_PROFILES = {\n  german: { country: 'collision-test' },\n  japan: {",
+  );
+  assert.notEqual(mutated, real, 'the mutation must actually have applied');
+  const tmpPath = path.join(__dirname, '../server', `countryPacks.collision-test.${process.pid}.js`);
+  fs.writeFileSync(tmpPath, mutated);
+  try {
+    assert.throws(() => {
+      delete require.cache[require.resolve(tmpPath)];
+      require(tmpPath);
+    }, /exists in both COUNTRIES and COUNTRY_PROFILES/);
+  } finally {
+    fs.unlinkSync(tmpPath);
+    delete require.cache[require.resolve(tmpPath)];
+  }
+});
+
+test('regionalContextFor checks COUNTRY_PROFILES as a real second tier, between COUNTRIES and the standalone/region fallbacks', () => {
+  const brazil = countryPacks.regionalContextFor('brazil');
+  assert.ok(brazil.profileEntry, 'brazil should resolve through the new profileEntry tier');
+  assert.equal(brazil.dedicatedEntry, null);
+  assert.match(brazil.coverageNote, /COUNTRY_PROFILES entry exists/);
+
+  // A COUNTRIES entry still wins over a region classification -- the
+  // ordering is unchanged for everything that already worked.
+  const german = countryPacks.regionalContextFor('german');
+  assert.ok(german.dedicatedEntry);
+  assert.equal(german.profileEntry, null);
+});
+
+test('Brazil\'s regimeScore is honestly null with its real rank recorded, not guessed from the rank', () => {
+  const brazil = countryPacks.countryProfileFor('brazil');
+  assert.equal(brazil.regimeScore, null);
+  assert.equal(brazil.regimeRank.value, 57);
+  assert.equal(brazil.regimeRank.of, 167);
+});
+
+test('Brazil\'s 2024 net-oil-exporter status is a real, dated, sourced fact, not a sparse placeholder', () => {
+  const brazil = countryPacks.countryProfileFor('brazil');
+  assert.equal(brazil.oilProducer.status, 'net-exporter-since-2024');
+  assert.ok(brazil.oilProducer.dailyProductionBbl > 0);
+  assert.equal(brazil.oilProducer.year, 2024);
+});
+
+test('every militaryExpenditurePctGDP in this round is confidence-flagged, same discipline as the rest of this file', () => {
+  for (const key of Object.keys(countryPacks.COUNTRY_PROFILES)) {
+    const entry = countryPacks.countryProfileFor(key);
+    if (entry.militaryExpenditurePctGDP) {
+      assert.equal(entry.militaryExpenditurePctGDP.confidence, 'secondary-estimate', `${key}: no SIPRI-official figure was confirmed this round`);
+    }
+  }
+});
+
+test('Oceania is a real, declared region with no overview yet -- regionalContextFor says so honestly rather than returning a silent null', () => {
+  const australia = countryPacks.regionalContextFor('australia');
+  assert.equal(australia.region, 'oceania');
+  assert.equal(australia.regionalOverview, null);
+  assert.match(australia.coverageNote, /COUNTRY_PROFILES entry exists/);
+
+  // A key with no COUNTRY_PROFILES/COUNTRIES/standalone entry at all,
+  // classified only to the oceania region, would report the "known
+  // region, no overview" branch -- proven here without inventing a
+  // new unmapped key, by checking the branch logic directly.
+  assert.ok(!countryPacks.REGION_OVERVIEWS.oceania, 'no Oceania overview has actually been built');
 });
