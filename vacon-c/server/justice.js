@@ -554,6 +554,15 @@ function release(worldState, entityId, options = {}) {
     });
   }
 
+  // Prison-to-street pipeline (see that section's own header below):
+  // if this release just freed a real prison-gang member, connect them
+  // to its real street-side counterpart in the real community they are
+  // actually in. A no-op, returning null, for anyone who was never a
+  // member of one — defined after this function in the file, but a
+  // function declaration, so the forward reference resolves at call
+  // time rather than needing to be moved above `release` itself.
+  joinStreetAffiliate(worldState, entityId, { tick });
+
   return caseRow;
 }
 
@@ -712,6 +721,155 @@ function ensurePrisonGang(worldState, prisonPropertyId, tick) {
   });
 
   return founded;
+}
+
+// ---------------------------------------------------------------------
+// Prison-to-street pipeline
+// ---------------------------------------------------------------------
+//
+// By direct instruction: "let certain gangs branch from the prisons to
+// the streets. They'll be connected depending on area, connections,
+// organizations that are connected." Reuses the exact same real
+// substrate `ensurePrisonGang` above already does — `engine.
+// generateFaction` (the identical call `worldgen.js`'s own ordinary
+// street-gang generation makes, `type: 'gang'`, no new archetype
+// invented for it) and `membership.joinOrganization` — rather than a
+// second, parallel founding mechanism.
+//
+// **"Connected depending on area" is the real, already-tracked
+// `npc.communityId` a released person is actually in, never an
+// invented relocation.** Nothing in this engine moves a released
+// person's community (see `release()` above — only their routine is
+// re-seeded), so "the area they're connected to" is exactly where
+// they already are when they walk out, the identical real field
+// `characterCreation.js`'s own (module-local) `communityOf` helper
+// already reads for a different purpose elsewhere in this engine.
+//
+// **One real affiliate per (prison gang, community) pair, not one
+// global street arm.** `worldState.streetAffiliates` keys on
+// `${prisonGangOrganizationId}:${communityId}` — the same in-memory-
+// only, no-schema-column posture `worldState.prisonGangs` above
+// already carries, for the identical reason (no column exists for
+// either, and this is real, separate schema work no round here takes
+// on casually). Two different released members of the same prison
+// gang, returning to two different real communities, grow two real,
+// separately-tracked street crews rather than one that implausibly
+// spans both at once — the literal reading of "branch... depending on
+// area."
+
+function streetAffiliateOf(worldState, prisonGangOrganizationId, communityId) {
+  if (prisonGangOrganizationId == null || communityId == null) return null;
+  const affiliates = worldState.streetAffiliates || {};
+  const key = `${prisonGangOrganizationId}:${communityId}`;
+  const existingId = affiliates[key] ?? null;
+  if (!existingId) return null;
+  return (worldState.organizations || []).find((o) => o.id === existingId) ?? null;
+}
+
+// Founds (or returns the already-real) street-side counterpart to one
+// real prison gang, scoped to one real community. A single released
+// founding member is enough — unlike `ensurePrisonGang`'s real
+// `PRISON_GANG_MIN_MEMBERS` floor of two, there is no equivalent
+// "is this even a gang" question here: the founder is a real,
+// already-proven member of the prison gang they are branching from,
+// not an arbitrary pair of strangers, so no minimum-members constant
+// is needed or defined.
+function ensureStreetAffiliate(worldState, options = {}) {
+  const { prisonGangOrganizationId, communityId, tick = worldState.tick ?? 0 } = options;
+  if (prisonGangOrganizationId == null || communityId == null) return null;
+
+  const existing = streetAffiliateOf(worldState, prisonGangOrganizationId, communityId);
+  if (existing) return existing;
+
+  const prisonGang = (worldState.organizations || []).find(
+    (o) => o.id === prisonGangOrganizationId,
+  ) ?? null;
+  if (!prisonGang) return null;
+
+  const community = (worldState.communities || []).find((c) => c.id === communityId) ?? null;
+
+  // eslint-disable-next-line global-require
+  const engine = require('./engine.js');
+  // eslint-disable-next-line global-require
+  const { seededDraw } = require('./seeded.js');
+  worldState.organizations = worldState.organizations || [];
+  const founded = engine.generateFaction({
+    name: `${prisonGang.name} Street Crew`,
+    type: 'gang',
+    // §88: seeded on the stable (prisonGangOrganizationId, communityId)
+    // pair, never on a founding member's own id — a roster changes
+    // tick to tick and a trait draw keyed on one would not replay. Same
+    // primitive `orgArchetypes.traitValueFor` already uses, a 20-90
+    // band matching `worldgen.js`'s own ordinary street-gang trait
+    // spread, not a different invented range for an affiliate crew.
+    traitValueFor: (def) => Math.round(
+      20 + seededDraw([
+        worldState.seed ?? 'world', 'street-affiliate-trait',
+        prisonGangOrganizationId, communityId, def.family, def.name,
+      ]) * 70,
+    ),
+  });
+  if (!worldState.organizations.includes(founded)) worldState.organizations.push(founded);
+
+  // In-memory-only convenience fields, the same treatment `founded.
+  // leader_id = leaderId` already gets a few lines above in
+  // `ensurePrisonGang` — not a schema column, a real fact about this
+  // one generated row nonetheless.
+  founded.affiliatedPrisonGangId = prisonGangOrganizationId;
+  founded.communityId = communityId;
+
+  worldState.streetAffiliates = worldState.streetAffiliates || {};
+  worldState.streetAffiliates[`${prisonGangOrganizationId}:${communityId}`] = founded.id;
+
+  worldStore.addHistoricalRecord(worldState, {
+    event_type: 'street_affiliate_founded',
+    description: `${founded.name} forms on the street`
+      + `${community ? ` in ${community.name}` : ''}, affiliated with ${prisonGang.name}`,
+    when_tick: tick,
+    participants: [],
+    where_location_id: null,
+  });
+
+  return founded;
+}
+
+// Called from `release()` below. If the person being released was a
+// real member of a prison gang (`'prison gang'` or
+// `'racially-affiliated prison gang'`, both `orgArchetypes` entries),
+// connects them to its real street-side counterpart in the real
+// community they are actually in — founding it if this is the first
+// member of that prison gang ever released into that community.
+// Returns the affiliate organization, or null if the released person
+// was never a prison-gang member, or has no real community to be
+// connected into.
+function joinStreetAffiliate(worldState, entityId, options = {}) {
+  const { tick = worldState.tick ?? 0 } = options;
+
+  const prisonMembership = (worldState.entityOrganizationMemberships || []).find((m) => {
+    if (m.entity_id !== entityId) return false;
+    const org = (worldState.organizations || []).find((o) => o.id === m.organization_id);
+    return org != null && (org.archetype === 'prison gang' || org.archetype === 'racially-affiliated prison gang');
+  });
+  if (!prisonMembership) return null;
+
+  // The real `npc.communityId`, read directly — the same field
+  // `characterCreation.js`'s own (unexported) `communityOf` helper
+  // reads, inlined here rather than widening that module's exports for
+  // one field already reachable off the real `npcs` row this file
+  // already holds a reference style for elsewhere in this section.
+  const npc = (worldState.npcs || []).find((n) => n.id === entityId) ?? null;
+  const communityId = npc?.communityId ?? null;
+  if (communityId == null) return null;
+
+  const affiliate = ensureStreetAffiliate(worldState, {
+    prisonGangOrganizationId: prisonMembership.organization_id,
+    communityId,
+    tick,
+  });
+  if (!affiliate) return null;
+
+  membership.joinOrganization(worldState, { entityId, organizationId: affiliate.id, tick });
+  return affiliate;
 }
 
 // ---------------------------------------------------------------------
@@ -1258,4 +1416,7 @@ module.exports = {
   inmatesOf,
   ensurePrisonGang,
   runPrisonBreaks,
+  streetAffiliateOf,
+  ensureStreetAffiliate,
+  joinStreetAffiliate,
 };

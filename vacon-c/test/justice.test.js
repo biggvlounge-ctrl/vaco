@@ -875,3 +875,128 @@ test('release notes real living family when this engine actually has one on reco
   assert.match(release.description, /Okafor family/);
   assert.ok(w.memories.some((m) => m.entity_id === 1 && m.category === 'family'));
 });
+
+// ---------------------------------------------------------------------
+// Prison-to-street pipeline — "let certain gangs branch from the
+// prisons to the streets... connected depending on area, connections,
+// organizations that are connected"
+// ---------------------------------------------------------------------
+
+test('a released prison-gang member connects to a real street-side affiliate in their own community', () => {
+  const w = courtWorld();
+  w.properties.push({ id: 200, city_id: 9, landmark_category: 'prison', name: 'Riverside Correctional' });
+  w.npcs.push({ id: 2, communityId: 5, status: 'active', home_property_id: 78 });
+  w.crimeIncidents.push({
+    id: 2, category: 'theft', perpetrator_entity_id: 2, victim_entity_id: null,
+    community_id: 5, tick: 9, severity: 30, investigated_tick: 10, cleared: true,
+  });
+
+  justice.runJustice(w, { tick: 10 });
+  const gangId = w.prisonGangs[200];
+  assert.ok(gangId, 'no prison gang formed with two inmates at the same prison');
+
+  const released = justice.release(w, 1, { tick: 50 });
+  assert.ok(released, 'release() found nothing to release');
+
+  const affiliateId = w.streetAffiliates[`${gangId}:5`];
+  assert.ok(affiliateId, 'no street affiliate was founded on release');
+  const affiliate = w.organizations.find((o) => o.id === affiliateId);
+  assert.equal(affiliate.type, 'gang');
+  assert.match(affiliate.name, /Street Crew/);
+  assert.equal(affiliate.affiliatedPrisonGangId, gangId);
+  assert.equal(affiliate.communityId, 5);
+
+  const membershipRow = w.entityOrganizationMemberships.find(
+    (m) => m.entity_id === 1 && m.organization_id === affiliateId,
+  );
+  assert.ok(membershipRow, 'the released member never joined their own street affiliate');
+
+  assert.ok(w.historicalRecords.some((r) => r.event_type === 'street_affiliate_founded'));
+});
+
+test('a second member of the same prison gang, released into the same community, joins the EXISTING affiliate rather than founding a second one', () => {
+  const w = courtWorld();
+  w.properties.push({ id: 200, city_id: 9, landmark_category: 'prison', name: 'Riverside Correctional' });
+  w.npcs.push({ id: 2, communityId: 5, status: 'active', home_property_id: 78 });
+  w.crimeIncidents.push({
+    id: 2, category: 'theft', perpetrator_entity_id: 2, victim_entity_id: null,
+    community_id: 5, tick: 9, severity: 30, investigated_tick: 10, cleared: true,
+  });
+
+  justice.runJustice(w, { tick: 10 });
+  const gangId = w.prisonGangs[200];
+
+  justice.release(w, 1, { tick: 50 });
+  const firstAffiliateId = w.streetAffiliates[`${gangId}:5`];
+
+  justice.release(w, 2, { tick: 51 });
+  const secondAffiliateId = w.streetAffiliates[`${gangId}:5`];
+
+  assert.equal(secondAffiliateId, firstAffiliateId, 'a second release founded a second, duplicate street affiliate');
+  const founders = w.organizations.filter((o) => o.affiliatedPrisonGangId === gangId);
+  assert.equal(founders.length, 1, 'more than one real street affiliate exists for the same (gang, community) pair');
+
+  const bothMembers = w.entityOrganizationMemberships
+    .filter((m) => m.organization_id === firstAffiliateId)
+    .map((m) => m.entity_id);
+  assert.deepEqual(new Set(bothMembers), new Set([1, 2]));
+});
+
+test('two members of the same prison gang, released into two DIFFERENT real communities, branch into two separate street affiliates', () => {
+  const w = courtWorld();
+  w.properties.push({ id: 200, city_id: 9, landmark_category: 'prison', name: 'Riverside Correctional' });
+  w.communities.push({ id: 6, city_id: 9 });
+  w.npcs.push({ id: 2, communityId: 6, status: 'active', home_property_id: 78 });
+  w.crimeIncidents.push({
+    id: 2, category: 'theft', perpetrator_entity_id: 2, victim_entity_id: null,
+    community_id: 6, tick: 9, severity: 30, investigated_tick: 10, cleared: true,
+  });
+
+  justice.runJustice(w, { tick: 10 });
+  const gangId = w.prisonGangs[200];
+
+  justice.release(w, 1, { tick: 50 }); // communityId 5
+  justice.release(w, 2, { tick: 51 }); // communityId 6
+
+  const affiliateIdA = w.streetAffiliates[`${gangId}:5`];
+  const affiliateIdB = w.streetAffiliates[`${gangId}:6`];
+  assert.ok(affiliateIdA, 'no affiliate founded in community 5');
+  assert.ok(affiliateIdB, 'no affiliate founded in community 6');
+  assert.notEqual(affiliateIdA, affiliateIdB, 'the same prison gang branching into two real areas produced only one street affiliate');
+
+  const founders = w.organizations.filter((o) => o.affiliatedPrisonGangId === gangId);
+  assert.equal(founders.length, 2, 'exactly two area-scoped street affiliates should exist for this one prison gang');
+});
+
+test('releasing someone who was never a prison-gang member founds no street affiliate at all', () => {
+  const w = courtWorld();
+  w.properties.push({ id: 200, city_id: 9, landmark_category: 'prison', name: 'Riverside Correctional' });
+
+  justice.runJustice(w, { tick: 10 }); // one inmate alone — no gang forms (PRISON_GANG_MIN_MEMBERS)
+  assert.equal(w.prisonGangs?.[200], undefined);
+
+  const released = justice.release(w, 1, { tick: 50 });
+  assert.ok(released, 'release() found nothing to release');
+  assert.equal(w.streetAffiliates, undefined, 'a street affiliate was founded with no real prison gang behind it');
+});
+
+test('joinStreetAffiliate is a real no-op (returns null) for an entity with no real community', () => {
+  const w = courtWorld();
+  w.properties.push({ id: 200, city_id: 9, landmark_category: 'prison', name: 'Riverside Correctional' });
+  w.npcs.push({ id: 2, communityId: 5, status: 'active', home_property_id: 78 });
+  w.crimeIncidents.push({
+    id: 2, category: 'theft', perpetrator_entity_id: 2, victim_entity_id: null,
+    community_id: 5, tick: 9, severity: 30, investigated_tick: 10, cleared: true,
+  });
+  justice.runJustice(w, { tick: 10 });
+  const gangId = w.prisonGangs[200];
+  assert.ok(gangId);
+
+  // A real member whose communityId has gone missing (e.g. a living
+  // record with no placement) — a real, if unusual, case `membership
+  // .communityOf` already returns null for, not a fabricated one.
+  w.npcs.find((n) => n.id === 1).communityId = null;
+  const result = justice.joinStreetAffiliate(w, 1, { tick: 50 });
+  assert.equal(result, null);
+  assert.equal(w.streetAffiliates, undefined);
+});
