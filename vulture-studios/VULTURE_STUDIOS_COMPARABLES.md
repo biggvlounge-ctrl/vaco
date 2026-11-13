@@ -4,7 +4,7 @@ Written to close a comparables-coverage gap.
 
 **What it is:** fund-and-produce financing — the division that invests
 in projects and takes a share of what they earn, then distributes the
-output into Vvltvre Music and Vvltvre Pods.
+output into Vvltvre Flix (film/tv) or Vvltvre Music (music/podcast).
 
 ## Comparables
 
@@ -49,8 +49,22 @@ good selection fixes small-n variance.
 ## What is genuinely built
 
 Fund-and-produce financing, project investment and revenue
-distribution, real distribution into Vvltvre Music and Pods, and a VDP
-district. Persisted.
+distribution, real distribution into Vvltvre Flix and Vvltvre Music,
+and a VDP district. Persisted.
+
+> *Correction, added during this round's doc-vs-code reconciliation
+> (13 Nov 2026, later the same day as the "Implementation status" pass
+> below).* The line above previously said "into Vvltvre Music and
+> Pods." That second half was never true: `grep` across this app's own
+> `server.js` and `lib/*.js` for `vulture-pods`/`VULTURE_PODS` returns
+> nothing. `distribute` only ever calls `registerWithVultureFlix`
+> (film/tv) or `registerWithVultureMusic` (music/podcast — see "Real
+> music/podcast distribution (Phase 2)" above, which itself already
+> explains that a `podcast` project maps to Vvltvre Music's own
+> `podcast-episode` format specifically *so that* no Vvltvre Pods
+> Show/Episode wrapper has to be fabricated). The same stale claim was
+> copied into `../vulture-pods/VULTURE_PODS_COMPARABLES.md`'s own "What
+> is genuinely built" line and is corrected there too.
 
 ## Implementation status (verified 13 Nov 2026)
 
@@ -60,5 +74,6 @@ distribution into `vulture-music` (branching on
 `vulture-music/lib/releases.js`'s own exact-sum rounding. The VOKEN
 `fractional-ownership` gating asymmetry this doc raises is still real
 and still unresolved — re-checked, not just re-asserted; it remains an
-open, named legal question rather than an engineering gap. Nothing
-else stale found; no changes needed.
+open, named legal question rather than an engineering gap. One stale
+claim found later the same day and corrected above: this app never
+distributes into Vvltvre Pods.

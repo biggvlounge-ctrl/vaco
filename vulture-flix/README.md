@@ -288,7 +288,13 @@ credential, confirming the backend-only routes really do require one.
 `public/index.html`.
 
 ## Not yet built
-- Any UI — this phase is the real API and data model only.
+- ~~Any UI — this phase is the real API and data model only.~~
+  **Done — checked directly, 13 Nov 2026, during this round's doc-vs-
+  code reconciliation.** This bullet predates the "Frontend coverage
+  pass (31 Oct 2026)" section above and was never removed once that
+  landed. `public/index.html` is a real, working client of this app's
+  Catalogue and Account tabs (subscribe/watch/cancel) plus the
+  Creators tab added in that pass — not just an API and data model.
 - Real content delivery/streaming infrastructure — `watchTitle` is a
   real access-gated event record, not actual video playback.
 - Viewership-based bonus/backend participation clauses some real

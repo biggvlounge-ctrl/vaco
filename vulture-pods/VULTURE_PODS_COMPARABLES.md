@@ -37,12 +37,29 @@ measured anywhere.
 ## What is genuinely built
 
 10 show categories, subscriptions with the 10% take, video cross-links
-to Vavlt Stvdios, distribution from Vvltvre Studios. Persisted.
+to Vavlt Stvdios. Persisted.
+
+> *Correction, added during this round's doc-vs-code reconciliation
+> (13 Nov 2026).* This line previously also claimed "distribution from
+> Vvltvre Studios" — checked directly rather than trusted from either
+> doc, and it is false: nothing in `vulture-studios/server.js` or
+> `vulture-studios/lib/*.js` ever references `vulture-pods` under any
+> name. `vulture-studios/README.md`'s own "Real music/podcast
+> distribution" section confirms why — a studio-financed `podcast`
+> project distributes into **Vvltvre Music's** own `podcast-episode`
+> format directly (`registerWithVultureMusic`), explicitly *bypassing*
+> Vvltvre Pods' own Show/Episode wrapper rather than creating one. The
+> only real distribution this app has is still the one already
+> described above: `publishEpisode`'s own outbound call into
+> `vulture-music`'s `POST /api/releases`. See the matching correction
+> in `../vulture-studios/VULTURE_STUDIOS_COMPARABLES.md`.
 
 ## Implementation status (verified 13 Nov 2026)
 
 Checked directly against real code. `PLATFORM_TAKE_PERCENT = 0.10` is
 exactly as stated in `lib/subscriptions.js`. `lib/shows.js#SHOW_CATEGORIES`
 has exactly 10 real entries (news, comedy, true-crime, business,
-technology, sports, culture, education, fiction, other). Nothing stale
-found; no changes needed.
+technology, sports, culture, education, fiction, other). One stale
+claim found and corrected in this same round, later the same day — see
+the correction immediately above: this app receives no real
+distribution from Vvltvre Studios.
