@@ -490,6 +490,24 @@ Belize (a real CRS-sourced finding that the EIU's own Caribbean
 coverage excludes them). This is reported as a real, reproducible
 coverage ceiling, not a stopping point chosen out of fatigue.
 
+## Chaos-driven family/tribe absorption (seventieth standing rule)
+See `CLAUDE.md`'s own seventieth standing rule for the full account.
+`recruitment.js`'s chaos-driven recruitment mechanic scoped itself to
+gangs only at landing, since a gang recruiting a stranger and a family
+absorbing someone are not the same shape of event — a family does not
+recruit peers. This closes the real, narrower mechanism that actually
+fits: kinship absorbing an already-orphaned child under local danger.
+"Tribe" needed no separate mechanism — `engine.tribeIdFor` already
+reads one straight off `family_memberships`. A real version of the
+sixth standing rule's own trap was found first: `family_memberships
+.role` is never `'parent'` in a real generated world, so a child's
+parent is read from `births.js`'s own real birth record instead.
+Honestly scoped: only a child actually born during the running
+simulation has one, so an NPC present from world generation can never
+be detected as orphaned this way. The absorbing family is picked by
+the real `families.unity` field, the family-side mirror of picking a
+gang's recruit by `influenceRatingOf`.
+
 ## Bluffing and its exposure
 See `CLAUDE.md`'s own fifty-second standing rule for the full design.
 `server/bluff.js` models the gap between what `weapons

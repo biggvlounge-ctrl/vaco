@@ -4316,6 +4316,58 @@ Full suite, this round's own final run: 2076 tests, 2052 pass, 0 fail,
 7 cancelled (the pre-existing `worldgen.test.js` hang and its
 downstream collateral timeouts, unrelated to this round), 17 skipped.
 
+**A seventieth, and it is `recruitment.js`'s own declared gap closed --
+written after the fact for the same reason the sixty-second, sixty-
+fourth and sixty-eighth rules' entries were, this file being mid-flight
+under a concurrent round at the time.** The chaos-driven recruitment
+mechanic (the fifty-first-adjacent instruction, "organizations, gangs,
+tribes, families grow") had scoped itself to gangs only, because a
+gang recruiting a stranger off the street under danger and a family
+absorbing someone are not the same shape of event -- a family does not
+recruit peers. `statistics.js`'s own `tribe_family_recruitment_growth`
+read a declared `'unavailable'` rather than guess at a mechanism that
+did not exist yet.
+
+**The real, narrower mechanism that actually fits this engine's own
+substrate is kinship absorbing an already-orphaned child under local
+danger, not a stranger joining as a peer.** "Tribe" needed no separate
+mechanism at all -- `engine.tribeIdFor` already reads a tribe straight
+off `family_memberships`, the same real structure `characterCreation
+.js`'s own extended-family generation already builds.
+
+**A real version of the sixth standing rule's own trap was found and
+avoided rather than repeated.** The obvious way to find a child's
+parent -- `family_memberships.role === 'parent'` -- is dead on arrival
+against a real generated world: `worldgen.js` assigns every ordinary
+NPC the flat role `'member'`, and `births.js` never relabels a bearer
+`'parent'` anywhere. Checked directly against a real generated world
+rather than assumed. `parentIdsOf` reads `births.js`'s own real birth
+record (`what: 'birth', who: [child, bearer, other?]`) instead --
+closing the identical shape of gap the sixth rule first named, in a
+new place. **Honestly scoped, not hidden**: only a child actually born
+during the running simulation has a birth record to read a parent's
+identity from, so an NPC present from initial world generation can
+never be detected as orphaned by this mechanism -- stated plainly
+rather than silently narrowing the claim.
+
+**The absorbing family is picked by the real, already-existing
+`families.unity` field** -- the family-side mirror of picking a gang's
+recruit by `influenceRatingOf`, never a second invented score for the
+same real question (which group, among those eligible, is the one that
+takes this person in). Writes go directly to the passed `worldState`,
+never through `engine.addFamilyMember` -- the same two-`worldState`-
+divergence hazard `justice.js#ensurePrisonGang`'s own header already
+names for a different function, avoided here on sight rather than
+rediscovered.
+
+12 new tests in `test/recruitment.test.js`; mutation-verified both of
+this round's riskiest claims -- weakening "every parent dead" to "any
+parent dead," and removing the own-family exclusion -- and both were
+caught cleanly before being reverted. Full suite at landing time: 2111
+tests, 2088 pass, 0 fail, 6 cancelled (the pre-existing `worldgen
+.test.js` hang and its collateral, a separate concurrent fork's own
+fix target at the time -- unrelated to this round), 17 skipped.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and
