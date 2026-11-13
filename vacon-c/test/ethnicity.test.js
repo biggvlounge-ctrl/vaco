@@ -67,6 +67,10 @@ test('no generator of outcomes reads ethnicity', () => {
     'archetypes.js',   // what they are taken to be
     'migration.js',    // who is pushed out
     'succession.js',   // who inherits
+    'orgArchetypes.js', // who founds, joins or leads a `'nationalist movement'`/
+                        // `'racially-affiliated prison gang'` — see that file's
+                        // own header for why this is the identical answer
+                        // `'religious order'` already gave for `npc.religion`
   ];
 
   const offenders = FORBIDDEN.filter((file) => {

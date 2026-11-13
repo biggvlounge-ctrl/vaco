@@ -119,6 +119,47 @@
 // This is a single national reference table, the same shape
 // `migrationPathwayPacks.js` already took for DHS/CBP data with no
 // geography of its own.
+//
+// ---------------------------------------------------------------------
+// Re-checked, not re-trusted: the thirty-sixth standing rule's STG
+// finding, revisited for `orgArchetypes.js`'s new
+// `'racially-affiliated prison gang'` archetype
+// ---------------------------------------------------------------------
+// CLAUDE.md's thirty-sixth standing rule already found there is no
+// current public, structured dataset on prison gang (STG) racial
+// membership — CDCR abandoned its validation-based indefinite SHU
+// isolation approach after *Ashker v. Brown*, the only public figure
+// was a single stale 2012 press snapshot, and LA County's own
+// Inspector General found its own jail-gang data too unreliable to
+// release. Re-checked this round rather than trusted — still true: no
+// newer CDCR or LA County STG racial-validation dataset was found.
+//
+// One real, current, ADJACENT chart was found and is named here
+// rather than wired in: a 2014-2025 CDCR admissions chart showing
+// admissions carrying a gang ENHANCEMENT running roughly 71% Hispanic
+// against roughly 44% of all CDCR admissions. Not wired into this
+// file or `orgArchetypes.js`, for three stated reasons: a gang
+// enhancement is a court-applied sentencing outcome, not an STG
+// membership validation — a different real fact from the one asked
+// about; the chart's own authorship could not be confirmed this
+// session; and PPIC separately notes CDCR does not publicly
+// disaggregate Asian American, Native American or other groups at
+// all in its own releases. The same posture this file already took
+// declining the 2012 STG snapshot, CalGang and the Chicago gang-
+// boundary FOIA release: a real number found at too low a confidence
+// to stand behind is a gap to declare, not a number to use.
+//
+// `orgArchetypes.js`'s new sub-archetype instead cites the real,
+// general, independent academic literature finding U.S. prison gangs
+// have historically organised substantially along racial lines
+// (Skarbek; a 2014 *Prison Journal* Texas study; Infante, Morse,
+// Fahmy & Wright 2023; the *SAGE Encyclopedia of Race and Crime*) —
+// enough to band a generic archetype's cohesion, not enough to claim
+// a membership count. See that file's own header for the full
+// reasoning; this file's own `FACILITY_DEMOGRAPHICS` table is
+// unchanged by this round, on purpose — it already reports real BJS
+// facility-level race composition, and a prison gang's own race
+// composition is not the same statistic as the facility population's.
 
 'use strict';
 

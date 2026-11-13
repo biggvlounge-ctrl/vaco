@@ -318,6 +318,189 @@ const ARCHETYPES = {
     // have.
     posts: ['teacher'],
   },
+
+  // **Genuinely new again, by direct instruction: "certain racial
+  // organizations, well, nationalist organizations." Confirmed scoped
+  // to two things — a civilian archetype and a prison-gang
+  // sub-category — and this file's own header reasoning above applies
+  // unchanged: no real, named, identifiable group goes here. SPLC's
+  // own "Year in Hate and Extremism" counted 1,371 hate and
+  // antigovernment extremist groups nationally in 2024 (down from
+  // 1,430 in 2023), 533 of them active hate groups (down from a 2018
+  // peak of 1,021) — real, current, and the reason this archetype is
+  // GENERIC rather than a roster: there are hundreds of small, mostly
+  // unrelated bodies, not one organization to name.
+  //
+  // **Why `type: 'club'`, not `'gang'`.** `militia`/`insurgent cell`/
+  // `prison gang` are `type: 'gang'` because they hold ground by force
+  // — `isFaction: true`, a real row in `territory_blocks`. ADL's own
+  // H.E.A.T. Map FAQ says plainly why this archetype does not: a
+  // movement's membership "draws from fairly wide geographic areas
+  // that cannot be accurately represented by a single point on a
+  // map" — real, direct, and the reason `territory` is banded near
+  // zero and `isFaction` is absent rather than false-by-omission. This
+  // is a political-social movement — propaganda, recruitment, rallies
+  // — the same `club` category `aid organization`/`trade union`
+  // already use for civil-society bodies that are not businesses,
+  // governments or armed factions.
+  //
+  // **Growth is banded DOWN, on a real cited trend, not up.** SPLC's
+  // own count of active hate groups has fallen for six straight years
+  // from its 2018 peak — real and current, even though SPLC's and
+  // ADL's own reporting both note the groups' online REACH growing as
+  // their formal membership count shrinks. This archetype bands the
+  // measured thing (group count) and does not invent a number for the
+  // unmeasured one (online reach).
+  //
+  // **Posts carry the one real violence finding this file has no
+  // trait dimension for, rather than forcing a trait that does not
+  // exist.** `ORGANIZATION_TRAIT_FAMILIES` has no "violence propensity"
+  // dimension at the organization tier — crime and violence are
+  // per-NPC mechanics (`crime.js`, `keys.resolveAggression`), not an
+  // organization trait, and standing rule 6 says a band on a
+  // dimension that does not exist is applied to nothing forever. The
+  // real finding — DHS's Homeland Threat Assessment has named
+  // racially/ethnically motivated violent extremism (RMVE), white
+  // supremacist extremism specifically, the most persistent and
+  // lethal domestic terrorism threat category every year since 2020
+  // through its 2024 edition, and ADL's 2024 murder report found
+  // white supremacists committed 8 of that year's 13 extremist-related
+  // murders (62%) — is instead the real reason `enforcer` is one of
+  // this archetype's two posts: a small, violence-capable minority
+  // within an otherwise propaganda-and-recruitment body, the same
+  // "real finding without an invented number" shape the eighteenth
+  // standing rule's own corollary already follows. `influencer` is
+  // the other post — SPLC's report names Telegram as a real recruiting
+  // hub cross-pollinating neo-Nazi, QAnon and white-nationalist
+  // audiences, and `influencer` is already this engine's "no
+  // institution, no credential" occupation (CLAUDE.md's forty-second
+  // standing rule), the honest fit for exactly that real recruiting
+  // shape.
+  //
+  // ---------------------------------------------------------------------
+  // The §9 question this archetype actually raises, reasoned through
+  // rather than assumed either way
+  // ---------------------------------------------------------------------
+  // §9's own text: demographics "must never determine an NPC's
+  // morality, criminality, intelligence or worth." A real-world
+  // ethno-nationalist movement's defining real structural trait IS
+  // race/ethnicity-restricted membership — so the live question is
+  // whether gating eligibility to FOUND or JOIN this one archetype on
+  // an NPC's real `race`/`ethnicity` field is a narrow, factual
+  // modelling choice, or the exact thing §9 exists to stop.
+  //
+  // **Decided: no gate, and the reason is a precedent already on this
+  // page rather than a new argument.** `'religious order'`'s own
+  // header, four entries up, already answered the identical-shaped
+  // question for religion and declined the gate: "a world's in-game
+  // religious institutions and its NPCs' own private, real-Census-
+  // sourced religious identity stay two deliberately unconnected
+  // facts." A congregation's real-world defining trait is shared
+  // religious identity, exactly the same shape as a nationalist
+  // movement's defining trait being shared race/ethnicity — and if
+  // `npc.religion` was not allowed to decide who founds, joins or
+  // leads a `'religious order'`, there is no principled reason
+  // `npc.race`/`npc.ethnicity` should be allowed to decide who founds,
+  // joins or leads this one. Generation stays the identical generic,
+  // trait-driven process every archetype in this file already uses;
+  // `test/org-archetypes.test.js`'s own new test (below) asserts this
+  // file reads neither field, the same forbidden-file-scan shape
+  // `test/ethnicity.test.js`/`test/race-packs.test.js` already hold
+  // for every outcome-deciding module.
+  'nationalist movement': {
+    type: 'club',
+    reach: 'city',
+    note: 'A political-social movement organised around racial or ethnic exclusivity — '
+      + 'propaganda and recruitment rather than territory, per ADL\'s own finding that this '
+      + 'kind of group\'s membership is too geographically dispersed to hold ground the way '
+      + '`militia` does.',
+    traits: {
+      territory: [0, 15],
+      diplomacy: [5, 20],
+      internalLoyalty: [55, 85],
+      growthPotential: [10, 30],
+      power: [15, 40],
+      production: [5, 20],
+    },
+    posts: ['influencer', 'enforcer'],
+  },
+
+  // **The prison-gang half of the same instruction, and the thirty-
+  // sixth standing rule's own finding re-checked before building
+  // anything on it.** That rule already found there is no current
+  // public, structured dataset on prison gang (STG) racial
+  // composition — CDCR abandoned validation-based indefinite SHU
+  // isolation after *Ashker v. Brown*, the only public figure was a
+  // single stale 2012 press snapshot, and LA County's own Inspector
+  // General found its own jail-gang data too unreliable to release.
+  // Re-checked this round rather than trusted: still true. A real,
+  // CURRENT (2014-2025) CDCR chart was found showing Hispanic
+  // admissions at ~71% of admissions carrying a gang ENHANCEMENT
+  // against ~44% of all admissions — but a gang enhancement is a
+  // court-applied sentencing outcome, not an STG membership
+  // validation, the chart's authorship could not be confirmed this
+  // session, and PPIC separately notes CDCR does not publicly
+  // disaggregate Asian American, Native American or other groups at
+  // all. Named here and NOT wired in, for the same reason this
+  // project has already declined CalGang, the 2012 STG snapshot and
+  // the Chicago gang-boundary FOIA release: a real number found at too
+  // low a confidence to stand behind is a gap to declare, not a
+  // number to use.
+  //
+  // **What IS real and citable is the general academic pattern, not a
+  // current membership count — exactly the distinction this file's
+  // own header draws between "statistics about a kind" and "a roster
+  // of named bodies."** Skarbek's political-economy account of
+  // California prison gangs forming along racial lines; a 2014
+  // *Prison Journal* study finding Texas prison-gang formation aided
+  // by historical racial segregation, persisting after segregation was
+  // outlawed in 1979; Infante, Morse, Fahmy & Wright's 2023 *Criminal
+  // Justice and Behavior* study of a distinct "racial code" in Arizona
+  // prisons; and the *SAGE Encyclopedia of Race and Crime*'s own
+  // reference entry, stating plainly that prison gangs coalesce around
+  // race, ethnicity, nationality and neighbourhood. Four real,
+  // independent, citable sources agreeing on the same general
+  // structural pattern — enough to band a generic sub-archetype's
+  // `internalLoyalty` up from the base `'prison gang'`, not enough to
+  // claim a membership count for one.
+  //
+  // **Same shape as `'prison gang'` in every dimension this round has
+  // no new real information about** (`territory`, `membership`,
+  // `production`) — copied rather than re-derived, because inventing a
+  // reason to change a band with no new evidence behind it is the
+  // twelfth standing rule's own mistake in a new place. `diplomacy` is
+  // banded slightly lower than the base archetype's neutral default,
+  // citing the National Gang Crime Research Center's 1995
+  // administrator survey finding racial conflict raises the
+  // probability of gang disturbances — real, if dated, and flagged as
+  // such rather than presented as current.
+  //
+  // **The identical §9 answer as `'nationalist movement'`, for the
+  // identical reason.** This archetype's generation is exactly as
+  // generic and trait-driven as the base `'prison gang'`'s — no NPC's
+  // real `race`/`ethnicity` field is read to decide who is generated
+  // into this archetype rather than the base one. A believable
+  // facility population's own racial composition is `prisonPacks.js`'s
+  // job (real BJS data, already firewalled), not this file's — the two
+  // stay the same two deliberately unconnected facts `'religious
+  // order'` and `'nationalist movement'` already establish.
+  'racially-affiliated prison gang': {
+    type: 'gang',
+    reach: 'community',
+    note: 'The same shape as `prison gang` — bounded membership, nowhere to recruit from but '
+      + 'who is already inside — with higher internal loyalty, on real cited academic '
+      + 'literature finding U.S. prison gangs have historically organised substantially along '
+      + 'racial lines.',
+    isFaction: true,
+    traits: {
+      internalLoyalty: [75, 98],
+      territory: [20, 55],
+      membership: [5, 35],
+      production: [0, 10],
+      diplomacy: [5, 25],
+    },
+    posts: ['enforcer'],
+  },
 };
 
 const ARCHETYPE_NAMES = Object.keys(ARCHETYPES);

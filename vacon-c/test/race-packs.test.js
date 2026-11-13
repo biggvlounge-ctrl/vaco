@@ -102,6 +102,7 @@ test('no generator of outcomes reads race', () => {
     'crime.js', 'policing.js', 'economy.js', 'mortality.js', 'traits.js',
     'entityTraits.js', 'traitDrift.js', 'keys.js', 'contest.js',
     'motivation.js', 'archetypes.js', 'migration.js', 'succession.js',
+    'orgArchetypes.js',
   ];
   const offenders = FORBIDDEN.filter((file) => {
     if (!fs.existsSync(path.join(SERVER, file))) return false;

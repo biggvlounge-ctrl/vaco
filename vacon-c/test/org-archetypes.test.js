@@ -213,3 +213,95 @@ test('describeArchetypes reports zero founded rather than assuming', () => {
   assert.equal(described.founded, 0);
   assert.deepEqual(described.unbacked, [], 'an archetype wants a post no occupation supplies');
 });
+
+// -- nationalist/racial organizations ------------------------------------
+//
+// Direct instruction: "certain racial organizations, well, nationalist
+// organizations." No real, named group is in either archetype — see
+// their own headers, immediately above their entries in `ARCHETYPES`.
+
+test('nationalist movement is a dispersed political body, not a territorial faction', () => {
+  // ADL's own H.E.A.T. Map FAQ: membership "draws from fairly wide
+  // geographic areas that cannot be accurately represented by a
+  // single point on a map" — the real reason this archetype holds no
+  // ground, unlike `militia`/`insurgent cell`/`prison gang`.
+  const definition = orgArchetypes.definitionOf('nationalist movement');
+  assert.equal(definition.type, 'club');
+  assert.equal(definition.isFaction, undefined, 'a dispersed movement cannot hold a territory block');
+  const profile = orgArchetypes.profileOf('nationalist movement');
+  const militiaProfile = orgArchetypes.profileOf('militia');
+  assert.ok(profile.territory[1] < militiaProfile.territory[0],
+    'a nationalist movement should never out-hold a militia at its own game');
+});
+
+test('nationalist movement has no faction generator, and found() does not ask for one', () => {
+  const org = orgArchetypes.found(engine.WorldState, {
+    archetype: 'nationalist movement',
+    name: 'Fixture Bloc',
+    seed: 'nationalist-movement-test',
+    generateOrganization: engine.generateOrganization,
+  });
+  assert.equal(org.type, 'club');
+  assert.equal(org.archetype, 'nationalist movement');
+});
+
+test('racially-affiliated prison gang is the prison-gang shape, with higher cohesion', () => {
+  // Four real, independent academic sources (Skarbek; the 2014 Prison
+  // Journal Texas study; Infante, Morse, Fahmy & Wright 2023; the SAGE
+  // Encyclopedia of Race and Crime) agree prison gangs have
+  // historically organised substantially along racial lines — enough
+  // to band cohesion up from the base archetype, not enough to claim
+  // a current membership count (the thirty-sixth standing rule's own
+  // finding, re-checked this round and still true).
+  const definition = orgArchetypes.definitionOf('racially-affiliated prison gang');
+  assert.equal(definition.type, 'gang');
+  assert.equal(definition.isFaction, true, 'it holds ground inside its prison exactly like `prison gang`');
+  const profile = orgArchetypes.profileOf('racially-affiliated prison gang');
+  const baseProfile = orgArchetypes.profileOf('prison gang');
+  assert.ok(profile.internalLoyalty[0] > baseProfile.internalLoyalty[0],
+    'the racially-affiliated sub-archetype should read as MORE cohesive, not merely as different');
+  // Every dimension this round found no new evidence about stays
+  // identical to the base archetype, rather than drifting for no
+  // stated reason (standing rule 12's own mistake, avoided here).
+  assert.deepEqual(profile.territory, baseProfile.territory);
+  assert.deepEqual(profile.membership, baseProfile.membership);
+  assert.deepEqual(profile.production, baseProfile.production);
+});
+
+test('racially-affiliated prison gang must be founded as a faction, same as prison gang', () => {
+  assert.throws(
+    () => orgArchetypes.found(engine.WorldState, {
+      archetype: 'racially-affiliated prison gang',
+      name: 'Fixture Wing',
+      generateOrganization: engine.generateOrganization,
+    }),
+    /references factions\(organization_id\)/,
+  );
+  const org = orgArchetypes.found(engine.WorldState, {
+    archetype: 'racially-affiliated prison gang',
+    name: 'Fixture Wing',
+    seed: 'prison-gang-race-test',
+    generateOrganization: engine.generateOrganization,
+    generateFaction: engine.generateFaction,
+  });
+  assert.equal(org.isFaction, true);
+  assert.equal(org.archetype, 'racially-affiliated prison gang');
+});
+
+test('neither new archetype\'s own file reads race or ethnicity to decide anything', () => {
+  // The §9 answer both archetypes' headers reason through: the
+  // identical one `'religious order'` already gave for `npc.religion`.
+  // `test/ethnicity.test.js` and `test/race-packs.test.js` hold the
+  // real forbidden-file-scan assertion (`orgArchetypes.js` is in both
+  // FORBIDDEN lists); this is the narrower, file-local version of the
+  // same check, kept here so this file's own test suite does not
+  // depend on another file's list staying in sync to catch a
+  // regression.
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'server', 'orgArchetypes.js'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+  assert.ok(!/\brace\b/.test(source), 'orgArchetypes.js reads race outside its own comments');
+  assert.ok(!/ethnicity/i.test(source), 'orgArchetypes.js reads ethnicity outside its own comments');
+});
