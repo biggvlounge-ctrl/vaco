@@ -229,6 +229,7 @@ function compositionOf(worldState, residents) {
   const religion = distributionOf(residents, (n) => n.religion ?? null);
   const islamicSect = distributionOf(residents, (n) => n.islamicSect ?? null);
   const jewishObservance = distributionOf(residents, (n) => n.jewishObservance ?? null);
+  const protestantDenomination = distributionOf(residents, (n) => n.protestantDenomination ?? null);
   const politicalTypology = distributionOf(residents, (n) => n.politicalTypology ?? null);
   const ethnicity = distributionOf(residents, (n) => n.ethnicity ?? null);
   const education = distributionOf(residents, (n) => n.education ?? null);
@@ -274,6 +275,18 @@ function compositionOf(worldState, residents) {
       distribution: jewishObservance,
       diversity: diversityOf(jewishObservance),
       dominantShare: dominantShareOf(jewishObservance),
+    },
+    // **A real Baptist/nondenominational/other-Protestant split,
+    // measured here and read nowhere else — `protestantDenomination
+    // Packs.js`'s own header, same firewall discipline `islamicSect`/
+    // `jewishObservance` hold.** Drawn only for an NPC whose `religion`
+    // already resolved to `'protestant'`; everyone else reports `null`
+    // here, the same shape `islamicSect`/`jewishObservance` already
+    // have for a non-Muslim/non-Jewish resident.
+    protestantDenomination: {
+      distribution: protestantDenomination,
+      diversity: diversityOf(protestantDenomination),
+      dominantShare: dominantShareOf(protestantDenomination),
     },
     // **The real, nonpartisan substitute for "different types of
     // American politicians... neocons, Republicans, different

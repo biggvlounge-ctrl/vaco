@@ -12,6 +12,12 @@
 // inventory, books, weapons... keys still exist... or have some type
 // of knowledge... or it can come from word of mouth."
 //
+// A later, direct instruction, about this same system: "incorporate
+// Maniac Mansion type characteristics in that." See "Chaining" below,
+// next to `generateHiddenCaches`'s own second pass — the one piece of
+// this file that is a design decision rather than a real-data claim,
+// because Maniac Mansion is a named reference GAME, not a dataset.
+//
 // ---------------------------------------------------------------------
 // What was already real, reused rather than duplicated
 // ---------------------------------------------------------------------
@@ -155,6 +161,8 @@ function generateHiddenCaches(worldState, options = {}) {
       claimed: false,
       foundBy: null,
       missionId: null,
+      // See "Chaining" below — set in the second pass, never here.
+      chainedFromCacheId: null,
     };
     worldState.hiddenCaches.push(cache);
 
@@ -169,7 +177,69 @@ function generateHiddenCaches(worldState, options = {}) {
 
     created.push(cache);
   });
+
+  // ---------------------------------------------------------------------
+  // Chaining — "incorporate Maniac Mansion type characteristics," by
+  // direct instruction. Not a real-data claim like the rest of this
+  // file; a real design decision closing a real, MEASURED gap.
+  // ---------------------------------------------------------------------
+  // A landmark property almost never has a real recorded owner —
+  // `worldgen.js` only ever calls `property.recordOwnership` for an
+  // ordinary HOME, never for a museum, masonic building or church —
+  // measured directly (`node scripts/measure-world.mjs`-style probe,
+  // `hiddenCaches.test.js`'s own version below): 0 of 3 landmark caches
+  // in a freshly generated world had any real owner at all. Before this,
+  // such a key sat in `barterItems` as a registered item type and was
+  // never actually placed in anyone's inventory — "honestly unassigned"
+  // forever, not occasionally.
+  //
+  // Rather than leave every landmark key permanently unreachable, an
+  // orphaned one is chained FROM one real, unclaimed residential cache
+  // in the SAME real community — Maniac Mansion's own structure: search
+  // the ordinary house, find the key that opens the extraordinary one.
+  // `revealCache` is what actually hands the chained key over, the
+  // moment the source cache is found, by whichever real gate (key,
+  // architect, word of mouth) got the finder in — never a second access
+  // mechanism invented for the idea. One residential cache chains at
+  // most one landmark cache, so a single ordinary "secret drawer" never
+  // becomes the single point of access to the whole town's history.
+  // Attempted over EVERY still-unchained cache this world has, not just
+  // the ones this call just created — a residential source may not have
+  // existed yet the moment its own community's landmark cache first
+  // appeared (exactly what the retry loop in this file's own tests
+  // does), and a later call must still be able to complete that chain.
+  // Idempotent the same way the rest of this pass is: a cache that
+  // already chained, or has no eligible source, is simply left as is.
+  const propertyById = new Map((worldState.properties || []).map((p) => [p.id, p]));
+  const usedAsChainSource = new Set(
+    (worldState.hiddenCaches || [])
+      .map((c) => c.chainedFromCacheId)
+      .filter((id) => id !== null),
+  );
+  (worldState.hiddenCaches || [])
+    .filter((cache) => cache.category !== 'residential' && cache.chainedFromCacheId === null)
+    .forEach((cache) => {
+      if (property.getCurrentOwner(worldState, cache.propertyId)) return;
+      const communityId = propertyById.get(cache.propertyId)?.community_id;
+      if (communityId == null) return;
+      const source = (worldState.hiddenCaches || []).find(
+        (other) => other.id !== cache.id
+          && other.category === 'residential'
+          && !usedAsChainSource.has(other.id)
+          && propertyById.get(other.propertyId)?.community_id === communityId,
+      );
+      if (!source) return;
+      cache.chainedFromCacheId = source.id;
+      usedAsChainSource.add(source.id);
+    });
+
   return created;
+}
+
+// The real cache (if any) a given cache's own reveal unlocks — the
+// read side of the chain `generateHiddenCaches` sets up.
+function chainedCacheFor(worldState, cacheId) {
+  return (worldState.hiddenCaches || []).find((c) => c.chainedFromCacheId === cacheId) ?? null;
 }
 
 // ---------------------------------------------------------------------
@@ -248,7 +318,16 @@ function revealCache(worldState, entityId, cacheId, options = {}) {
     tick,
   });
 
-  return { cacheId: cache.id, artifactId: artifact.id, missionId: mission.id };
+  // The Maniac Mansion chain: finding THIS cache hands the finder the
+  // real key to whichever OTHER cache was chained from it — never a
+  // second access check, the same `inventory.give` the owner-at-
+  // generation path above already uses.
+  const unlocked = chainedCacheFor(worldState, cache.id);
+  if (unlocked) {
+    inventory.give(worldState, { entityId, itemName: unlocked.keyItemName, quantity: 1, tick });
+  }
+
+  return { cacheId: cache.id, artifactId: artifact.id, missionId: mission.id, unlocksCacheId: unlocked?.id ?? null };
 }
 
 // ---------------------------------------------------------------------
@@ -322,6 +401,7 @@ module.exports = {
   chanceFor,
   keyItemNameFor,
   generateHiddenCaches,
+  chainedCacheFor,
   isArchitect,
   hasKey,
   hasWordOfMouthKnowledge,

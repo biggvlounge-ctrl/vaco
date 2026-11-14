@@ -893,6 +893,21 @@ against its own real current owner -- inventory itself still lives on
 a real custodian NPC, never a second property-level storage system.
 Two new gates mutation-verified.
 
+**Chained caches, Maniac Mansion-style: see CLAUDE.md's ninety-sixth
+standing rule.** By direct instruction ("incorporate Maniac Mansion
+type characteristics"), and the one entry in this file that is a
+design decision rather than a real-data claim. Measured first: 0 of 3
+landmark caches in a freshly generated world ever had a real owner,
+since `worldgen.js` only ever records ownership for ordinary homes --
+so a landmark's key sat permanently unassigned. Now, an owner-less
+landmark cache chains from one real, unclaimed residential cache in
+the SAME real community (never across communities, and never when
+either side has no real community at all); `revealCache` hands the
+chained key over the moment the source is actually found, through the
+identical real access gates (key/architect/word of mouth) and
+`inventory.give` call this file already used. One residential cache
+chains at most one landmark cache. Three new gates mutation-verified.
+
 ## Drug trade: a real hierarchy, real production chains, the prison tie-in
 See `CLAUDE.md`'s own eighty-eighth standing rule for the full
 reasoning. By direct instruction, with real research done first (DEA
@@ -1011,6 +1026,85 @@ identical real landmark-clue mechanism to any real relationship,
 deliberately without the fugitive-specific evasive flight on a wrong
 guess -- an ordinary relation has no reason to run from a search they
 don't know is happening.
+
+## Biker gangs and motorcycle clubs, criminal and legitimate
+See `CLAUDE.md`'s own standing rule for this round for the full
+reasoning. By direct instruction: "biker gangs and biker
+organizations... criminal and legitimate... statistics on areas with
+the most motorcycles." Two new, generic `orgArchetypes.js` entries
+reuse the real DOJ/ATF-documented structure (a "mother chapter,"
+real officer roles, real criminal scope) without ever naming a real
+club: **`'outlaw motorcycle gang'`** (`type: 'gang'`, the same real
+§14 gang hierarchy every gang archetype already gets, banded low on
+membership per NGIC's own real ~2.5%-of-all-gang-members figure) and
+**`'motorcycle club'`** (`type: 'club'`, the real AMA-chartered/
+veteran-riding-club shape, e.g. Patriot Guard Riders -- generalized
+from, never generated as itself). No current real state-by-state OMG
+density map exists, checked rather than assumed, so geography closes
+with what IS real instead: `countryPacks.js`'s new `motorcycleOwnership`
+field -- MIC's 2024 national topline plus a real but dated
+per-capita state ranking (Montana and South Dakota rank above New
+Hampshire/Iowa, correcting the common assumption). Opt-in
+(`config.motorcycleOrganizations`), one of each per city.
+
+## Baptist/nondenominational Protestant split, and why NOI/Moorish Science Temple/megachurch are declined
+See `CLAUDE.md`'s ninety-fifth standing rule for the full reasoning. By
+direct instruction: "add in the Moorish Science Temple of America...
+the Nation of Islam... Add in any other religions I missed in Baptist
+churches, mega churches." `server/protestantDenominationPacks.js`
+draws a real `npc.protestantDenomination` (`'baptist'`,
+`'nondenominational'`, `'other-protestant'`) from Pew's 2023-24
+Religious Landscape Study, the same shape `islamicSectPacks.js`/
+`jewishObservancePacks.js` already take, only for an NPC whose
+`religion` already resolved to `'protestant'`. The Nation of Islam and
+the Moorish Science Temple of America are checked and declined for a
+data-quality reason, not a political one: no real survey (Pew's own
+2021 "Faith Among Black Americans," the 2023-24 RLS) differentiates
+Muslim traditions this finely, and the Moorish Science Temple of
+America has no U.S. Religion Census or ARDA entry of any kind.
+"Megachurch" is also declined -- real data, but from the Hartford
+Institute's congregation-SIZE dataset, not the denominational-FAMILY
+dataset this file actually draws from, and conflating the two would
+misstate both.
+
+## Homelessness statistics: veterans, addiction, mental health, and the honest limits around all three
+See `CLAUDE.md`'s ninety-fourth and ninety-fifth standing rules for the
+full reasoning. By direct instruction: "add in veterans and addictions
+when you do unhoused statistics all over the country and the world,"
+then "incorporate addiction, mental health, disease... do the same
+thing all over the world."
+`populationPacks.veteranHomelessnessRateFor` compounds HUD's real,
+cited national veteran-share-of-homeless figure (32,882/771,480,
+2024 PIT) onto whatever real local `homelessnessRate` a tract already
+carries -- VA program-throughput data is a real, different fact,
+checked and deliberately not merged in. `nationalDisablingConditionRateOf`
+is a flat, national-only HUD figure (152,585/771,480) explicitly
+labeled "disabling condition" (SUD plus mental illness plus
+developmental plus chronic physical) rather than addiction-specific,
+since no real sub-national addiction-only rate exists at any grain
+HUD, SAMHSA or NSDUH publishes -- checked rather than fabricated.
+
+`nationalSeriousMentalIllnessRateOf`/`nationalSubstanceUseDisorderRateOf`
+break that bundle apart with SAMHSA's own real national figures
+(~21% SMI, ~16% SUD, 2022-2023) -- HUD's CoC-level reports do separate
+the two, but only as per-CoC PDFs, not one bulk file, so this stays
+national-only like the bundle beside it. The widely-repeated
+"35-40% have a substance use disorder" claim was checked again here
+and still has no traceable HUD/SAMHSA source -- not used. Chronic
+physical illness has no real isolated rate at any grain and is
+declared rather than built. All three real community-level fields
+(`chronicHomelessnessDisablingConditionRate`,
+`homelessnessSeriousMentalIllnessRate`,
+`homelessnessSubstanceUseDisorderRate`) are gated on the same real
+local rate `veteranHomelessnessRate` already requires -- null for a
+community with no real population pack.
+
+International comparison was checked twice now: OECD's own
+documentation says homelessness definitions are not comparable across
+its member countries, and UN-Habitat's current ~318 million global
+estimate is a single aggregate with no per-country breakdown and no
+harmonized definition yet published -- so none was wired in as if it
+were either time.
 
 ## Rogue ex-state security forces
 See `CLAUDE.md`'s own seventy-ninth standing rule for the full

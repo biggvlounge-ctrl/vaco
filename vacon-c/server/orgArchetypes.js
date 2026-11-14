@@ -569,6 +569,80 @@ const ARCHETYPES = {
     },
     posts: ['enforcer'],
   },
+
+  // By direct instruction: "biker gangs and biker organizations...
+  // biker organizations, criminal and legitimate." Two real archetypes
+  // rather than one, for the identical reason `'religious order'` and
+  // `'nationalist movement'`/`'racially-affiliated prison gang'` stay
+  // separate pairs — a real structural category this engine already
+  // has a vocabulary for is not a new vocabulary, it is two existing
+  // ones applied to a real, cited structure.
+  //
+  // **No specific real club is ever named or generated** — the
+  // identical §9-firewall discipline `'drug trafficking organization'`
+  // already holds (DEA-cited geographic categories, never a named
+  // cartel). DOJ/ATF's own reporting (1987 ATF "Outlaw Motorcycle
+  // Gangs" report; FBI/DOJ National Gang Intelligence Center threat
+  // assessments, most recently 2015) documents a real organizational
+  // shape generically, without naming any one club: a "mother
+  // chapter" governs, officer roles are president/vice president/
+  // secretary/treasurer/road captain/sergeant-at-arms, and documented
+  // criminal activity spans drug and weapons trafficking, extortion
+  // and violence. `isFaction: true` because DOJ/ATF reporting is
+  // explicit that these clubs hold real chapter territory
+  // (clubhouses, claimed turf) — the same real criterion `'militia'`/
+  // `'prison gang'` already use to decide `type: 'gang'` over
+  // `'club'`. Membership is a real, cited SMALL share of the whole —
+  // NGIC's 2013 assessment found outlaw motorcycle gang members were
+  // only about 2.5% of all U.S. gang members, even though the same
+  // survey's respondents ranked them the single most problematic gang
+  // TYPE in their own jurisdictions — banded low on `membership`,
+  // not assumed large because the name sounds imposing.
+  'outlaw motorcycle gang': {
+    type: 'gang',
+    reach: 'city',
+    note: 'DOJ/ATF-documented structure (a real "mother chapter," real officer roles) and real '
+      + 'criminal scope (drug/weapons trafficking, extortion) — reuses the same real §14 gang '
+      + 'hierarchy every other gang archetype gets (`membership.gangTierFor`), never a second, '
+      + 'parallel role vocabulary. NGIC 2013: ~2.5% of all U.S. gang members, banded low here '
+      + 'on `membership` despite being rated the most problematic gang TYPE by surveyed '
+      + 'jurisdictions.',
+    isFaction: true,
+    traits: {
+      internalLoyalty: [55, 85],
+      territory: [25, 60],
+      membership: [5, 25],
+      production: [15, 45],
+    },
+    posts: ['enforcer'],
+  },
+
+  // The real, legitimate counterpart — `type: 'club'`, the identical
+  // civil-society category `'aid organization'`/`'trade union'`
+  // already use, for the identical reason `'nationalist movement'`
+  // is `'club'` rather than `'gang'`: no real territorial claim,
+  // `isFaction` absent rather than false-by-omission. The American
+  // Motorcyclist Association (AMA) is the real umbrella body for
+  // chartered recreational clubs; Patriot Guard Riders (a real,
+  // federally registered 501(c)(3), no dues, membership open with no
+  // motorcycle-ownership requirement) is the cited real example of a
+  // veteran/charitable riding organization this archetype generalizes
+  // from, never named or generated as itself.
+  'motorcycle club': {
+    type: 'club',
+    reach: 'community',
+    note: 'The real AMA-chartered/veteran-riding-organization shape — recreational or '
+      + 'charitable, open membership, no real territorial claim. The real "1%er" patch '
+      + 'convention (three-piece "colors" plus a diamond patch) is how real reporting '
+      + 'distinguishes this archetype from `outlaw motorcycle gang`, which this engine draws '
+      + 'the identical line on via `isFaction` rather than a costume detail.',
+    traits: {
+      internalLoyalty: [40, 75],
+      membership: [10, 60],
+      diplomacy: [30, 70],
+    },
+    posts: ['manager'],
+  },
 };
 
 const ARCHETYPE_NAMES = Object.keys(ARCHETYPES);

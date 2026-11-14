@@ -28,14 +28,14 @@ function person() {
   return engine.generateNPC();
 }
 
-function landmarkProperty(category) {
+function landmarkProperty(category, communityId) {
   return engine.generateProperty({
-    type: 'commercial', value: 100000, landmarkCategory: category,
+    type: 'commercial', value: 100000, landmarkCategory: category, communityId,
   });
 }
 
-function residentialProperty(age = 0) {
-  return engine.generateProperty({ type: 'residential', value: 80000, age });
+function residentialProperty(age = 0, communityId) {
+  return engine.generateProperty({ type: 'residential', value: 80000, age, communityId });
 }
 
 function organization(leaderId) {
@@ -112,6 +112,83 @@ test('generateHiddenCaches: a property with no real recorded owner leaves its ke
   // Nobody in the world holds this specific key -- confirmed by it not
   // appearing in any real inventory row.
   assert.ok(!(w.inventory || []).some((h) => h.item_name === cache.keyItemName));
+});
+
+// ---------------------------------------------------------------------
+// Chaining -- "incorporate Maniac Mansion type characteristics"
+// ---------------------------------------------------------------------
+
+test('generateHiddenCaches: an owner-less landmark cache chains from a real, unclaimed residential cache in the SAME real community', () => {
+  const communityId = nextId += 1;
+  const historic = landmarkProperty('masonic-building', communityId);
+  const home = residentialProperty(50, communityId);
+  let landmark = null;
+  let source = null;
+  for (let i = 0; i < 80 && (!landmark || !source); i += 1) {
+    hiddenCaches.generateHiddenCaches(w, { tick: i, seed: `chain-${i}` });
+    landmark = landmark || (w.hiddenCaches || []).find((c) => c.propertyId === historic.id);
+    source = source || (w.hiddenCaches || []).find((c) => c.propertyId === home.id);
+  }
+  assert.ok(landmark, 'the masonic building must land a cache within 80 real tries');
+  assert.ok(source, 'the old house must land a cache within 80 real tries');
+  assert.equal(landmark.chainedFromCacheId, source.id,
+    'an owner-less landmark cache must chain from a real residential cache sharing its own community');
+  // The key itself was never handed to anyone at generation -- it only
+  // exists once the source cache is actually found.
+  assert.ok(!(w.inventory || []).some((h) => h.item_name === landmark.keyItemName));
+});
+
+test('generateHiddenCaches: a landmark cache never chains from a residential cache in a DIFFERENT community', () => {
+  const communityA = nextId += 1;
+  const communityB = nextId += 1;
+  const historic = landmarkProperty('historic-site', communityA);
+  residentialProperty(50, communityB);
+  let landmark = null;
+  for (let i = 0; i < 80 && !landmark; i += 1) {
+    hiddenCaches.generateHiddenCaches(w, { tick: i, seed: `chain-mismatch-${i}` });
+    landmark = landmark || (w.hiddenCaches || []).find((c) => c.propertyId === historic.id);
+  }
+  assert.ok(landmark, 'the historic site must land a cache within 80 real tries');
+  assert.equal(landmark.chainedFromCacheId, null,
+    'a different real community gives no eligible chain source -- honestly unassigned, not a cross-town chain');
+});
+
+test('revealCache: finding the source cache hands over the real key to whichever cache was chained from it', () => {
+  const communityId = nextId += 1;
+  const historic = landmarkProperty('church', communityId);
+  const home = residentialProperty(50, communityId);
+  let landmark = null;
+  let source = null;
+  for (let i = 0; i < 80 && (!landmark || !source); i += 1) {
+    hiddenCaches.generateHiddenCaches(w, { tick: i, seed: `chain-reveal-${i}` });
+    landmark = landmark || (w.hiddenCaches || []).find((c) => c.propertyId === historic.id);
+    source = source || (w.hiddenCaches || []).find((c) => c.propertyId === home.id);
+  }
+  assert.ok(landmark && source && landmark.chainedFromCacheId === source.id,
+    'this scenario requires a real chain to exist to be worth testing');
+
+  assert.equal(hiddenCaches.chainedCacheFor(w, source.id).id, landmark.id);
+
+  const finder = person();
+  inventory.give(w, { entityId: finder.id, itemName: source.keyItemName, quantity: 1, tick: w.tick });
+  assert.equal(inventory.quantityOf(w, finder.id, landmark.keyItemName), 0,
+    'the chained key must not exist for anyone before the source cache is actually found');
+
+  const result = hiddenCaches.revealCache(w, finder.id, source.id);
+  assert.equal(result.unlocksCacheId, landmark.id);
+  assert.ok(inventory.quantityOf(w, finder.id, landmark.keyItemName) > 0,
+    'finding the source cache must hand the finder the real key to the cache chained from it');
+});
+
+test('chainedCacheFor: null for a cache nothing was chained from', () => {
+  const plain = residentialProperty(0);
+  let cache = null;
+  for (let i = 0; i < 60 && !cache; i += 1) {
+    hiddenCaches.generateHiddenCaches(w, { tick: i, seed: `no-chain-${i}` });
+    cache = (w.hiddenCaches || []).find((c) => c.propertyId === plain.id);
+  }
+  assert.ok(cache, 'an old residential property must land a cache within 60 real tries');
+  assert.equal(hiddenCaches.chainedCacheFor(w, cache.id), null);
 });
 
 // ---------------------------------------------------------------------

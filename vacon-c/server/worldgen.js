@@ -111,6 +111,7 @@ const climatePacks = require('./climatePacks.js');
 const riskPacks = require('./riskPacks.js');
 const religionPacks = require('./religionPacks.js');
 const islamicSectPacks = require('./islamicSectPacks.js');
+const protestantDenominationPacks = require('./protestantDenominationPacks.js');
 const jewishObservancePacks = require('./jewishObservancePacks.js');
 const politicalTypologyPacks = require('./politicalTypologyPacks.js');
 const ancestryPacks = require('./ancestryPacks.js');
@@ -262,6 +263,13 @@ const DEFAULTS = {
   // already asserts against -- no drug trafficking organization ever
   // founded, same as today.
   drugTrafficking: false,
+  // **Opt-in, same posture -- by direct instruction: "biker gangs and
+  // biker organizations... criminal and legitimate."** Up to one
+  // real `'outlaw motorcycle gang'` AND one real `'motorcycle club'`
+  // per city (`server/orgArchetypes.js`'s own two new entries). Off,
+  // every existing call to `generateWorld()` gets the exact unchanged
+  // world the whole suite already asserts against.
+  motorcycleOrganizations: false,
   businessesPerCommunity: 2,
   factionsPerCity: 2,
   // Homes are generated to house everybody with a margin, which is
@@ -897,6 +905,32 @@ function generateWorld(options = {}) {
       void drugOrg;
     }
 
+    // One real outlaw motorcycle gang AND one real legitimate
+    // motorcycle club per city, opt-in (`config.motorcycleOrganizations`)
+    // -- idempotent via `city.motorcycleOrgsFounded`, the identical
+    // in-memory marker shape `city.drugOrgFounded` already holds.
+    if (config.motorcycleOrganizations && !city.motorcycleOrgsFounded) {
+      const omg = orgArchetypes.found(w, {
+        archetype: 'outlaw motorcycle gang',
+        name: `${city.name} Motorcycle Club`,
+        seed: config.seed,
+        key: c,
+        generateOrganization: engine.generateOrganization,
+        generateFaction: engine.generateFaction,
+      });
+      const legitimateClub = orgArchetypes.found(w, {
+        archetype: 'motorcycle club',
+        name: `${city.name} Riders Association`,
+        seed: config.seed,
+        key: c,
+        generateOrganization: engine.generateOrganization,
+      });
+      city.motorcycleOrgsFounded = true;
+      summary.organizations += 2;
+      void omg;
+      void legitimateClub;
+    }
+
     // ---- communities -------------------------------------------------
     for (let b = 0; b < config.communitiesPerCity; b += 1) {
       const communityPosition = geo.scatter(
@@ -993,6 +1027,34 @@ function generateWorld(options = {}) {
       const realHomelessnessRate = populationPacks.homelessnessRateFor(homesTract);
       const realHomesPerResident = realHomelessnessRate !== null
         ? 1 - realHomelessnessRate
+        : null;
+      // A real, reportable statistic in its own right -- by direct
+      // instruction, "add in veterans... when you do unhoused
+      // statistics." Stored once at generation, the same posture
+      // `city.healthBaseline`/`city.hazardRisk` already hold, since
+      // this never changes what `homeCount` above actually is -- see
+      // `populationPacks.js`'s own header on why this is a compounding
+      // fraction of the real local rate, never a second independently
+      // measured one.
+      community.veteranHomelessnessRate = populationPacks.veteranHomelessnessRateFor(homesTract);
+      // **Three more real national rates, reported only where this
+      // community already carries a real local homelessness rate —
+      // same gate `veteranHomelessnessRate` holds, never a fabricated
+      // fact for a community with no real pack at all.** The flat
+      // disabling-condition bundle was built in the prior round and
+      // left uncalled anywhere (standing rule 11); the serious-mental-
+      // illness and substance-use-disorder shares are the real
+      // breakout of that same bundle. See `populationPacks.js`'s own
+      // header for why chronic physical illness and a per-country
+      // global figure are declared gaps rather than built here.
+      community.chronicHomelessnessDisablingConditionRate = realHomelessnessRate !== null
+        ? populationPacks.nationalDisablingConditionRateOf()
+        : null;
+      community.homelessnessSeriousMentalIllnessRate = realHomelessnessRate !== null
+        ? populationPacks.nationalSeriousMentalIllnessRateOf()
+        : null;
+      community.homelessnessSubstanceUseDisorderRate = realHomelessnessRate !== null
+        ? populationPacks.nationalSubstanceUseDisorderRateOf()
         : null;
       const homeCount = Math.round(
         config.populationPerCommunity * (realHomesPerResident ?? config.homesPerResident),
@@ -1207,6 +1269,12 @@ function generateWorld(options = {}) {
           // to `'jewish'` — same fallback shape as `islamicSect`.
           jewishObservance: religionValue === 'jewish'
             ? jewishObservancePacks.branchFor(random.unit('jewish-observance-real', c, b, p))
+            : null,
+          // A real Baptist/nondenominational/other split, drawn ONLY
+          // when the real tradition above resolved to `'protestant'`
+          // — same fallback shape as `islamicSect`/`jewishObservance`.
+          protestantDenomination: religionValue === 'protestant'
+            ? protestantDenominationPacks.denominationFor(random.unit('protestant-denomination-real', c, b, p))
             : null,
           // A real ancestry group, drawn from the tract's own shares,
           // when this world was built with an ancestry pack; the

@@ -242,6 +242,114 @@ function homelessnessRateFor(tract) {
   return Number.isFinite(value) ? value : null;
 }
 
+// By direct instruction: "add in veterans and addictions when you do
+// unhoused statistics." HUD's own Annual Homeless Assessment Report
+// (AHAR) Part 1 — the same real PIT count `homelessnessRate` already
+// reads — publishes a dedicated veteran subpopulation count: 32,882
+// homeless veterans against 771,480 total homeless, 2024 PIT, both
+// real HUD figures from the same year (never mixed across years with
+// a differently-dated total). **A compounding fraction of this
+// tract's own real `homelessnessRate`, not a second, independently
+// measured local rate** — HUD does publish state/CoC-level veteran
+// tables, but fetching that specific spreadsheet was outside this
+// round's reach, so the honest, stated method is the real NATIONAL
+// veteran share applied to whatever real local rate the tract
+// already carries — the same "a real ratio narrows a real local
+// value" shape `incomePacks.js`/`riskPacks.js` already use, not a
+// claim that this is itself a separately measured local figure.
+//
+// **The VA's own figures are a real, DIFFERENT fact, deliberately not
+// merged in.** VA program data (e.g., FY2025: 51,936 unique veterans
+// placed in permanent housing) measures program throughput, not
+// population size, and conflating the two would misstate both — the
+// same "keep disagreeing/different-grain real sources separate"
+// discipline this registry already holds elsewhere. Not read here at
+// all, named only so a future caller does not reach for it by mistake.
+const VETERAN_HOMELESS_SHARE_OF_TOTAL_2024 = 32882 / 771480;
+
+function veteranHomelessnessRateFor(tract) {
+  const base = homelessnessRateFor(tract);
+  if (base === null) return null;
+  return Math.round(base * VETERAN_HOMELESS_SHARE_OF_TOTAL_2024 * 1e6) / 1e6;
+}
+
+// **National-only, by design, not a fabricated local rate.** HUD's
+// PIT "chronically homeless" category requires a real "disabling
+// condition" — a bucket that bundles substance use disorder with
+// serious mental illness, developmental disability and chronic
+// physical illness, never isolated to addiction alone at ANY grain
+// HUD publishes. 152,585 of 771,480 total homeless, 2024 PIT — real
+// and current, but checked and confirmed to have no real sub-national
+// SUD-specific breakout anywhere (SAMHSA's own comparable figure is a
+// 2004 TEDS admissions count, twenty years stale, and NSDUH
+// structurally excludes shelter populations from its survey frame).
+// Inventing a per-tract version of this would be exactly the kind of
+// fabrication this registry's own discipline exists to avoid — so
+// this stays a flat, national, honestly-labelled constant, never
+// assigned a real tract position the way every other field in this
+// file is.
+const CHRONIC_HOMELESSNESS_DISABLING_CONDITION_SHARE_2024 = 152585 / 771480;
+
+function nationalDisablingConditionRateOf() {
+  return Math.round(CHRONIC_HOMELESSNESS_DISABLING_CONDITION_SHARE_2024 * 1e6) / 1e6;
+}
+
+// Breaking the bundle above apart, by direct instruction: "incorporate
+// addiction, mental health, disease... do statistics." Checked
+// directly rather than assumed real: HUD's own CoC-level Population-
+// and-Subpopulation (PopSub) reports DO separate "Adults with a
+// Serious Mental Illness" from "Adults with a Substance Use Disorder"
+// as two independent categories — but distributed as individual
+// per-CoC PDFs/spreadsheets through HUD's HDX system, never as one
+// bulk CSV the way the PIT/HIC time series this file already reads
+// is. So, same posture as the veteran share above, these stay flat
+// NATIONAL constants rather than a fabricated per-tract breakout —
+// reconciling the full per-CoC PopSub set was outside this round's
+// reach.
+//
+// SAMHSA's own published national rates (SAMHSA.gov, 2022-2023): ~21%
+// serious mental illness, ~16% substance use disorder among the
+// homeless population. **The commonly-cited "35-40% have a substance
+// use disorder" figure has no traceable HUD/SAMHSA source** — checked
+// directly and found only on uncited secondary content sites — and is
+// deliberately NOT used here.
+const SERIOUS_MENTAL_ILLNESS_SHARE_NATIONAL_2023 = 0.21;
+const SUBSTANCE_USE_DISORDER_SHARE_NATIONAL_2023 = 0.16;
+
+function nationalSeriousMentalIllnessRateOf() {
+  return SERIOUS_MENTAL_ILLNESS_SHARE_NATIONAL_2023;
+}
+
+function nationalSubstanceUseDisorderRateOf() {
+  return SUBSTANCE_USE_DISORDER_SHARE_NATIONAL_2023;
+}
+
+// **Chronic physical illness/disease has no real, isolated, citable
+// rate at ANY grain among the homeless population — checked directly,
+// not assumed.** No HUD PIT subpopulation category, no AHAR breakout,
+// and no standardized CDC national prevalence rate exists for it; the
+// only CDC figures found are scattered and non-comparable (a 2009 CDC
+// study's 53% chronic-condition rate is veteran-only and dated; a CDC
+// NCHS report counts emergency-department VISITS, not a prevalence
+// rate). Per this registry's own discipline (the Antifa-designation
+// and jail/STG-classification declines), a declared gap beats a
+// fabricated number — this is deliberately NOT built, and
+// `CHRONIC_HOMELESSNESS_DISABLING_CONDITION_SHARE_2024` above remains
+// the only real figure this registry carries for that slice of the
+// bundle.
+//
+// **No real per-country comparable homelessness dataset exists
+// either — checked directly, not assumed.** UN-Habitat's current
+// global estimate is ~318 million homeless worldwide (2024-2025
+// UN-Habitat/UN News materials), real but a single global aggregate
+// with no published per-country breakdown or transparent country-level
+// methodology, and UN-Habitat's own 2025-2026 working papers say
+// plainly no harmonized global DEFINITION exists yet — so there is
+// nothing to assign to a `countryPacks.js` entry the way
+// `motorcycleOwnership`/`regimeType` are. "Do the same thing all over
+// the world" is therefore declined for homelessness specifically — not
+// a gap in this round's reach, a gap in what exists to read.
+
 module.exports = {
   SOURCES,
   EDUCATION_LEVELS,
@@ -259,4 +367,12 @@ module.exports = {
   healthBaselineFor,
   overdoseBaselineFor,
   homelessnessRateFor,
+  VETERAN_HOMELESS_SHARE_OF_TOTAL_2024,
+  veteranHomelessnessRateFor,
+  CHRONIC_HOMELESSNESS_DISABLING_CONDITION_SHARE_2024,
+  nationalDisablingConditionRateOf,
+  SERIOUS_MENTAL_ILLNESS_SHARE_NATIONAL_2023,
+  SUBSTANCE_USE_DISORDER_SHARE_NATIONAL_2023,
+  nationalSeriousMentalIllnessRateOf,
+  nationalSubstanceUseDisorderRateOf,
 };

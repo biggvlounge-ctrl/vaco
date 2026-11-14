@@ -482,6 +482,11 @@ function generateNPC(options = {}) {
     // tradition — see `jewishObservancePacks.js`'s own header. Null
     // unless a caller supplies one, same posture as `islamicSect`.
     jewishObservance: options.jewishObservance ?? null,
+    // A real Baptist/nondenominational/other-Protestant split, drawn
+    // only when `religion` resolved to the real `'protestant'`
+    // tradition — see `protestantDenominationPacks.js`'s own header.
+    // Null unless a caller supplies one, same posture as `islamicSect`.
+    protestantDenomination: options.protestantDenomination ?? null,
     // Pew Research's real Political Typology group (ninth edition,
     // 2026) — see `politicalTypologyPacks.js`'s own header for why
     // this is drawn unconditionally, the honest substitute for naming

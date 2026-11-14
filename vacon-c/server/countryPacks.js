@@ -5392,7 +5392,28 @@ const RESOURCE_PROFILES = {
       { item: 'vehicles', shareOfImportsPct: 11.65, valueUsdBillion: 391.46, year: 2024, confidence: 'secondary-estimate' },
       { item: 'pharmaceuticals', shareOfImportsPct: 6.3, valueUsdBillion: 212.67, year: 2024, confidence: 'secondary-estimate', note: 'fastest-growing of the top categories, +19.6% vs 2023' },
     ],
-    source: 'trading-economics-un-comtrade-2024; worldstopexports; tendata',
+    // By direct instruction: "statistics on areas with the most
+    // motorcycles." Real, cited, and honest about its own vintage --
+    // the national topline (MIC's 2024 Statistical Annual) is current;
+    // the per-state per-capita ranking is several years old (2010-2017
+    // vintage breakdowns are what is reachable), named here rather
+    // than silently presented as current. Montana/South Dakota rank
+    // above New Hampshire/Iowa -- corrected against the common folk
+    // assumption that New Hampshire is #1, which checking the real
+    // ranking does not support.
+    motorcycleOwnership: {
+      motorcyclesInUse: { value: 11600000, year: 2024, confidence: 'official', source: 'mic-statistical-annual-2024' },
+      westRegionPer100People: { value: 3.9, year: 2024, confidence: 'official', source: 'mic-statistical-annual-2024' },
+      perCapitaStateRanking: {
+        note: 'raw registration totals and per-capita rates diverge sharply -- California/Texas/Florida lead by raw count because of population size, not motorcycle density',
+        topByPerCapita: ['montana', 'south-dakota', 'new-hampshire', 'iowa'],
+        bottomByPerCapita: ['district-of-columbia', 'mississippi'],
+        year: 'various, 2010-2017 vintage',
+        confidence: 'secondary-estimate',
+        source: 'fhwa-dot-state-dmv-rankings-various-years',
+      },
+    },
+    source: 'trading-economics-un-comtrade-2024; worldstopexports; tendata; mic-statistical-annual-2024',
   },
   germany: {
     country: 'Germany',

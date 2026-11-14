@@ -157,6 +157,77 @@ test('homelessnessRateFor reads a real rate, including a real zero, and null wit
   assert.equal(populationPacks.homelessnessRateFor(null), null);
 });
 
+test('veteranHomelessnessRateFor: a real, cited HUD AHAR national share compounded onto this tract\'s own real rate, never a second independently measured local figure', () => {
+  const tract = { tractId: 'T1', homelessnessRate: 0.012 };
+  const expected = Math.round(0.012 * populationPacks.VETERAN_HOMELESS_SHARE_OF_TOTAL_2024 * 1e6) / 1e6;
+  assert.equal(populationPacks.veteranHomelessnessRateFor(tract), expected);
+  assert.ok(populationPacks.veteranHomelessnessRateFor(tract) < populationPacks.homelessnessRateFor(tract),
+    'the veteran-specific rate must be a real fraction of the tract\'s own overall rate, never larger');
+  assert.equal(populationPacks.veteranHomelessnessRateFor({ tractId: 'T1' }), null, 'no real overall rate means no real veteran rate either');
+  assert.equal(populationPacks.veteranHomelessnessRateFor(null), null);
+});
+
+test('nationalDisablingConditionRateOf: a flat, cited, national-only HUD figure -- never assigned a real tract position the way every other field in this file is', () => {
+  const rate = populationPacks.nationalDisablingConditionRateOf();
+  assert.equal(rate, Math.round(populationPacks.CHRONIC_HOMELESSNESS_DISABLING_CONDITION_SHARE_2024 * 1e6) / 1e6);
+  assert.ok(rate > 0 && rate < 1);
+  assert.equal(populationPacks.nationalDisablingConditionRateOf.length, 0, 'takes no tract/position argument -- it is deliberately not a per-place reader');
+});
+
+test('nationalSeriousMentalIllnessRateOf / nationalSubstanceUseDisorderRateOf: the real SAMHSA breakout of the bundled disabling-condition figure, both flat national-only', () => {
+  assert.equal(populationPacks.nationalSeriousMentalIllnessRateOf(), populationPacks.SERIOUS_MENTAL_ILLNESS_SHARE_NATIONAL_2023);
+  assert.equal(populationPacks.nationalSubstanceUseDisorderRateOf(), populationPacks.SUBSTANCE_USE_DISORDER_SHARE_NATIONAL_2023);
+  assert.equal(populationPacks.nationalSeriousMentalIllnessRateOf.length, 0);
+  assert.equal(populationPacks.nationalSubstanceUseDisorderRateOf.length, 0);
+  // Both real SAMHSA shares, and never the uncited "35-40% SUD" figure
+  // that circulates with no traceable source.
+  assert.equal(populationPacks.SERIOUS_MENTAL_ILLNESS_SHARE_NATIONAL_2023, 0.21);
+  assert.equal(populationPacks.SUBSTANCE_USE_DISORDER_SHARE_NATIONAL_2023, 0.16);
+});
+
+test('worldgen.js stores a real community.veteranHomelessnessRate at generation when a real population pack covers it', () => {
+  const w = engine.WorldState;
+  const before = w.communities.length;
+  worldgen.generateWorld({
+    seed: 'veteran-homelessness-pack-test',
+    populationPack: pack({ tracts: [{ tractId: 'T1', homelessnessRate: 0.04 }] }),
+    communitiesPerCity: 1,
+    populationPerCommunity: 100,
+  });
+  const newCovered = w.communities.slice(before);
+  assert.ok(newCovered.length > 0);
+  assert.ok(newCovered.every((c) => c.veteranHomelessnessRate > 0));
+  assert.equal(newCovered[0].veteranHomelessnessRate, populationPacks.veteranHomelessnessRateFor({ homelessnessRate: 0.04 }));
+});
+
+test('worldgen.js stores the three real national homelessness-breakout rates on a community only when a real local rate covers it', () => {
+  const w = engine.WorldState;
+  const before = w.communities.length;
+  worldgen.generateWorld({
+    seed: 'homelessness-breakout-pack-test',
+    populationPack: pack({ tracts: [{ tractId: 'T1', homelessnessRate: 0.04 }] }),
+    communitiesPerCity: 1,
+    populationPerCommunity: 100,
+  });
+  const newCovered = w.communities.slice(before);
+  assert.ok(newCovered.length > 0);
+  assert.ok(newCovered.every((c) => c.chronicHomelessnessDisablingConditionRate === populationPacks.nationalDisablingConditionRateOf()));
+  assert.ok(newCovered.every((c) => c.homelessnessSeriousMentalIllnessRate === populationPacks.nationalSeriousMentalIllnessRateOf()));
+  assert.ok(newCovered.every((c) => c.homelessnessSubstanceUseDisorderRate === populationPacks.nationalSubstanceUseDisorderRateOf()));
+});
+
+test('worldgen.js leaves the three real homelessness-breakout rates null on a community with no real population pack, same as before this existed', () => {
+  cleanup();
+  const w = engine.WorldState;
+  const before = w.communities.length;
+  worldgen.generateWorld({ seed: 'no-pack-homelessness-breakout', communitiesPerCity: 1, populationPerCommunity: 10 });
+  const made = w.communities.slice(before);
+  assert.ok(made.every((c) => c.chronicHomelessnessDisablingConditionRate === null));
+  assert.ok(made.every((c) => c.homelessnessSeriousMentalIllnessRate === null));
+  assert.ok(made.every((c) => c.homelessnessSubstanceUseDisorderRate === null));
+  cleanup();
+});
+
 test('a world built with a real homelessness rate draws homeCount below the invented margin', () => {
   const w = engine.WorldState;
   try {

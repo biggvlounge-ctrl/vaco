@@ -1752,6 +1752,13 @@ test('counterfeitGoodsSeizedByCbpFy2024: a real, cited CBP enforcement fact, pre
     'this is a real, specific CBP fact about China -- not a field every country gets a value for');
 });
 
+test('motorcycleOwnership: real MIC/FHWA-cited figures on the United States entry, with the stale per-capita vintage named rather than hidden', () => {
+  const us = countryPacks.resourceProfileFor('united-states');
+  assert.equal(us.motorcycleOwnership.motorcyclesInUse.value, 11600000);
+  assert.deepEqual(us.motorcycleOwnership.perCapitaStateRanking.topByPerCapita.slice(0, 2), ['montana', 'south-dakota']);
+  assert.match(us.motorcycleOwnership.perCapitaStateRanking.year, /2010-2017/);
+});
+
 test('report-only discipline: nothing outside countryPacks.js itself reads RESOURCE_PROFILES to decide an outcome', () => {
   // `fugitives.js#countryFlavorFor` is the one real, deliberate second
   // reader -- real per-country flavour text inside a chase CLUE, never
