@@ -825,6 +825,22 @@ comment already named -- `protector` ("on security"), `caregiver`
 Reachable in both citizen and leader mode, since a family head needs
 no Leader-mode promotion. Both new refusal gates mutation-verified.
 
+## Dominance: pre-existing local power converts into real territory at chaos
+See `CLAUDE.md`'s own eighty-fourth standing rule for the full
+reasoning. By direct instruction: a gang, business, or religious order
+that already dominates a community's residents (`membership.
+organizationPresence`'s own real member count, government excluded)
+converts that real presence into a real territorial claim
+(`server/dominance.js#claimDominantGround`) the moment the area's writ
+leaves `governed` (`contested` qualifies, not only full `lawless`) --
+`organization.isFaction` flips true and a real `territory_blocks` row
+is claimed and resolved, reusing `roguePolice.js`'s own "try to use
+that force" step rather than a second one. Staying in power or losing
+it afterward needed no new code -- `tick.js` already resolves every
+real block's hold from the holder's own live traits, every tick.
+Families (tribes) hold ground through `control.js`'s own takeover key
+instead, named rather than folded in. Both new gates mutation-verified.
+
 ## Rogue ex-state security forces
 See `CLAUDE.md`'s own seventy-ninth standing rule for the full
 reasoning. By direct instruction: once a real local government stops

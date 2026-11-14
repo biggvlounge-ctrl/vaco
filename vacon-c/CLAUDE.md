@@ -5109,6 +5109,62 @@ test when removed, each reverted once confirmed. 10 new tests in
 file's existing comment already states), full suite 2291/2291 real
 (17 honestly skipped), no regression.
 
+**An eighty-fourth, and the "already run a certain amount of a town"
+half needed no new code at all — only the conversion did.** By direct
+instruction: "gang, tribes, organizations, religions, families could
+already run a certain amount of a town or city or block through
+drugs, religion, or whatever their organization holds power over that
+community, through business. This will automatically put them into a
+power position when the chaos kicks off. And then it is, from there,
+it is their security and infrastructure that maintains it or loses
+it." `membership.organizationPresence(worldState, communityId)` had
+already answered the first half since the membership round that built
+it — real member count per real organization resident in a community,
+tagged by real `type` and real `influence`. The gap was narrower than
+it looked: `territory_blocks.faction_id` can only ever name a real
+`isFaction: true` organization, and `orgArchetypes.js`'s own
+`'religious order'` entry deliberately set `isFaction: false`
+("persuades rather than holds ground") — a real, considered decision
+this round does not reverse for a GOVERNED area.
+
+`server/dominance.js#claimDominantGround` is the new, narrow
+conversion: the real organization that already dominates a community
+(`dominantOrganizationOf`, government-type excluded — the state's own
+collapse cannot make the state the beneficiary of it) flips its own
+real `isFaction` to true and claims a real `territory_blocks` row the
+moment the area's `authority.writOf` reading leaves `governed` —
+`contested` or `lawless` both qualify, the same wider gate
+`runCorruptGuardBreaks` (the eighty-first standing rule) already chose
+over `roguePolice.js`'s stricter one, for the identical reason: an
+actor already standing on the ground does not need the state to
+finish collapsing first. The "try to use that force" step itself —
+`territory.generateTerritoryBlock` + `resolveTerritoryControl` — is
+reused verbatim from `roguePolice.js`, not reinvented a second time.
+
+**"From there, it is their security and infrastructure that maintains
+it or loses it" was already real and needed nothing new.**
+`tick.js#runOrganizationPhase` already calls
+`resolveTerritoryControl` for every real block, every tick, reading
+the holder's own LIVE `power`/`territory` traits. The only new event is
+the conversion; staying in power or losing it afterward was a live
+mechanism before this file existed, which is itself a small instance
+of this document's own eleventh standing rule's inverse — a mechanism
+that already runs on everything it is handed does not need to be told
+about a new kind of thing to hand it.
+
+**Families (tribes) are named rather than folded in.**
+`territory_blocks.faction_id` references `organizations.id`; a family
+is a distinct root entity under standing rule 4's own parent/subtype
+split, which does not make `families` a subtype of `organizations`.
+Forcing a family through the organization-shaped structure here would
+invent a second, disagreeing model of the same fact `control.js`'s own
+takeover key already covers for a family's real route to holding
+ground. Both new gates (the regime check, the already-held idempotence
+check) were mutation-verified — each one caught by a real test when
+removed, each reverted once confirmed. 9 new tests in
+`test/dominance.test.js`, full suite 2300/2300 real (17 honestly
+skipped), no regression.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

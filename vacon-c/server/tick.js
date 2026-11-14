@@ -79,6 +79,7 @@ const recruitment = require('./recruitment.js');
 const households = require('./households.js');
 const roguePolice = require('./roguePolice.js');
 const fraud = require('./fraud.js');
+const dominance = require('./dominance.js');
 const tribeMissions = require('./tribeMissions.js');
 const migration = require('./migration.js');
 const environment = require('./environment.js');
@@ -873,6 +874,28 @@ function runOrganizationPhase(worldState, options = {}) {
         global_effects: { ...formed },
       });
     }
+  }
+
+  // **A real, pre-existing local power converting into a real
+  // territorial claim the moment the state's writ fails here** —
+  // dominance.js's own header for the full reasoning. Unconditional,
+  // unlike the rogue-police block above: nothing here founds a new
+  // organization (`organization.isFaction` flips on a real, already-
+  // existing one), so no `generateOrganization`/`generateFaction`
+  // injection is needed. Also before the territory-block loop below,
+  // for the identical reason — a freshly claimed block's own first
+  // resolution happens this same tick.
+  for (const claimed of dominance.scanForPowerVacuums(worldState, { tick: worldState.tick })) {
+    events.push({
+      type: 'dominant_power_claims_ground',
+      severity: 'high',
+      note: `organization ${claimed.organizationId} (${claimed.dominantType}, `
+        + `${claimed.dominantMembers} local member(s)) converts its real local dominance into a `
+        + `territorial claim in community ${claimed.communityId}, territory ${claimed.territoryStatus}`,
+      tick: worldState.tick,
+      affected_entity_ids: [claimed.organizationId],
+      global_effects: { ...claimed },
+    });
   }
 
   for (const block of worldState.territoryBlocks) {
