@@ -43,22 +43,29 @@
 // the count; the history row is the memory.
 //
 // ---------------------------------------------------------------------
-// Eight categories, four generators, and the four that are honest
-// about having none
+// Eight categories, seven generators, and the one that is honest about
+// having none
 //
 // Every category §9 names is here and countable. **Only some of them
 // are produced by anything**, and the rest say what they are waiting
 // for rather than being quietly filled with a plausible number — the
-// same discipline `areaStats.UNAVAILABLE` uses.
+// same discipline `areaStats.UNAVAILABLE` uses. This table drifted out
+// of date twice before being caught (`gun` and `fraud` had both
+// already flipped to ✅ while this comment still showed them ✗) — see
+// CLAUDE.md's eighty-second standing rule for the shape of that
+// mistake: a derived flag updates itself, the PROSE describing it does
+// not.
 //
 //   violent    ✅ aggression that escalates (keys.resolveAggression)
 //   domestic   ✅ the same escalation between two people in one family
 //   theft      ✅ deprivation, against a wealthier resident
 //   property   ✅ deprivation, with nobody to take from
-//   drug       ✗  no substance, contraband or trade in one exists
-//   gun        ✗  no weapon exists anywhere in the schema
-//   fraud      ✗  market listings resolve honestly; there is no
-//                 contract, claim or instrument to falsify
+//   gun        ✅ an escalation where the aggressor has something from
+//                 §26's `protection` category equipped (inventory.js)
+//   fraud      ✅ a false property sale — no real contract or
+//                 instrument needed to forge (fraud.js)
+//   drug       ✅ a real substance (drugTrade.js), sold street-level
+//                 or smuggled into a cartel-connected prison gang
 //   sex_offense ✗ **not a gap — a decision.** The category exists so
 //                 the statistic can be reported honestly by a world
 //                 that has one (an import, a scenario, a scripted
@@ -137,9 +144,11 @@ const CATEGORIES = {
     note: 'deprivation with no wealthier resident present to take from',
   },
   drug: {
-    generated: false,
-    substrate: 'no substance, contraband or illicit trade exists. resources.resource_type is '
-      + 'open TEXT and nothing produces one, so a drug offence has no object.',
+    generated: true,
+    note: 'a street-level sale (server/drugTrade.js#runStreetDealing) by a real soldier/'
+      + 'associate of a real drug trafficking organization, holding a real substance; also a '
+      + 'real corrupt guard/warden smuggling a real substance into a cartel-connected prison '
+      + 'gang (#runPrisonSmuggling).',
   },
   theft: {
     generated: true,

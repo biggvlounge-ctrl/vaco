@@ -134,6 +134,7 @@ const weapons = require('./weapons.js');
 const worldStore = require('./worldStore.js');
 const characterCreation = require('./characterCreation.js');
 const hiddenCaches = require('./hiddenCaches.js');
+const drugTrade = require('./drugTrade.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
 
 //: Everything below is flagged interpretive. No document specifies a
@@ -251,6 +252,16 @@ const DEFAULTS = {
   // already asserts against -- no hidden cache ever exists, same as
   // today.
   hiddenCaches: false,
+  // **Opt-in, same posture as the flags just above -- by direct
+  // instruction: "do a drug organization template so we can copy it
+  // all over the country."** One real `'drug trafficking
+  // organization'` per city (`server/orgArchetypes.js`'s own new
+  // entry; see `server/drugTrade.js`'s header for the real, cited
+  // research it's built from). Off, every existing call to
+  // `generateWorld()` gets the exact unchanged world the whole suite
+  // already asserts against -- no drug trafficking organization ever
+  // founded, same as today.
+  drugTrafficking: false,
   businessesPerCommunity: 2,
   factionsPerCity: 2,
   // Homes are generated to house everybody with a margin, which is
@@ -860,6 +871,31 @@ function generateWorld(options = {}) {
       factions.push(faction);
     }
     summary.organizations += factions.length;
+
+    // **One real drug trafficking organization per city, opt-in
+    // (`config.drugTrafficking`) — see that flag's own comment on
+    // `DEFAULTS` and `server/drugTrade.js`'s header for the full,
+    // cited reasoning.** `isFaction: true` (the archetype's own real
+    // shape), so `generateFaction` is required alongside
+    // `generateOrganization` the identical way `orgArchetypes.found`
+    // requires both for any faction archetype. Idempotent via
+    // `city.drugOrgFounded`, the same in-memory marker shape
+    // `prisonProperty.staffed` already holds for the identical
+    // "a second `generateWorld()` call on a growing world must not
+    // found a second one" reason.
+    if (config.drugTrafficking && !city.drugOrgFounded) {
+      const drugOrg = orgArchetypes.found(w, {
+        archetype: 'drug trafficking organization',
+        name: `${city.name} Trafficking Network`,
+        seed: config.seed,
+        key: c,
+        generateOrganization: engine.generateOrganization,
+        generateFaction: engine.generateFaction,
+      });
+      city.drugOrgFounded = true;
+      summary.organizations += 1;
+      void drugOrg;
+    }
 
     // ---- communities -------------------------------------------------
     for (let b = 0; b < config.communitiesPerCity; b += 1) {

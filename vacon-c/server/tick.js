@@ -80,6 +80,7 @@ const households = require('./households.js');
 const roguePolice = require('./roguePolice.js');
 const fraud = require('./fraud.js');
 const dominance = require('./dominance.js');
+const drugTrade = require('./drugTrade.js');
 const tribeMissions = require('./tribeMissions.js');
 const migration = require('./migration.js');
 const environment = require('./environment.js');
@@ -1234,6 +1235,42 @@ function runSecurityPhase(worldState) {
   // property sale) and why nothing here forges a contract or
   // insurance claim that does not exist.
   for (const incident of fraud.runFraud(worldState, worldState.tick)) {
+    events.push({
+      type: 'crime', severity: incident.severity >= 60 ? 'high' : 'medium',
+      note: `${incident.category} offence by entity ${incident.perpetrator_entity_id}`
+        + `${incident.victim_entity_id === null ? '' : ` against entity ${incident.victim_entity_id}`}`,
+      tick: incident.tick,
+      affected_entity_ids: [incident.perpetrator_entity_id, incident.victim_entity_id]
+        .filter((id) => id !== null),
+      global_effects: { crimeIncidentId: incident.id, crimeCategory: incident.category },
+    });
+  }
+
+  // **Drug trade -- closes `crime.js`'s own declared, ungenerated
+  // `drug` category.** Same shape as fraud just above: a real
+  // street-level sale by a real soldier/associate of a real gang,
+  // holding a real substance. See `server/drugTrade.js`'s own header
+  // for the real, cited substrate.
+  for (const incident of drugTrade.runStreetDealing(worldState, worldState.tick)) {
+    events.push({
+      type: 'crime', severity: incident.severity >= 60 ? 'high' : 'medium',
+      note: `${incident.category} offence by entity ${incident.perpetrator_entity_id}`
+        + `${incident.victim_entity_id === null ? '' : ` against entity ${incident.victim_entity_id}`}`,
+      tick: incident.tick,
+      affected_entity_ids: [incident.perpetrator_entity_id, incident.victim_entity_id]
+        .filter((id) => id !== null),
+      global_effects: { crimeIncidentId: incident.id, crimeCategory: incident.category },
+    });
+  }
+
+  // The drug-trade half of "tie this into the prison pipeline" — a
+  // real corrupt guard/warden smuggling a real substance into a real,
+  // cartel-connected prison gang's own real inside leader. Reads
+  // `worldState.prisonGangs` directly (a plain data map `justice.js`
+  // already maintains), never `require('./justice.js')` — no
+  // circular-require risk either way, since it is data, not a
+  // function call back into this file's own caller.
+  for (const incident of drugTrade.runPrisonSmuggling(worldState, { tick: worldState.tick })) {
     events.push({
       type: 'crime', severity: incident.severity >= 60 ? 'high' : 'medium',
       note: `${incident.category} offence by entity ${incident.perpetrator_entity_id}`

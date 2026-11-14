@@ -893,6 +893,26 @@ against its own real current owner -- inventory itself still lives on
 a real custodian NPC, never a second property-level storage system.
 Two new gates mutation-verified.
 
+## Drug trade: a real hierarchy, real production chains, the prison tie-in
+See `CLAUDE.md`'s own eighty-eighth standing rule for the full
+reasoning. By direct instruction, with real research done first (DEA
+National Drug Threat Assessment 2024/2025; DOJ National Gang
+Intelligence Center): `server/drugTrade.js` closes `crime.js`'s last
+ungenerated §9 crime category. Street-level dealing reuses the real
+§14 gang hierarchy (`membership.gangTierFor`); "connected to the
+cartel" is earned (`grantCartelConnection`, gated on a real leader's
+own `criminal.'Black Market Ties'`), never free, and never names a
+real cartel or gang -- `cartelConnection` is a real geographic
+category (`mexican`/`colombian`) only. Marijuana is grown domestically;
+crack is converted domestically from cocaine; cocaine, heroin,
+methamphetamine, fentanyl and synthetic cannabinoids all require a
+real, earned cartel connection to import, matching DEA's own real
+sourcing facts ("if it can't be done in the states, it needs to tie
+in"). `runStreetDealing` is the real generator; `runPrisonSmuggling`
+ties into the real prison-gang pipeline a corrupt guard already
+exploits elsewhere in this engine. Opt-in (`config.drugTrafficking`),
+one organization per city. Four new gates mutation-verified.
+
 ## Rogue ex-state security forces
 See `CLAUDE.md`'s own seventy-ninth standing rule for the full
 reasoning. By direct instruction: once a real local government stops

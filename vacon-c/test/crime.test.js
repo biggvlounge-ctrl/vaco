@@ -510,9 +510,12 @@ test('every category §9 names is countable, and the ungenerated ones say why', 
   // stopped being true. `fraud` joined the same way: its declared
   // reason was "no contract, claim or instrument exists to falsify",
   // and server/fraud.js's false property sale needs no such
-  // instrument, so that stopped being true too.
+  // instrument, so that stopped being true too. `drug` joined the
+  // identical way: its declared reason was "no substance, contraband
+  // or illicit trade exists... a drug offence has no object", and
+  // server/drugTrade.js's real substances closed exactly that gap.
   assert.deepEqual(crime.GENERATED_CATEGORIES.sort(),
-    ['domestic', 'fraud', 'gun', 'property', 'theft', 'violent']);
+    ['domestic', 'drug', 'fraud', 'gun', 'property', 'theft', 'violent']);
 });
 
 test('sex_offense is recordable and nothing in the engine generates one', () => {

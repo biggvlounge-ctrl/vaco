@@ -221,6 +221,46 @@ const ARCHETYPES = {
     posts: ['enforcer'],
   },
 
+  // **Drug trafficking organization — by direct instruction, and the
+  // same archetype shape as `militia`/`prison gang` once more.**
+  // "Some drug dealers are just street-level... some are connected to
+  // the cartel... some kingpins run the states" is real, cited
+  // structure (DEA National Drug Threat Assessment 2024/2025; DOJ
+  // National Gang Intelligence Center's own *National Gang Report*),
+  // not an invented hierarchy — see `server/drugTrade.js`'s own header
+  // for the full citation and for why no specific real cartel or gang
+  // is ever named here (the §9 firewall's own "general, cited research
+  // calibrates a generic archetype; nothing here claims to BE or NAME
+  // a real organization" rule, already applied once for `'nationalist
+  // movement'`/`'racially-affiliated prison gang'`). `isFaction: true`
+  // for the identical reason every other archetype that can hold real
+  // `territory_blocks` has it — "a neighborhood kingpin" versus "runs
+  // the states" is read off how MANY real blocks, across how many
+  // real cities, this organization actually holds, never a second,
+  // invented scale field (`drugTrade.kingpinScaleOf`). `membership`'s
+  // tier (soldier, lieutenant, shot_caller, leader) is the real,
+  // already-cited §14 gang hierarchy `membership.gangTierFor` already
+  // computes for ANY `isGang` organization — street-level dealing is
+  // the `soldier`/`associate` tier of exactly this archetype, not a
+  // fourth tier vocabulary.
+  'drug trafficking organization': {
+    type: 'gang',
+    reach: 'city',
+    note: 'The same real §14 gang hierarchy every other gang archetype already gets '
+      + '(`membership.gangTierFor`) — street-level dealing is its own `soldier`/`associate` '
+      + 'tier. Moderate internal loyalty (porous at the street level, the opposite of a '
+      + '`prison gang`\'s captive membership); real production, because this is the one '
+      + 'archetype in this file whose members actually make or move a physical good.',
+    isFaction: true,
+    traits: {
+      internalLoyalty: [35, 65],
+      territory: [30, 70],
+      membership: [10, 50],
+      production: [20, 60],
+    },
+    posts: ['enforcer'],
+  },
+
   // **Rogue security force, and it is the SAME archetype shape as
   // `militia`/`prison gang` once more, for the identical reason:
   // `isFaction: true` because a body that could not hold a real

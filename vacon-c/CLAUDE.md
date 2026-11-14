@@ -5392,6 +5392,112 @@ flag this session has added holds. 15 new tests in
 `test/actions.test.js`, full suite 2344/2344 real (17 honestly
 skipped), no regression.
 
+**An eighty-eighth, and it closes the last of §9's four generatable
+crime categories — by direct instruction, with real research done
+first rather than assumed.** "In drug organizations, you have a
+hierarchy. Some drug dealers are just street-level dealers. Some drug
+dealers are connected to the cartel... Mexican, Colombian... some
+kingpins that are neighborhood kingpins, some that run the states...
+look up information on drug organizations... use federal records...
+made, how some of them are made from like the fabricated drugs like
+meth, K2... marijuana, crack, cocaine, fentanyl, heroin. Everything
+needs to be a complete process, and if it can't be done in the states
+or the cities, it needs to tie in... tie this into the prison
+pipeline as well."
+
+**The research was real, cited, and done before any code was
+written** — DEA's own National Drug Threat Assessment (2024/2025) and
+DOJ's National Gang Intelligence Center's *National Gang Report*.
+Neither publishes one official named hierarchy; the real, documented
+shape is a hub-and-branch/cellular model (street dealer → local
+distributor → regional distributor with a direct cartel "source of
+supply" → the cartel). "Neighborhood kingpin" and "runs the states"
+are this engine's own abstraction of that, onto substrate it already
+had: `membership.gangTierFor`'s real §14 gang hierarchy gives the
+internal tier (street-level dealing is a real `soldier`/`associate`,
+never a fourth tier vocabulary invented for it); `kingpinScaleOf`
+reads how many real cities an organization's own real
+`territory_blocks` actually span.
+
+**No specific real cartel or gang is ever named or generated** — the
+identical §9-firewall discipline the thirty-second standing rule's
+`orgArchetypes.js` archetypes already hold, applied a third time.
+`cartelConnection` is one of two real, geographic categories
+(`'mexican'`/`'colombian'`, reflecting the real DEA-documented SOURCE
+REGION), never a specific organization's name, and it is EARNED, not
+free: `grantCartelConnection` requires a real gang whose real leader's
+own real, already-generated `criminal.'Black Market Ties'` trait
+clears the trait scale's own neutral centre (50) — the identical
+threshold shape `roguePolice.js`/`justice.js#CORRUPT_STAFF_THRESHOLD`
+already use, restated locally rather than cross-imported.
+
+**"Everything needs to be a complete process... if it can't be done in
+the states, it needs to tie in" is the real, cited sourcing fact for
+each of the seven named substances, not a flat list of items.**
+Marijuana is grown domestically (DEA: domestic cultivation now
+supplies most of the U.S. market). Crack is a domestic CONVERSION of
+imported powder cocaine, never separately imported. Cocaine, heroin,
+methamphetamine, fentanyl and synthetic cannabinoids ("K2") all
+require a real, earned cartel connection to bring in at all — DEA:
+coca and opium poppy are not grown at real scale in the continental
+U.S., and meth/fentanyl are now produced almost entirely by Mexican
+organizations from precursor chemicals largely sourced from China.
+`importSubstance` enforces the real region match (a `'colombian'`
+connection cannot supply a substance DEA documents as Mexican-sourced)
+— mutation-verified, caught by a real test when removed.
+
+**"Tie this into the prison pipeline" closes with research too, not
+an assumed link.** DOJ gang-intelligence profiles document the Mexican
+Mafia and Nuestra Familia controlling and "taxing" street-level drug
+distribution from inside prison; DOJ-OIG case announcements document
+correctional officers bribed to smuggle drugs in. `runPrisonSmuggling`
+reads `worldState.prisonGangs` directly — the real map
+`justice.js#ensurePrisonGang` already maintains — never
+`require('./justice.js')`, because it is a plain data map, not a
+function call back into a caller. It reuses the identical
+`leadership.'Corruption Risk'` threshold `justice.js#
+runCorruptGuardBreaks` already established (restated locally, the same
+precedent that file's own header already set), but runs every real
+tick as a real, bounded probability rather than once — smuggling is
+ongoing; a break-out is not, and conflating the two would have reused
+the wrong shape. Both the corrupt-staff gate and the cartel-connection
+gate were mutation-verified.
+
+**A real, pre-existing staleness found and fixed in the same pass,
+not introduced by it.** `crime.js`'s own header comment table still
+showed `gun` and `fraud` as ✗ (ungenerated) — both had already flipped
+to ✅ in earlier rounds, and the PROSE describing the flag never
+updated either time. The eighty-second standing rule's own lesson — "a
+derived value updates itself when its source changes; a sentence
+describing that value does not" — had already been written once and
+not checked against this exact table. Fixed for all three (`gun`,
+`fraud`, `drug`) in the same edit, along with `prisonPacks.js`'s own
+`describePopulationCaveat` note and `test/statistics.test.js`'s own
+example category, which had already migrated once (gun → drug) and
+needed to migrate a second time (drug → `sex_offense`, the one
+category that stays permanently, deliberately ungenerated).
+
+**No new landmark category, no new crime category, and one small,
+explicit, documented step outside §26.** `crime.js#CATEGORIES.drug`
+already existed with a real severity (25) and a real law mapping,
+waiting only for an object — the identical shape `fraud` closed
+earlier. `items.js`'s own §26 `TRADE_CATEGORIES` is quoted verbatim
+from spec and stays exactly that; nothing validates an item's
+`category` field against it anywhere in this engine (checked directly
+before writing anything), so the seven new substances carry a new,
+honestly-labelled `'contraband'` category rather than editing a table
+this file's own comment calls verbatim.
+
+Opt-in (`config.drugTrafficking`, default false, `worldgen.js`) founds
+one real drug trafficking organization per city, idempotent via
+`city.drugOrgFounded` — every existing call to `generateWorld()` gets
+the exact unchanged world the whole suite already asserts against.
+13 new tests in `test/drugTrade.test.js`, with updates to
+`test/crime.test.js`/`test/prison-packs.test.js`/
+`test/statistics.test.js` for the category flip. Four new gates
+mutation-verified. Full suite 2357/2357 real (17 honestly skipped),
+no regression.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and
