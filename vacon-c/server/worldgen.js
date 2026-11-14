@@ -133,6 +133,7 @@ const merchandise = require('./merchandise.js');
 const weapons = require('./weapons.js');
 const worldStore = require('./worldStore.js');
 const characterCreation = require('./characterCreation.js');
+const hiddenCaches = require('./hiddenCaches.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
 
 //: Everything below is flagged interpretive. No document specifies a
@@ -240,6 +241,16 @@ const DEFAULTS = {
   // `generateWorld()` gets the exact unchanged world the whole suite
   // already asserts against -- no prison staff hired, same as today.
   prisonStaffing: false,
+  // **Opt-in, same posture as `securityForces`/`prisonStaffing` above
+  // -- by direct instruction, scattering hidden caches (a key, real
+  // knowledge, or word of mouth required to actually open one) across
+  // the world's own real properties, including every ordinary home
+  // generation already builds.** `server/hiddenCaches.js`'s own
+  // header has the full reasoning. Off, every existing call to
+  // `generateWorld()` gets the exact unchanged world the whole suite
+  // already asserts against -- no hidden cache ever exists, same as
+  // today.
+  hiddenCaches: false,
   businessesPerCommunity: 2,
   factionsPerCity: 2,
   // Homes are generated to house everybody with a margin, which is
@@ -2872,6 +2883,17 @@ function generateWorld(options = {}) {
   // Also writes `properties.occupants`, which nothing wrote.
   const homes = households.syncHouseholds(w, { tick });
   summary.households = homes.formed.length;
+
+  // **Hidden caches, opt-in (`config.hiddenCaches`, default false --
+  // see that flag's own comment on `DEFAULTS`).** After households
+  // and prison staffing, same as `prisonStaffing` above its own call
+  // site — properties and whichever ownership this world has already
+  // recorded both need to exist first.
+  if (config.hiddenCaches) {
+    const caches = hiddenCaches.generateHiddenCaches(w, { tick, seed: config.seed });
+    summary.hiddenCaches = (w.hiddenCaches || []).length;
+    summary.hiddenCachesCreated = caches.length;
+  }
 
   // A world with no history of crime has no clearance rate and no
   // opinion of public safety, and both are statistics somebody asked

@@ -79,9 +79,9 @@ test('every verb an action names is one the engine actually supplies', () => {
   assert.deepEqual(
     actions.REQUIRED_VERBS,
     ['acceptMission', 'addScheduleEvent', 'assessTakeover', 'assessThreat', 'assignRole', 'attemptHeist', 'attemptTakeover',
-      'breakDownItem', 'broadcastMessage', 'callBluff', 'canMakeThing', 'directMission', 'findOrCreateContact', 'holdMeeting',
+      'breakDownItem', 'broadcastMessage', 'callBluff', 'canMakeThing', 'designateStashHouse', 'directMission', 'findOrCreateContact', 'holdMeeting',
       'intimidate', 'investInTarget', 'makeThing', 'manufactureAmmunition', 'quoteTrade',
-      'reinforceHabit', 'repurposeProperty', 'resolveContest', 'searchLocation', 'sendMessage', 'sendSpy',
+      'reinforceHabit', 'repurposeProperty', 'resolveContest', 'revealCache', 'searchLocation', 'sendMessage', 'sendSpy',
       'stripBuilding', 'resolveMission', 'studySource', 'tradeWith'].sort(),
   );
 });
@@ -206,6 +206,42 @@ test('attempt-heist reaches heists.js#attemptHeist through the real dispatcher',
   });
   assert.equal(out.result.complied, true);
   assert.deepEqual(out.result.crew.sort(), [leaderNpc.id, crewMember.id].sort());
+});
+
+test('reveal-cache reaches hiddenCaches.js#revealCache through the real dispatcher', () => {
+  const hiddenCaches = require('../server/hiddenCaches.js');
+  const finder = engine.generateNPC();
+  const property = engine.generateProperty({ type: 'residential', value: 100000 });
+  hiddenCaches.generateHiddenCaches(engine.WorldState, { tick: 0 });
+  const cacheId = engine.WorldState.hiddenCaches.length + 1;
+  const keyItemName = `Dispatch Test Key ${cacheId}`;
+  engine.WorldState.hiddenCaches.push({
+    id: cacheId, propertyId: property.id, category: 'residential',
+    keyItemName, revealed: false, claimed: false, foundBy: null, missionId: null,
+  });
+  engine.WorldState.barterItems = engine.WorldState.barterItems || [];
+  engine.WorldState.barterItems.push({ name: keyItemName, category: 'tools', origin: 'remnant' });
+  inventory.give(engine.WorldState, { entityId: finder.id, itemName: keyItemName, quantity: 1, tick: 0 });
+  const player = engine.generatePlayer({ linkedEntityId: finder.id });
+
+  const out = engine.dispatchAction(player.id, { action: 'reveal-cache', cacheId });
+  assert.ok(out.result.missionId);
+});
+
+test('designate-stash-house reaches hiddenCaches.js#designateStashHouse through the real dispatcher', () => {
+  const property2 = require('../server/property.js');
+  const leaderNpc = engine.generateNPC();
+  const org = engine.generateOrganization({ type: 'gang', leaderId: leaderNpc.id });
+  const stashProperty = engine.generateProperty({ type: 'residential', value: 100000 });
+  property2.recordOwnership(engine.WorldState, {
+    entityId: stashProperty.id, ownerEntityId: leaderNpc.id, ownerType: 'individual', tick: 0,
+  });
+  const player = engine.generatePlayer({ linkedEntityId: leaderNpc.id });
+
+  const out = engine.dispatchAction(player.id, {
+    action: 'designate-stash-house', propertyId: stashProperty.id, organizationId: org.id,
+  });
+  assert.equal(out.result.organizationId, org.id);
 });
 
 // ---------------------------------------------------------------------------

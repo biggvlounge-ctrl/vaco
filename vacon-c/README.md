@@ -876,6 +876,23 @@ crew) and detection (real heat with the specific target) are two
 independent draws -- service is recorded only on a clean, undetected
 success. Three new gates mutation-verified.
 
+## Hidden caches: secret compartments, buried finds, and stash houses
+See `CLAUDE.md`'s own eighty-seventh standing rule for the full
+reasoning. By direct instruction: `server/hiddenCaches.js` gates
+`discovery.js`'s own existing landmark pools (and, newly, ordinary
+homes and apartments) behind a real key, a real `architect`'s own
+knowledge, or real word-of-mouth knowledge already spread by
+`media.js`'s own channel -- scattered across the world at generation
+(`config.hiddenCaches`, opt-in), boosted for historic/religious
+categories (`masonic-building`, `historic-site`, mosque, church,
+synagogue, temple, cave-system). Opening one ("these are all
+missions") generates a real artifact and a real mission rather than an
+instant grab, one real time per cache. `designateStashHouse` declares
+which real organization or family a property belongs to, validated
+against its own real current owner -- inventory itself still lives on
+a real custodian NPC, never a second property-level storage system.
+Two new gates mutation-verified.
+
 ## Rogue ex-state security forces
 See `CLAUDE.md`'s own seventy-ninth standing rule for the full
 reasoning. By direct instruction: once a real local government stops

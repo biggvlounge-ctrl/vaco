@@ -447,6 +447,28 @@ const ACTIONS = {
     }),
   },
 
+  'reveal-cache': {
+    summary: 'Open a real hidden cache you hold the real key to, really have an architect\'s own '
+      + 'knowledge to find, or have genuinely heard about by word of mouth.',
+    modes: ['citizen', 'leader'],
+    requires: ['cacheId'],
+    verbs: ['revealCache'],
+    run: (verbs, actorId, body) => verbs.revealCache(actorId, { cacheId: Number(body.cacheId) }),
+  },
+
+  'designate-stash-house': {
+    summary: 'Mark a real property your own real people actually hold as your organization\'s '
+      + 'or family\'s stash house.',
+    modes: ['citizen', 'leader'],
+    requires: ['propertyId'],
+    verbs: ['designateStashHouse'],
+    run: (verbs, actorId, body) => verbs.designateStashHouse(actorId, {
+      propertyId: Number(body.propertyId),
+      organizationId: body.organizationId != null ? Number(body.organizationId) : null,
+      familyId: body.familyId != null ? Number(body.familyId) : null,
+    }),
+  },
+
   'attempt-heist': {
     summary: 'Send a real crew (2-4 of your own people matter most) to rob a real organization\'s '
       + 'own real assets.',

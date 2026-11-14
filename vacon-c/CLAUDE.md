@@ -5318,6 +5318,80 @@ confirmed. 12 new tests in `test/heists.test.js`, 1 more wiring test
 in `test/actions.test.js`, full suite 2327/2327 real (17 honestly
 skipped), no regression.
 
+**An eighty-seventh, and the hard half of the gap was already closed
+— only the gated layer on top of it needed building.** By direct
+instruction: "safes... secret compartments and secret passageways...
+things that have been buried or put in the wall... these are all
+missions... stash spots, stash houses... underground caves, secret
+passageways, secret spots in woods... integrate these all over the
+country and the world... especially old things like old Masonic
+buildings, mosque, religious places... historic buildings... keys
+still exist... or have some type of knowledge... or it can come from
+word of mouth."
+
+`discovery.js` had already turned a landmark's own real category into
+a real pool of books, artifacts and items, scaled by `landmarks.
+significanceOf`, and already named `masonic-building`, `historic-
+site`, mosque, church, synagogue, temple and `cave-system` among its
+pools — exactly the places this request names. What it never had is
+a GATE: anybody can walk into a cathedral and search it down, no key,
+no knowledge, no word of mouth. `server/hiddenCaches.js` is that
+gated layer, reusing `discovery.poolFor` directly for landmark
+properties rather than a second content vocabulary, and extending the
+identical idea to ordinary residential properties — homes and
+apartments — which `discovery.js` never covered at all.
+
+**The user's own three words for access are the real gates, nothing
+invented to fit them.** A key is a real, cache-SPECIFIC item
+(`Old Key (cache N)`, registered under §26's existing `tools` category
+the exact way `weapons.js` registers `pistol`/`rifle` under
+`protection`) — never a universal skeleton key, so holding one cache's
+key does not open another's (mutation-verified by proxy: a dedicated
+test confirms a different cache's key is refused). Knowledge is a
+real occupation, not an invented skill check: `architect` is
+`occupations.js`'s own tier-5 Construction post, found by checking the
+file directly rather than assumed — "a contractor... who has the
+knowledge to see a secret spot" is this engine's own real architect.
+Word of mouth is the real channel `media.js#runWordOfMouth` already
+runs every tick, checked directly before writing anything here: it
+only propagates an `entity_knowledge` row that carries a real,
+positive `spread_rate`, so `revealCache` writes one with
+`media.CHANNELS.word_of_mouth`'s own real rate rather than a second
+number for the identical idea.
+
+**"These are all missions," taken literally rather than loosely.**
+`discovery.js#search` hands a find over immediately; a hidden cache
+does not. `revealCache` generates a real artifact
+(`missions.generateArtifact`, `location_id` pointed at the real
+property — the identical precedent `discovery.js` itself already set)
+and a real mission around it, and the finder goes through the one
+real mission state machine this engine already has
+(`acceptMission`/`resolveMission`/`payReward`) to actually bring it
+home, rather than a second, parallel "claim" mechanic. One real
+mission per cache, ever — mutation-verified: removing the
+already-claimed guard let a second real mission get created from the
+same cache, which is not what "one real find" means.
+
+**Stash houses are a declaration, not a second inventory system.**
+`inventory.js` holds everything by a real `holder_entity_id` — a
+person, never a building — and that did not change here.
+`designateStashHouse` records which real organization or family a
+property belongs to for this purpose, validated against the
+property's own real current owner so a sponsor can only designate
+ground their own real people genuinely hold (mutation-verified: the
+ownership-membership check is load-bearing, not decorative). The
+actual inventory a stash house "keeps" still lives on whichever real
+person actually holds it, named here as a real, declared limitation
+rather than an invented property-level storage mechanic.
+
+Opt-in (`config.hiddenCaches`, default false, `worldgen.js`) — every
+existing call to `generateWorld()` gets the exact unchanged world the
+whole suite already asserted against, the same posture every other
+flag this session has added holds. 15 new tests in
+`test/hiddenCaches.test.js`, 2 more wiring tests in
+`test/actions.test.js`, full suite 2344/2344 real (17 honestly
+skipped), no regression.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

@@ -67,6 +67,7 @@ const players = require('./players.js');
 const leadership = require('./leadership.js');
 const espionage = require('./espionage.js');
 const heists = require('./heists.js');
+const hiddenCaches = require('./hiddenCaches.js');
 const influence = require('./influence.js');
 const characterCreation = require('./characterCreation.js');
 const mainCharacters = require('./mainCharacters.js');
@@ -843,6 +844,17 @@ function attemptHeist(entityId, options = {}) {
   return heists.attemptHeist(WorldState, entityId, options);
 }
 
+// Same convention again: a real key, a real architect's own
+// knowledge, or real word-of-mouth gets you into a real hidden cache
+// — see hiddenCaches.js's own header for the full design.
+function revealCache(entityId, options = {}) {
+  return hiddenCaches.revealCache(WorldState, entityId, options.cacheId, options);
+}
+
+function designateStashHouse(entityId, options = {}) {
+  return hiddenCaches.designateStashHouse(WorldState, entityId, options);
+}
+
 // Character creation — see characterCreation.js's own header for the
 // full design. `generateNPC`/`generateFamily`/`addFamilyMember` are
 // injected rather than required back from that module, because their
@@ -1122,6 +1134,8 @@ const ACTION_VERBS = {
   assignRole: (...args) => assignRole(...args),
   sendSpy: (...args) => sendSpy(...args),
   attemptHeist: (...args) => attemptHeist(...args),
+  revealCache: (...args) => revealCache(...args),
+  designateStashHouse: (...args) => designateStashHouse(...args),
   addScheduleEvent: (...args) => addScheduleEvent(...args),
   reinforceHabit: (...args) => reinforceHabit(...args),
   resolveContest: (...args) => resolveContest(...args),
