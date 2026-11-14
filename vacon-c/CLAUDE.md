@@ -4866,6 +4866,167 @@ Mutation-verified: temporarily widened the regime gate from `!==
 through), confirmed the dedicated "refuses a merely contested
 community" test caught it, reverted.
 
+**An eightieth, closing `crime.js`'s own declared, ungenerated `fraud`
+category -- by direct instruction, among a wider request for
+"corruption at all levels... scamming and scheming all over."**
+`CATEGORIES.fraud`'s own substrate note had already named the real
+gap precisely: "market_listings resolve honestly and there is no
+contract, claim, insurance or instrument to falsify." `server/
+fraud.js` adds no invented instrument to falsify -- a false PROPERTY
+SALE is the one real transaction type `properties`/`ownership_records`
+already support without one: a perpetrator offers a real property
+they do not hold title to (`property.getCurrentOwner`), a real victim
+pays a real deposit, and no title is ever actually transferred because
+the perpetrator never had one to give.
+
+**Gated on the real, already-read `criminal.Deception` trait --
+`policing.evasionOf` and `bluff.js` already treat it as "how good this
+person is at making someone believe something false," reused rather
+than a second, disagreeing "scheming" trait.** `BASE_FRAUD_RISK`
+(0.0006 at Deception 100) is the same order of magnitude `crime
+.BASE_DEPRIVATION_RISK` already uses at full pressure, scaled by
+`deception / 100` directly -- a gate deciding whether the offence
+happens at all, the same shape deprivation's own pressure term already
+is, not a modifier perturbing an existing baseline the twelfth
+standing rule's "centre on 50" would otherwise apply to. Measured on a
+400-tick, 2-city generated world: 37 real fraud incidents against 12
+real theft/property incidents in the same world -- fraud reads as the
+more common offence once deception alone gates it, with no poverty
+line to clear first, which is the real shape "scamming and scheming
+all over" asked for.
+
+**The real wealth movement reuses the one precedent this engine
+already has for crediting money into somebody's savings, generalized
+to debit the other side too.** There is no general "adjust this
+person's money" function anywhere in `economy.js` -- only a generator
+and a reader of the latest `individual_finances` row.
+`engine.js#payMissionReward` is the one real precedent for moving
+money this way; `fraud.moveSavings` is the identical two-row shape,
+applied to both sides of a transfer rather than one.
+
+**A victim's own knowledge of what happened needed no new mechanism
+either.** `crime.recordCrime` already draws the victim's post-incident
+knowledge from the offender's own `criminal` family (Stealth,
+Deception, Black Market Ties, Heat Tolerance) against the victim's
+perception -- the exact "how good was the con, and how perceptive was
+the mark" question a fraud victim's own partial, sometimes-wrong
+knowledge already needed, read by nothing new.
+
+Mutation-verified: a single call's own `seededDraw` is a real per-tick
+probability, not a guarantee, the same reason `test/crime.test.js`'s
+own `runDeprivationCrime` tests loop hundreds of ticks rather than
+asserting on one call -- `test/fraud.test.js`'s own end-to-end test
+does the same, looping until a real incident lands. Temporarily
+removed the `seededDraw` gate entirely (every eligible NPC defrauds on
+every tick); confirmed the dedicated "only fires probabilistically"
+test failed immediately, reverted.
+
+**A second, separate real gap found while building this: `occupations
+.js`'s own `guard`/`warden`/`nurse` ("COs, nurses, warden — all the
+professions of the penitentiary") were exactly the `officer` shape all
+over again -- defined, real employers named, and never once hired.**
+Measured directly before writing anything: zero guards, zero wardens,
+zero nurses in a four-city generated world, at any population size.
+`config.prisonStaffing` (opt-in, default false, the identical posture
+`securityForces` already holds) hires one real warden and one real
+guard per real prison, drawn from that prison's own real city
+residents -- the same `cityResidents.find(unemployed, adult,
+tier-reachable)` pattern the `CITY_INSTITUTIONS` hiring block already
+uses for a school's teacher. A dirty-CO-in-league-with-a-real-prison-
+gang mechanic needs a real CO to begin with; this is that prerequisite,
+not the mechanic itself.
+
+**Idempotence had to be added by hand to both flags, not assumed --
+the fifteenth standing rule's own case study, twice over.** This
+file's own test suite calls `generateWorld()` many times against one
+shared, growing `WorldState`, and the first versions of both hiring
+blocks iterated every government/property that has EVER existed in
+it, with no check for whether a given city or prison already had its
+real officer or its real warden and guard. A second call would have
+hired a second, third, unbounded corps for the exact same city every
+time it ran. Fixed by marking the real, already-covered case directly
+-- an officer corps checked per (government, city) pair via a real
+employment-record lookup, a prison checked via a new in-memory-only
+`staffed` flag on the property itself, the identical posture
+`organization.archetype` already holds. Caught by this round's own
+new tests failing with inflated counts, not assumed correct from a
+clean read of the diff.
+
+**A third, real, and strictly separate bug the same debugging pass
+surfaced: `officer` candidates were never scoped to the hiring city at
+all.** The first version of `config.securityForces`'s own hiring loop
+searched every NPC in the whole world for "the first unemployed adult
+who reaches tier 5," with no city filter — which could, and in one of
+this round's own tests' seeds did, station "this city's officer" in a
+city they do not actually live in. That would have silently broken
+`roguePolice.js`'s own `localOfficersOf`, which correctly reads an
+officer's real `communityId` and would have found nobody for a city
+whose nominal officer was never really there. Fixed to search only
+`cityCommunityIds`-matching residents, the same scoping `prisonStaffing`'s
+own hiring already uses. Found by a test assertion failing with a
+plausible-looking but wrong count (2 of 3 cities staffed), not by
+inspection.
+
+**A fourth, found and deliberately left alone: `politics.scopeCitiesOf`
+returns every real city for ANY civilization-scoped government,
+regardless of that government's own real `scope_id`.** Surfaced while
+debugging the third bug above, in a world carrying two real
+civilization-scoped governments (`scope_id: 1` and `scope_id: 2`) from
+two different real civilizations — both ended up trying to hire an
+officer in the exact same handful of cities, neither correctly scoped
+to its own civilization. This is real, pre-existing, and strictly
+`politics.js`'s own concern, not `securityForces`'s or
+`prisonStaffing`'s — named here rather than fixed in passing, since
+fixing it would change `scopeCitiesOf`'s own behavior for every other
+real caller that already depends on its current shape (elections,
+legislation, revolutions), which is exactly the kind of retroactive
+change this file's own standing discipline warns against making
+without being asked.
+
+**An eighty-first, and it is a real actor-driven cause sitting right
+beside an area-wide one that already existed.** `justice.js#
+runPrisonBreaks` already fires exactly once, for every inmate, the
+moment a prison's own community crosses into `lawless` — a real
+mechanism, built before this round, for "the state's own writ gave
+out here." It does not cover the user's own distinct request: "the
+dirty COs... in cahoots with the gangs in jail... are the ones that
+start the prison breaks" — a corrupt STAFF MEMBER acting on behalf of
+a specific gang, which has to be able to fire before the surrounding
+area ever goes fully lawless, and has to release only that gang's own
+members, never the whole population the way an area-wide collapse
+does.
+
+`justice.js#runCorruptGuardBreaks` is the new, additive function,
+gated on three real, already-measured signals, never an invented one:
+a real prison gang already exists at this prison
+(`worldState.prisonGangs[prison.id]`, founded the identical way
+`ensurePrisonGang` already founds one); at least one real `guard`/
+`warden` employed there reads `leadership.'Corruption Risk' >= 50` —
+restated locally as `CORRUPT_STAFF_THRESHOLD` rather than importing
+`roguePolice.CORRUPTION_DEFECTION_THRESHOLD`, since the two modules
+have no real dependency on each other and a local constant says so
+honestly; and the prison's own community reads `contested` OR
+`lawless` (never `governed`, never unmeasured) via the same real
+`authority.writOf` this project's other collapse-triggered mechanics
+already read — deliberately NOT requiring full `lawless`, because a
+dirty CO in league with the inside does not need the whole area to
+fall apart first, which is the whole point of distinguishing this
+from `runPrisonBreaks`. Idempotent per-prison via a new in-memory
+`worldState.corruptGuardBreakState` marker, the same shape
+`prisonProperty.staffed` already took one round earlier. Releases
+only the real gang's own still-imprisoned members, via
+`membership.membersOf`, reusing the existing `release(..., { reason:
+'prison-break' })` path rather than a second one — which is also what
+already reports real living family on release, so "head back to
+their family" for a broken-out inmate was already built.
+
+Both new gates were mutation-verified: removing the regime check made
+the "refuses a governed prison" test fail, and removing the
+corrupt-staff check made the "no real corrupt staff, even with a gang
+and real chaos" test fail — each reverted once confirmed. 4 new tests
+in `test/justice.test.js`, full file 47/47, no regression to the
+pre-existing `runPrisonBreaks`/`release`/`ensurePrisonGang` coverage.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

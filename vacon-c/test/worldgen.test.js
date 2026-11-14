@@ -841,3 +841,93 @@ test('a city government\'s real leader comes from its own real city, never a dif
     assert.equal(leaderCityId, scopeRow.scope_id, 'a city government\'s real leader must come from that real city, never a different one');
   }
 });
+
+// ---------------------------------------------------------------------
+// A real security force and real prison staff -- both opt-in
+// (config.securityForces / config.prisonStaffing), closing the
+// identical "the occupation was defined, nothing ever hired it" gap
+// for `officer` and for `guard`/`warden`, so `roguePolice.js`'s
+// rogue-defection mechanic and a dirty-CO prison-break mechanic both
+// have a real corps to act on. See CLAUDE.md's seventy-ninth standing
+// rule.
+// ---------------------------------------------------------------------
+
+test('securityForces defaults to false -- every existing call to generateWorld() is byte-for-byte unaffected', () => {
+  const { before } = delta(() => worldgen.generateWorld({ ...SMALL, seed: 'security-forces-default-off' }));
+  const officers = (w.employmentRecords || []).slice(before.employment)
+    .filter((r) => r.position === 'officer');
+  assert.deepEqual(officers, [], 'no officer should ever be hired with securityForces left off');
+});
+
+test('securityForces hires one real officer per real city a government\'s own scope covers', () => {
+  // `officer` is tier 5 -- the hardest real tier -- and a small
+  // population can honestly have nobody who reaches it, the same
+  // reason `founding-leaders-gang` above had to bump its own
+  // `communitiesPerCity`. A bigger population here makes "nobody in
+  // this city reaches tier 5" negligible rather than papering over it.
+  const { before } = delta(() => worldgen.generateWorld({
+    communitiesPerCity: 6, populationPerCommunity: 20, cities: 3,
+    seed: 'security-forces-on', securityForces: true,
+  }));
+  const newCities = w.cities.slice(before.cities);
+  assert.equal(newCities.length, 3, 'cities: 3 should produce exactly three real cities');
+
+  // Checked as "at least one officer per new city" rather than an
+  // exact total -- `politics.scopeCitiesOf` returns every city for
+  // ANY civilization-scoped government regardless of its own real
+  // `scope_id` (a separate, pre-existing imprecision, not this
+  // round's to fix), so more than one civ-scoped government
+  // legitimately piling onto the same new city is a real possibility
+  // this file's own shared, multi-civilization WorldState can produce
+  // and is not a defect in this flag's own real guarantee: every city
+  // in scope gets a real officer, never zero.
+  for (const city of newCities) {
+    const communityIds = new Set(
+      (w.communities || []).filter((cm) => cm.city_id === city.id).map((cm) => cm.id),
+    );
+    const officersHere = (w.employmentRecords || [])
+      .filter((r) => r.position === 'officer' && r.status === 'active')
+      .filter((r) => communityIds.has((w.npcs || []).find((n) => n.id === r.entity_id)?.communityId));
+    assert.ok(officersHere.length > 0, `city ${city.id} should have at least one real officer`);
+    for (const record of officersHere) {
+      const employer = w.organizations.find((o) => o.id === record.employer_organization_id);
+      assert.equal(employer.type, 'government');
+    }
+  }
+});
+
+test('prisonStaffing defaults to false -- every existing call to generateWorld() is byte-for-byte unaffected', () => {
+  const { before } = delta(() => worldgen.generateWorld({
+    ...SMALL, seed: 'prison-staffing-default-off', landmarksPerCity: 24,
+  }));
+  const staff = (w.employmentRecords || []).slice(before.employment)
+    .filter((r) => ['guard', 'warden'].includes(r.position));
+  assert.deepEqual(staff, [], 'no guard or warden should ever be hired with prisonStaffing left off');
+});
+
+test('prisonStaffing hires a real warden and a real guard for every real prison, employed by its own real operator', () => {
+  const { before } = delta(() => worldgen.generateWorld({
+    ...SMALL, seed: 'prison-staffing-on', landmarksPerCity: 24, prisonStaffing: true,
+  }));
+  const newProperties = w.properties.slice(before.properties);
+  const prisons = newProperties.filter((p) => p.landmark_category === 'prison');
+  assert.ok(prisons.length > 0, 'this seed should produce at least one real prison');
+
+  // Checked per-prison via the real in-memory `staffed` marker the
+  // production code itself sets -- not a raw total employment count,
+  // because this file's own WorldState accumulates real prisons from
+  // every earlier test too, and turning the flag on here legitimately
+  // catches any of THOSE up as well (the identical real-gap-wherever-
+  // found posture this engine already holds everywhere else), which
+  // would make a total count assert on more than just this seed's own
+  // prisons.
+  for (const prison of prisons) {
+    assert.equal(prison.staffed, true, `prison ${prison.id} must be marked staffed`);
+    const staffHere = (w.employmentRecords || []).filter(
+      (r) => r.status === 'active' && ['guard', 'warden'].includes(r.position)
+        && r.employer_organization_id === prison.operating_organization_id,
+    );
+    assert.ok(staffHere.some((r) => r.position === 'warden'), `prison ${prison.id}'s real operator must employ a real warden`);
+    assert.ok(staffHere.some((r) => r.position === 'guard'), `prison ${prison.id}'s real operator must employ a real guard`);
+  }
+});

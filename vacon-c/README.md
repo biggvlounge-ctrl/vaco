@@ -773,6 +773,42 @@ storefront is a real VENVS seller with a runtime id and no separate
 product-id namespace to address. Four real link generators this
 round, not five.
 
+## Fraud: a false property sale closes crime.js's declared "fraud" gap
+See `CLAUDE.md`'s own eightieth standing rule for the full reasoning.
+By direct instruction, among a wider request for "corruption at all
+levels... scamming and scheming all over": `server/fraud.js` closes
+`crime.js`'s own declared, ungenerated `fraud` category with the one
+real transaction `properties`/`ownership_records` already support
+without inventing a contract or claim to forge -- a perpetrator (gated
+on the real, already-read `criminal.Deception` trait) offers a real
+property they do not hold title to, a real victim pays a real deposit,
+and no title changes hands. Measured on a 400-tick, 2-city world: 37
+real fraud incidents against 12 real theft/property incidents.
+
+The same round also closed a second, separate real gap found while
+building it: `occupations.js`'s `guard`/`warden`/`nurse` ("COs,
+nurses, warden") had been defined with `government` as their employer
+since an earlier round and never once hired, the identical "defined,
+never called" shape `config.securityForces` already closed for
+`officer`. `config.prisonStaffing` (opt-in, default false) hires a
+real warden and a real guard for every real prison, drawn from that
+prison's own real city residents -- the prerequisite a real
+dirty-CO/prison-gang mechanic needs before it can do anything.
+
+## Dirty COs break out their own gang
+See `CLAUDE.md`'s own eighty-first standing rule for the full
+reasoning. By direct instruction: `server/justice.js#
+runCorruptGuardBreaks` closes the real actor-driven cause sitting
+beside the pre-existing, area-wide `runPrisonBreaks` -- a corrupt
+guard or warden (`leadership.'Corruption Risk' >= 50`, the real
+threshold `roguePolice.js` already measures) already in league with
+a real prison gang can break that gang's own members out the moment
+the prison's community merely goes `contested` (never requiring full
+`lawless`, which is what makes this a different, earlier-firing cause
+than the area-wide one), and releases only that gang's own members,
+never the whole population. Idempotent per prison; mutation-verified
+on both new gates; 4 new tests, full `test/justice.test.js` 47/47.
+
 ## Rogue ex-state security forces
 See `CLAUDE.md`'s own seventy-ninth standing rule for the full
 reasoning. By direct instruction: once a real local government stops

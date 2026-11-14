@@ -169,6 +169,7 @@ const mortality = require('./mortality.js');
 const characterCreation = require('./characterCreation.js');
 const orgArchetypes = require('./orgArchetypes.js');
 const prisonPacks = require('./prisonPacks.js');
+const { getLiveEntity } = require('./entityTraits.js');
 
 // ---------------------------------------------------------------------
 // Vocabulary
@@ -956,6 +957,104 @@ function runPrisonBreaks(worldState, options = {}) {
 }
 
 // ---------------------------------------------------------------------
+// A dirty CO who is already in league with the real gang inside, by
+// direct instruction: "organize the dirty COs and the COs that are in
+// junction with the gangs in jail are the ones that... start the
+// prison breaks" — a real, actor-driven cause, separate from
+// `runPrisonBreaks` just above's own area-wide "the ground outside
+// went lawless" trigger. Both are real; this one needs neither a
+// crossing into full `lawless` nor every inmate let out, because an
+// insider does not need the whole area to collapse first.
+// ---------------------------------------------------------------------
+//
+// **Reuses `roguePolice.js`'s own measured corruption cut, not a
+// second number.** `CORRUPT_STAFF_THRESHOLD` is the identical trait
+// scale centre `roguePolice.CORRUPTION_DEFECTION_THRESHOLD` already
+// uses, for the identical reason: `leadership.'Corruption Risk'` is
+// the one real trait this engine already reads for exactly this
+// question, and a second, disagreeing cut here would be answering the
+// same question twice. `config.prisonStaffing`'s own real guard/warden
+// hiring (`worldgen.js`) is what makes there a real CO here to check
+// in the first place — this is the dirty-CO mechanic that round's own
+// comment named as the reason it had to exist.
+//
+// **Gated on "the chaos happens," not on an ordinary governed prison
+// quietly going dirty.** `authority.writOf`'s real reading has to be
+// at least `contested` — a fully `governed` area, or one never yet
+// observed at all, has not had its chaos happen, and a dirty CO in an
+// otherwise-functioning system is a different, real phenomenon this
+// round does not claim to model.
+//
+// **Releases the real gang's own members, never the whole population**
+// — `membership.membersOf` on the real organization `ensurePrisonGang`
+// already founded for this prison, filtered to who is still actually
+// imprisoned there. A prison with staff but no real gang yet (fewer
+// than `PRISON_GANG_MIN_MEMBERS` ever served together) has nothing for
+// a dirty CO to be "in junction with" and triggers nothing.
+//
+// **Idempotent per prison, the identical `regimeState`-style marker
+// `runPrisonBreaks` already holds** — `worldState.corruptGuardBreakState`,
+// in-memory only, same posture as `prisonGangs`/`prisonRegimeState`
+// beside it.
+const CORRUPT_STAFF_THRESHOLD = 50;
+
+function runCorruptGuardBreaks(worldState, options = {}) {
+  const { tick = worldState.tick ?? 0, threshold = CORRUPT_STAFF_THRESHOLD } = options;
+  const events = [];
+  const triggered = worldState.corruptGuardBreakState || (worldState.corruptGuardBreakState = {});
+
+  const prisons = (worldState.properties || []).filter((p) => p.landmark_category === 'prison');
+  for (const prison of prisons) {
+    if (triggered[prison.id]) continue;
+    if (prison.community_id === null || prison.community_id === undefined) continue;
+
+    const gangOrganizationId = (worldState.prisonGangs || {})[prison.id];
+    if (!gangOrganizationId) continue;
+
+    const reading = authority.writOf(worldState, prison.community_id);
+    if (reading.regime === 'governed' || reading.regime === null) continue;
+
+    const corruptStaffIds = (worldState.employmentRecords || [])
+      .filter((r) => r.status === 'active'
+        && ['guard', 'warden'].includes(r.position)
+        && r.employer_organization_id === prison.operating_organization_id)
+      .filter((r) => {
+        const risk = Number(getLiveEntity(worldState, r.entity_id)?.traits?.leadership?.['Corruption Risk']);
+        return Number.isFinite(risk) && risk >= threshold;
+      })
+      .map((r) => r.entity_id);
+    if (corruptStaffIds.length === 0) continue;
+
+    triggered[prison.id] = true;
+
+    const brokenOut = [];
+    for (const member of membership.membersOf(worldState, gangOrganizationId)) {
+      if (member.status !== 'imprisoned') continue;
+      const released = release(worldState, member.id, { tick, reason: 'prison-break' });
+      if (released) brokenOut.push(member.id);
+    }
+    if (brokenOut.length === 0) continue;
+
+    events.push({
+      type: 'prison_break',
+      severity: 'high',
+      note: `${prison.name}'s own dirty staff let organization ${gangOrganizationId}'s real `
+        + `members out -- ${brokenOut.length} released unserved`,
+      tick,
+      affected_entity_ids: [...corruptStaffIds, ...brokenOut],
+      global_effects: {
+        prisonPropertyId: prison.id,
+        gangOrganizationId,
+        corruptStaffIds,
+        releasedEntityIds: brokenOut,
+      },
+    });
+  }
+
+  return events;
+}
+
+// ---------------------------------------------------------------------
 // Group law — what answers an offence where the state does not
 // ---------------------------------------------------------------------
 //
@@ -1226,6 +1325,11 @@ function runJustice(worldState, options = {}) {
   // computed for this whole pass — see `runPrisonBreaks`'s own header.
   events.push(...runPrisonBreaks(worldState, { tick, writ }));
 
+  // A dirty CO already in league with the real gang inside -- a
+  // second, actor-driven break, separate from the area-wide crossing
+  // above. See `runCorruptGuardBreaks`'s own header.
+  events.push(...runCorruptGuardBreaks(worldState, { tick }));
+
   return events;
 }
 
@@ -1416,6 +1520,8 @@ module.exports = {
   inmatesOf,
   ensurePrisonGang,
   runPrisonBreaks,
+  runCorruptGuardBreaks,
+  CORRUPT_STAFF_THRESHOLD,
   streetAffiliateOf,
   ensureStreetAffiliate,
   joinStreetAffiliate,

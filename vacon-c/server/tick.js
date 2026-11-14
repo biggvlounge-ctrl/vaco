@@ -78,6 +78,7 @@ const justice = require('./justice.js');
 const recruitment = require('./recruitment.js');
 const households = require('./households.js');
 const roguePolice = require('./roguePolice.js');
+const fraud = require('./fraud.js');
 const tribeMissions = require('./tribeMissions.js');
 const migration = require('./migration.js');
 const environment = require('./environment.js');
@@ -1191,6 +1192,25 @@ function runSecurityPhase(worldState) {
   // it. Inside this phase rather than beside it: the pipeline is
   // locked at eleven, and crime is what Security is for.
   for (const incident of crime.runDeprivationCrime(worldState, worldState.tick)) {
+    events.push({
+      type: 'crime', severity: incident.severity >= 60 ? 'high' : 'medium',
+      note: `${incident.category} offence by entity ${incident.perpetrator_entity_id}`
+        + `${incident.victim_entity_id === null ? '' : ` against entity ${incident.victim_entity_id}`}`,
+      tick: incident.tick,
+      affected_entity_ids: [incident.perpetrator_entity_id, incident.victim_entity_id]
+        .filter((id) => id !== null),
+      global_effects: { crimeIncidentId: incident.id, crimeCategory: incident.category },
+    });
+  }
+
+  // **Fraud -- closes `crime.js`'s own declared, ungenerated `fraud`
+  // category.** Same "whole population, once per tick, inside
+  // Security" shape as deprivation crime just above, so the two sit
+  // beside each other rather than on different cadences. See
+  // `server/fraud.js`'s own header for the real substrate (a false
+  // property sale) and why nothing here forges a contract or
+  // insurance claim that does not exist.
+  for (const incident of fraud.runFraud(worldState, worldState.tick)) {
     events.push({
       type: 'crime', severity: incident.severity >= 60 ? 'high' : 'medium',
       note: `${incident.category} offence by entity ${incident.perpetrator_entity_id}`

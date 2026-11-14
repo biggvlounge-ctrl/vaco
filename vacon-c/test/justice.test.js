@@ -55,6 +55,7 @@ const behavior = require('../server/behavior.js');
 const statistics = require('../server/statistics.js');
 const engine = require('../server/engine.js');
 const worldgen = require('../server/worldgen.js');
+const { getTraitId } = require('../server/traitDefinitions.js');
 
 // -- the vocabularies are two other files' ---------------------------------
 
@@ -999,4 +1000,150 @@ test('joinStreetAffiliate is a real no-op (returns null) for an entity with no r
   const result = justice.joinStreetAffiliate(w, 1, { tick: 50 });
   assert.equal(result, null);
   assert.equal(w.streetAffiliates, undefined);
+});
+
+// ---------------------------------------------------------------------
+// runCorruptGuardBreaks — a dirty CO already in league with the real
+// gang inside, a real actor-driven cause separate from the area-wide
+// crossing `runPrisonBreaks` above already covers. See CLAUDE.md's
+// eighty-first standing rule.
+// ---------------------------------------------------------------------
+
+function setRawTrait(w, entityId, family, name, value) {
+  const traitId = getTraitId(family, name);
+  if (!traitId) throw new Error(`no such trait: ${family}.${name}`);
+  w.entityTraits.push({ entity_id: entityId, trait_id: traitId, current_value: value, base_value: value });
+}
+
+// A fixture that reads `contested`, not `lawless` and not `governed` —
+// a moderate real rival hold is enough, the same real `gripTerm`
+// mechanism `test/roguePolice.test.js` already relies on for its own
+// "merely contested" fixture.
+function corruptGuardWorld() {
+  const w = {
+    tick: 50,
+    npcs: [
+      { id: 1, communityId: 9, status: 'imprisoned', createdTick: 0 },
+      { id: 2, communityId: 9, status: 'imprisoned', createdTick: 0 },
+      { id: 3, communityId: 9, status: 'active', createdTick: 0 },
+    ],
+    communities: [{ id: 9, city_id: 1 }],
+    cities: [{ id: 1 }],
+    properties: [{
+      id: 500, city_id: 1, community_id: 9, landmark_category: 'prison',
+      name: 'Lawless Pen', operating_organization_id: 70,
+    }],
+    organizations: [{ id: 70, type: 'government' }],
+    employmentRecords: [{
+      id: 1, entity_id: 3, employer_organization_id: 70, position: 'guard',
+      status: 'active', wage: 50, start_tick: 0,
+    }],
+    entityTraits: [],
+    courtCases: [
+      {
+        id: 1, defendant_entity_id: 1, status: 'convicted', released_tick: null,
+        prison_property_id: 500, city_id: 1, community_id: 9, category: 'theft',
+        sentence_ticks: 999999, charged_tick: 0, incident_id: 1, law_id: 100,
+      },
+      {
+        id: 2, defendant_entity_id: 2, status: 'convicted', released_tick: null,
+        prison_property_id: 500, city_id: 1, community_id: 9, category: 'theft',
+        sentence_ticks: 999999, charged_tick: 0, incident_id: 2, law_id: 100,
+      },
+    ],
+    infrastructure: [], territoryBlocks: [], beliefs: [], publicOpinion: [], governments: [],
+    crimeIncidents: [], groupSanctions: [], scheduleEvents: [], habits: [], memories: [],
+    historicalRecords: [], familyMemberships: [], families: [],
+  };
+
+  // A real, moderate rival faction holding this same community — grip
+  // lands in the contested band, never lawless, never governed.
+  w.organizations.push({ id: 99, type: 'gang', isFaction: true });
+  setRawTrait(w, 99, 'organization', 'territory', 55);
+  setRawTrait(w, 99, 'organization', 'power', 55);
+  w.territoryBlocks.push({ id: 1, faction_id: 99, city_id: 1, community_id: 9, status: 'controlled' });
+
+  const reading = authority.writOf(w, 9);
+  assert.equal(reading.regime, 'contested', 'fixture construction itself must read contested');
+
+  // The real gang inside, founded the identical way `imprison` already
+  // founds one — never assumed, built through the same real function.
+  justice.ensurePrisonGang(w, 500, w.tick);
+  assert.ok(w.prisonGangs[500], 'fixture construction must found a real prison gang');
+
+  return w;
+}
+
+test('runCorruptGuardBreaks: an honest no-op with no real corrupt staff, even with a real gang and real chaos', () => {
+  const w = corruptGuardWorld();
+  setRawTrait(w, 3, 'leadership', 'Corruption Risk', 10);
+  const events = justice.runCorruptGuardBreaks(w, { tick: 51 });
+  assert.equal(events.length, 0);
+  assert.equal(w.npcs[0].status, 'imprisoned');
+  assert.equal(w.npcs[1].status, 'imprisoned');
+});
+
+test('runCorruptGuardBreaks: a dirty CO already in league with the real gang breaks its own members out, before the area ever goes fully lawless', () => {
+  const w = corruptGuardWorld();
+  setRawTrait(w, 3, 'leadership', 'Corruption Risk', 90);
+
+  const events = justice.runCorruptGuardBreaks(w, { tick: 51 });
+  assert.equal(w.npcs[0].status, 'active', 'the first real gang member broke out');
+  assert.equal(w.npcs[1].status, 'active', 'the second real gang member broke out');
+  assert.equal(w.courtCases[0].released_tick, 51);
+  assert.equal(w.courtCases[1].released_tick, 51);
+
+  const breakEvent = events.find((e) => e.type === 'prison_break');
+  assert.ok(breakEvent, 'a real prison_break event must be recorded');
+  assert.ok(breakEvent.affected_entity_ids.includes(3), 'the dirty CO is named in the event');
+  assert.ok(breakEvent.affected_entity_ids.includes(1));
+  assert.ok(breakEvent.affected_entity_ids.includes(2));
+
+  const release = w.historicalRecords.find((r) => r.event_type === 'release' && r.participants.includes(1));
+  assert.match(release.description, /broke out/);
+});
+
+test('runCorruptGuardBreaks never fires twice for the same real prison', () => {
+  const w = corruptGuardWorld();
+  setRawTrait(w, 3, 'leadership', 'Corruption Risk', 90);
+
+  const first = justice.runCorruptGuardBreaks(w, { tick: 51 });
+  assert.ok(first.some((e) => e.type === 'prison_break'));
+
+  // A second real inmate arrives after the break -- the prison is not
+  // re-broken just because somebody new is now serving there.
+  w.npcs.push({ id: 4, communityId: 9, status: 'imprisoned', createdTick: 0 });
+  w.courtCases.push({
+    id: 3, defendant_entity_id: 4, status: 'convicted', released_tick: null,
+    prison_property_id: 500, city_id: 1, community_id: 9, category: 'theft',
+    sentence_ticks: 999999, charged_tick: 0, incident_id: 3, law_id: 100,
+  });
+  const second = justice.runCorruptGuardBreaks(w, { tick: 52 });
+  assert.equal(second.filter((e) => e.type === 'prison_break').length, 0);
+  assert.equal(w.npcs.find((n) => n.id === 4).status, 'imprisoned');
+});
+
+test('runCorruptGuardBreaks refuses a fully governed prison, same as it refuses an unmeasured one', () => {
+  const w = corruptGuardWorld();
+  setRawTrait(w, 3, 'leadership', 'Corruption Risk', 90);
+
+  // Remove the real rival hold and give the state a real, strong writ
+  // instead -- a governed area, not merely an unmeasured one.
+  w.territoryBlocks = [];
+  const policing = require('../server/policing.js');
+  w.beliefs = [{
+    id: 1, entity_id: 1, belief_name: policing.TRUST_BELIEF,
+    belief_type: policing.TRUST_BELIEF_TYPE, strength: 90, tick: 0,
+  }];
+  w.infrastructure = [{
+    id: 1, city_id: 1, type: 'public_safety', capacity: 40, condition: 90,
+    maintenance_level: 90, age: 0,
+  }];
+  w.governments = [{ organization_id: 70, system_type: 'council' }];
+  w.publicOpinion = [{ city_id: null, topic: 'government:70', approval_score: 85, tick: 1 }];
+  assert.equal(authority.writOf(w, 9).regime, 'governed');
+
+  const events = justice.runCorruptGuardBreaks(w, { tick: 51 });
+  assert.equal(events.length, 0);
+  assert.equal(w.npcs[0].status, 'imprisoned');
 });

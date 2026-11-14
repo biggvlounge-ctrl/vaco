@@ -224,6 +224,22 @@ const DEFAULTS = {
   // the exact unchanged world the whole test suite already asserts
   // against -- no officer is ever hired, same as today.
   securityForces: false,
+  // **Opt-in, same posture and for the identical reason as
+  // `securityForces` just above -- a second real occupation triple
+  // that was defined and never hired.** `occupations.js#OCCUPATIONS
+  // .guard`/`.warden`/`.nurse` ("COs, nurses, warden — all the
+  // professions of the penitentiary") have always named `government`
+  // as their employer and a real prison has carried a real
+  // `operating_organization_id` since the round that added it -- but
+  // nothing ever called `hireEntity` for any of the three. Measured
+  // directly before writing this flag: zero guards, zero wardens, zero
+  // nurses in a four-city generated world, the same "defined, never
+  // called" shape `securityForces` already closed for `officer`. A
+  // real dirty-CO-in-league-with-a-real-prison-gang mechanic needs a
+  // real CO to begin with. Off, every existing call to
+  // `generateWorld()` gets the exact unchanged world the whole suite
+  // already asserts against -- no prison staff hired, same as today.
+  prisonStaffing: false,
   businessesPerCommunity: 2,
   factionsPerCity: 2,
   // Homes are generated to house everybody with a margin, which is
@@ -2219,6 +2235,52 @@ function generateWorld(options = {}) {
     prisonProperty.operating_organization_id = prisonOperatorId;
   }
 
+  // **Real prison staff, opt-in (`config.prisonStaffing`, default
+  // false -- see that flag's own comment on `DEFAULTS`).** One warden
+  // and one guard per real prison, drawn from that prison's own real
+  // city residents -- the identical "an unemployed real adult who can
+  // reach this tier" pattern the `CITY_INSTITUTIONS` hiring block
+  // already uses for a school's teacher or a hospital's physician,
+  // reused rather than re-derived a third time.
+  if (config.prisonStaffing) {
+    // **Idempotent the same way `securityForces` just above is, and
+    // for the identical reason** -- a second `generateWorld()` call on
+    // a growing world must not re-staff a prison that already has its
+    // real warden and guard. Marked directly on the property
+    // (`staffed`), the same in-memory-only posture `organization
+    // .archetype` already holds -- `properties` has no such column
+    // and this is never meant to survive a Postgres round trip.
+    (w.properties || []).forEach((prisonProperty, pi) => {
+      if (prisonProperty.landmark_category !== 'prison') return;
+      if (prisonProperty.staffed) return;
+      const cityCommunities = (w.communities || []).filter((cm) => cm.city_id === prisonProperty.city_id);
+      const cityResidents = (w.npcs || []).filter(
+        (n) => cityCommunities.some((cm) => cm.id === n.communityId),
+      );
+      ['warden', 'guard'].forEach((position, posIndex) => {
+        const candidate = cityResidents.find(
+          (n) => !economy.getEmployment(w, n.id)
+            && (tick - n.createdTick) / 365 >= 16
+            && occupations.tierReachable(n, occupations.tierOf(position)),
+        );
+        if (!candidate) return;
+        economy.hireEntity(w, {
+          entityId: candidate.id,
+          employerOrganizationId: prisonProperty.operating_organization_id,
+          wage: Math.round(random.range(40, 140, 'prison-staff-wage', prisonProperty.id, pi, posIndex)),
+          position,
+          tick,
+        });
+        membership.joinOrganization(w, {
+          entityId: candidate.id, organizationId: prisonProperty.operating_organization_id, role: 'employee', tick,
+        });
+        summary.employed += 1;
+        summary.institutionStaff = (summary.institutionStaff ?? 0) + 1;
+      });
+      prisonProperty.staffed = true;
+    });
+  }
+
   // **A seat, because an announcement has to be made somewhere.**
   // `properties.operating_organization_id` is the schema's own link
   // from a building to whoever runs it — `worldgen` already uses it for
@@ -2499,13 +2561,42 @@ function generateWorld(options = {}) {
   // -- `scopedGovernments` can found city- and region-level governments
   // too, and each one that exists gets its own real officers.
   if (config.securityForces) {
+    // **Idempotent against a world grown by more than one real
+    // `generateWorld()` call, the fifteenth standing rule's own
+    // check.** `w.governments` holds every government this WorldState
+    // has ever carried, not only the ones this call just founded --
+    // and a second call on the same growing world (this file's own
+    // test suite does exactly that, cumulatively) must not re-hire a
+    // second officer for a city that already has one. Skip any city
+    // in scope that already has a real, active officer employed by
+    // THIS SAME government.
     for (const government of (w.governments || [])) {
       const org = (w.organizations || []).find((o) => o.id === government.organization_id);
       if (!org) continue;
       const cities = politics.scopeCitiesOf(w, government);
+      const existingOfficerCommunityIds = new Set(
+        (w.employmentRecords || [])
+          .filter((r) => r.status === 'active' && r.position === 'officer' && r.employer_organization_id === org.id)
+          .map((r) => (w.npcs || []).find((n) => n.id === r.entity_id)?.communityId)
+          .filter((id) => id != null),
+      );
       cities.forEach((city, ci) => {
+        const cityCommunityIds = new Set(
+          (w.communities || []).filter((cm) => cm.city_id === city.id).map((cm) => cm.id),
+        );
+        const alreadyStaffed = [...existingOfficerCommunityIds].some((id) => cityCommunityIds.has(id));
+        if (alreadyStaffed) return;
+        // **Scoped to this city's own real residents.** The first
+        // version of this searched every NPC in the world with no city
+        // filter at all, which could station "this city's officer" in
+        // a city they do not live in — and would have made
+        // `roguePolice.js`'s own `localOfficersOf` (which correctly
+        // reads an officer's real `communityId`) silently find nobody
+        // for a city whose nominal officer actually lives elsewhere.
+        // Caught by this round's own test, not assumed correct.
         const candidate = (w.npcs || []).find(
-          (n) => !economy.getEmployment(w, n.id)
+          (n) => cityCommunityIds.has(n.communityId)
+            && !economy.getEmployment(w, n.id)
             && (tick - n.createdTick) / 365 >= 16
             && occupations.tierReachable(n, occupations.tierOf('officer')),
         );
