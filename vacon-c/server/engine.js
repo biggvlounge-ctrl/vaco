@@ -65,6 +65,7 @@ const investments = require('./investments.js');
 const tick = require('./tick.js');
 const players = require('./players.js');
 const leadership = require('./leadership.js');
+const espionage = require('./espionage.js');
 const influence = require('./influence.js');
 const characterCreation = require('./characterCreation.js');
 const mainCharacters = require('./mainCharacters.js');
@@ -827,6 +828,13 @@ function assignRole(entityId, options = {}) {
   return leadership.assignRole(WorldState, entityId, options);
 }
 
+// Same convention again: a sponsor (organization leader or family
+// head) sending one of their own real people to spy on a real
+// community — see espionage.js's own header for the full design.
+function sendSpy(entityId, options = {}) {
+  return espionage.sendSpy(WorldState, entityId, options);
+}
+
 // Character creation — see characterCreation.js's own header for the
 // full design. `generateNPC`/`generateFamily`/`addFamilyMember` are
 // injected rather than required back from that module, because their
@@ -1104,6 +1112,7 @@ const ACTION_VERBS = {
   directMission: (...args) => directMission(...args),
   broadcastMessage: (...args) => broadcastMessage(...args),
   assignRole: (...args) => assignRole(...args),
+  sendSpy: (...args) => sendSpy(...args),
   addScheduleEvent: (...args) => addScheduleEvent(...args),
   reinforceHabit: (...args) => reinforceHabit(...args),
   resolveContest: (...args) => resolveContest(...args),

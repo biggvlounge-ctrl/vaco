@@ -81,7 +81,7 @@ test('every verb an action names is one the engine actually supplies', () => {
     ['acceptMission', 'addScheduleEvent', 'assessTakeover', 'assessThreat', 'assignRole', 'attemptTakeover',
       'breakDownItem', 'broadcastMessage', 'callBluff', 'canMakeThing', 'directMission', 'findOrCreateContact', 'holdMeeting',
       'intimidate', 'investInTarget', 'makeThing', 'manufactureAmmunition', 'quoteTrade',
-      'reinforceHabit', 'repurposeProperty', 'resolveContest', 'searchLocation', 'sendMessage',
+      'reinforceHabit', 'repurposeProperty', 'resolveContest', 'searchLocation', 'sendMessage', 'sendSpy',
       'stripBuilding', 'resolveMission', 'studySource', 'tradeWith'].sort(),
   );
 });
@@ -168,6 +168,26 @@ test('assign-role reaches leadership.js#assignRole through the real dispatcher, 
   assert.equal(
     membership.findMembership(engine.WorldState, worker.id, org.id).role_in_org, 'security',
   );
+});
+
+test('send-spy reaches espionage.js#sendSpy through the real dispatcher', () => {
+  const leaderNpc = engine.generateNPC();
+  const spyNpc = engine.generateNPC();
+  const org = engine.generateOrganization({ type: 'business', leaderId: leaderNpc.id });
+  membership.joinOrganization(engine.WorldState, { entityId: spyNpc.id, organizationId: org.id });
+  const community = { id: 1000001, city_id: null, name: 'Target Community', population: 10 };
+  engine.WorldState.communities.push(community);
+  const player = engine.generatePlayer({ linkedEntityId: leaderNpc.id });
+  worldStore.getOrCreateRelationship(engine.WorldState, leaderNpc.id, spyNpc.id, 'social').loyalty = 100;
+
+  const out = engine.dispatchAction(player.id, {
+    action: 'send-spy', organizationId: org.id, spyEntityId: spyNpc.id,
+    targetCommunityId: community.id, range: 'far', stance: 'low_profile',
+  });
+  assert.equal(out.result.complied, true);
+  assert.equal(out.result.communityId, community.id);
+  assert.ok(out.result.report);
+  assert.equal(out.result.report.communityId, community.id);
 });
 
 // ---------------------------------------------------------------------------

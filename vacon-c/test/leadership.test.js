@@ -181,6 +181,7 @@ test('getLeaderDashboard reports real members, their real loyalty, and directed 
   assert.equal(orgView.members[0].id, soldier.id);
   assert.equal(orgView.members[0].roleInOrg, 'soldier');
   assert.equal(orgView.members[0].loyalty, 72);
+  assert.equal(orgView.members[0].serviceRecord, 0, 'a member with no real recorded service reads 0, not null');
   assert.ok(!orgView.members.some((m) => m.id === civilian.id));
 });
 
@@ -740,4 +741,45 @@ test('assignRole compliance really raises influence, and a refusal really lowers
   leadership.assignRole(w, head.id, { familyId: fam.id, subordinateEntityId: kid.id, role: 'protector', tick: 1 });
   const afterRefuse = worldStore.findRelationship(w, head.id, kid.id).influence;
   assert.ok(afterRefuse < afterComply, 'a refused assignment lowers real influence');
+});
+
+// -- recordService / serviceRecordOf -------------------------------------
+// "NPCs become main characters in your tribe through their actions
+// and their usage" -- a real, measured count of actual compliance,
+// never a status flag. Appended last for the same id-ordering reason
+// as the tests above.
+
+test('recordService / serviceRecordOf: an entity with no real recorded service reads 0, and each real call increments it', () => {
+  const w = world();
+  const someone = person(w);
+  assert.equal(leadership.serviceRecordOf(w, someone.id), 0);
+  leadership.recordService(w, someone.id);
+  assert.equal(leadership.serviceRecordOf(w, someone.id), 1);
+  leadership.recordService(w, someone.id);
+  assert.equal(leadership.serviceRecordOf(w, someone.id), 2);
+});
+
+test('directMission and assignRole both really record service on compliance, and neither does on a refusal', () => {
+  const w = world();
+  const leader = person(w);
+  const loyalSoldier = person(w);
+  const disloyalSoldier = person(w);
+  const org = organization(w, { leaderId: leader.id });
+  join(w, loyalSoldier.id, org.id);
+  join(w, disloyalSoldier.id, org.id);
+  worldStore.getOrCreateRelationship(w, leader.id, loyalSoldier.id, 'social').loyalty = 100;
+  worldStore.getOrCreateRelationship(w, leader.id, disloyalSoldier.id, 'social').loyalty = 0;
+
+  leadership.directMission(w, leader.id, {
+    organizationId: org.id, subordinateEntityId: loyalSoldier.id, artifactId: artifact(w, 'Service Relic').id, tick: 0,
+  });
+  assert.equal(leadership.serviceRecordOf(w, loyalSoldier.id), 1);
+
+  leadership.directMission(w, leader.id, {
+    organizationId: org.id, subordinateEntityId: disloyalSoldier.id, artifactId: artifact(w, 'Refused Relic').id, tick: 0,
+  });
+  assert.equal(leadership.serviceRecordOf(w, disloyalSoldier.id), 0);
+
+  leadership.assignRole(w, leader.id, { organizationId: org.id, subordinateEntityId: loyalSoldier.id, role: 'escort', tick: 1 });
+  assert.equal(leadership.serviceRecordOf(w, loyalSoldier.id), 2, 'a second real compliance -- this time via assignRole -- increments the same real counter');
 });

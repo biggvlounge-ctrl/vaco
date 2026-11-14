@@ -841,6 +841,24 @@ real block's hold from the holder's own live traits, every tick.
 Families (tribes) hold ground through `control.js`'s own takeover key
 instead, named rather than folded in. Both new gates mutation-verified.
 
+## Espionage: sending a real spy, and the record a real success leaves
+See `CLAUDE.md`'s own eighty-fifth standing rule for the full
+reasoning. By direct instruction: an organization leader or family
+head can send one of their own real people (`server/espionage.js
+#sendSpy`) to listen, infiltrate, or watch a real community -- a real
+range (close/mid/far) and stance (low_profile/close_watch/
+deep_infiltration), sponsored through the identical real authority and
+loyalty-gated compliance draw `assignRole` already established. A
+real, weighted aptitude (Stealth/Deception/Network Reach) decides how
+much detail a report carries and how likely detection is; `deep_
+infiltration` against a named organization adds that org's own real
+public-ish facts. Detection raises real heat with the specific
+organization that caught them. A successful, undetected return records
+real service for the spy (`leadership.recordService`) -- the real,
+measured answer to "NPCs become main characters... through their
+actions and usage," kept separate from `mainCharacters.js`'s own,
+different use of that term. All three new gates mutation-verified.
+
 ## Rogue ex-state security forces
 See `CLAUDE.md`'s own seventy-ninth standing rule for the full
 reasoning. By direct instruction: once a real local government stops

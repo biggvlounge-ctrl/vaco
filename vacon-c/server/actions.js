@@ -447,6 +447,24 @@ const ACTIONS = {
     }),
   },
 
+  'send-spy': {
+    summary: 'Send a real member of your organization or family to listen, infiltrate or watch a '
+      + 'real community -- a range (close/mid/far), a stance (low_profile/close_watch/'
+      + 'deep_infiltration), and optionally a specific organization to infiltrate.',
+    modes: ['citizen', 'leader'],
+    requires: ['spyEntityId', 'targetCommunityId'],
+    verbs: ['sendSpy'],
+    run: (verbs, actorId, body) => verbs.sendSpy(actorId, {
+      organizationId: body.organizationId != null ? Number(body.organizationId) : null,
+      familyId: body.familyId != null ? Number(body.familyId) : null,
+      spyEntityId: Number(body.spyEntityId),
+      targetCommunityId: Number(body.targetCommunityId),
+      targetOrganizationId: body.targetOrganizationId != null ? Number(body.targetOrganizationId) : null,
+      range: body.range ?? 'mid',
+      stance: body.stance ?? 'close_watch',
+    }),
+  },
+
   'broadcast-message': {
     summary: 'Put a real fact in front of your own outlet\'s audience.',
     modes: ['leader'],

@@ -5165,6 +5165,86 @@ removed, each reverted once confirmed. 9 new tests in
 `test/dominance.test.js`, full suite 2300/2300 real (17 honestly
 skipped), no regression.
 
+**An eighty-fifth, and it is two real things built together because
+the user's own message tied them together — a spy, and the record a
+spy's own real success leaves behind.** By direct instruction: "gangs,
+organizations, tribes, drug organizations, gangs, families can send
+out a listener or spy to get information in the neighborhood...
+multiple spies, however, whatever they want to do... the better they
+are at listening, infiltrating, spying, is the more information they
+will come back with... you can choose a range... close range,
+mid-range, far away... keep a close eye, don't be seen, infiltrate the
+whole organization." And in the same breath: "this allows NPCs to
+become main characters in your tribe through their actions and their
+usage."
+
+`server/espionage.js#sendSpy` is sponsored through the IDENTICAL real
+seat-of-authority check and loyalty-gated draw the eighty-third
+standing rule's `assignRole` already established
+(`leadership.complianceDraw`, exported for exactly this reuse rather
+than copied) — a spy is SENT, not self-dispatched, so a reluctant
+member can refuse the same way they can refuse any other order. "The
+better they are" is a real, weighted composite —
+`criminal.Stealth` (0.4), `criminal.Deception` (0.3), `social.
+'Network Reach'` (0.3) — the `influenceRatingOf` shape applied to a
+new question rather than a fourth composite invented from nothing.
+"Close range, mid-range, far away" and "keep a close eye, don't be
+seen, infiltrate the whole organization" are the user's own six words,
+kept as six real, named values (`RANGES`, `STANCES`) rather than
+expanded into an invented taxonomy — closer range and deeper
+infiltration both raise a real, bounded detection chance and raise how
+much a spy can plausibly return with, flagged interpretive like every
+other hand-fitted band in this engine that has no document to cite a
+real number from.
+
+**What a spy brings back is real substrate this engine already had,
+never a second information model.** `dominance.dominantOrganizationOf`
+(the eighty-fourth standing rule) and `authority.writOf` already
+answer "who runs this place and how far does the state's own writ
+reach it" — exactly what a listener sent into a neighbourhood would
+learn. `deep_infiltration` against a named organization additionally
+reads that organization's own real, already-public-ish facts
+(`leader_id`, `influence`, `isFaction`, real member count via
+`membership.memberCount`) — never a private fact this engine has no
+mechanism for an outsider to actually observe.
+
+**Getting caught raises real heat with the specific organization that
+caught them, and this does not reopen `heat.js`'s own declared
+scope.** That file's header is explicit that faction heat rises only
+when a faction actually ACTS on an offence
+(`justice.answerByGroup`), never from passive, omniscient crime
+awareness — and a spy detection is not that: it is the target
+organization directly, personally catching the one specific person
+who infiltrated it, a narrower and different event than the one that
+header declines. `heat.raiseHeat` is reused with its own default
+`HEAT_GAIN`, never a second number invented for the same idea.
+
+**The "main characters through actions and usage" half did not reuse
+the term, because the term was already taken.** `mainCharacters.js`
+already owns "main character" for a specific, different, real thing —
+the four per-community power-hierarchy leaders (criminal/political/
+religious/business). Reusing the name for "a rank-and-file member who
+has done a lot for their own tribe" would be two disagreeing answers
+to what sounds like the same question — this document's own
+twenty-first standing rule, aimed at a name instead of a data source.
+`leadership.js#recordService`/`serviceRecordOf` is the real, measured
+fact underneath the user's words instead: a running per-entity count,
+incremented only on an actual COMPLIED outcome (never a refusal) at
+all three real call sites — `directMission`, `assignRole`, and a
+spy mission that returns undetected — and surfaced on
+`getLeaderDashboard`'s own members list, so a human player can see who
+has a real track record without this file guessing at a threshold for
+"important" that nobody measured.
+
+All three new gates (compliance short-circuits before any report; a
+detection raises heat only against the specific named target; service
+is recorded only on an undetected return) were mutation-verified —
+each one caught by a real test when removed, each reverted once
+confirmed. 11 new tests in `test/espionage.test.js`, 2 more in
+`test/leadership.test.js` for the shared service-record counter, 1
+more wiring test in `test/actions.test.js`, full suite 2314/2314 real
+(17 honestly skipped), no regression.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

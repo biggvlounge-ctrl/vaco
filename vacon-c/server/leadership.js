@@ -166,6 +166,30 @@ function complianceDraw(worldState, leaderEntityId, subordinateId, tag, tick) {
   return { complied: draw < complianceChance, gatingValue, complianceChance };
 }
 
+// By direct instruction: "this allows NPCs to become main characters
+// in your tribe through their actions and their usage." The existing
+// `mainCharacters.js` already owns the term "main character" for a
+// different, specific thing — the four real per-community power-
+// hierarchy leaders (criminal/political/religious/business) — so this
+// does not reuse that name for a second, disagreeing concept. What it
+// gives instead is the real, measured fact the user is actually
+// asking for: a running count of how many times a specific person has
+// actually been relied on and come through, so a human player can see
+// which of their own rank-and-file has a real track record, without
+// this file guessing at a threshold for "important" that nobody
+// measured. `directMission`, `assignRole`, and `espionage.js#sendSpy`
+// are the three real call sites, each incrementing on an actual
+// COMPLIED outcome only — a refusal is not usage.
+function recordService(worldState, entityId) {
+  const record = worldState.serviceRecord || (worldState.serviceRecord = {});
+  record[entityId] = (record[entityId] || 0) + 1;
+  return record[entityId];
+}
+
+function serviceRecordOf(worldState, entityId) {
+  return (worldState.serviceRecord || {})[entityId] ?? 0;
+}
+
 function assignRole(worldState, leaderEntityId, options = {}) {
   const {
     organizationId = null, familyId = null, subordinateEntityId, role,
@@ -253,6 +277,7 @@ function assignRole(worldState, leaderEntityId, options = {}) {
   }
 
   apply();
+  recordService(worldState, subordinateId);
   return {
     complied: true, basis, gatingValue, complianceChance, refusedBy: null, role,
   };
@@ -340,6 +365,10 @@ function getLeaderDashboard(worldState, playerId) {
           status: m.status,
           roleInOrg: roleRow ? roleRow.role_in_org : null,
           loyalty: rel ? Number(rel.loyalty) : null,
+          // "NPCs become main characters in your tribe through their
+          // actions and their usage" — see `recordService`'s own
+          // header. A real, measured track record, not a status flag.
+          serviceRecord: serviceRecordOf(worldState, m.id),
         };
       });
 
@@ -476,6 +505,7 @@ function directMission(worldState, leaderEntityId, options = {}) {
   missions.acceptMission(worldState, mission.id, subordinateId);
   mission.issued_by_entity_id = Number(leaderEntityId);
   mission.issuing_organization_id = organization ? organization.id : null;
+  recordService(worldState, subordinateId);
 
   return {
     complied: true, basis, gatingValue, complianceChance, refusedBy: null, mission,
@@ -533,4 +563,7 @@ module.exports = {
   broadcastMessage,
   assignRole,
   ASSIGNABLE_FAMILY_ROLES,
+  complianceDraw,
+  recordService,
+  serviceRecordOf,
 };
