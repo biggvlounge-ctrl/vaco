@@ -66,6 +66,7 @@ const tick = require('./tick.js');
 const players = require('./players.js');
 const leadership = require('./leadership.js');
 const espionage = require('./espionage.js');
+const heists = require('./heists.js');
 const influence = require('./influence.js');
 const characterCreation = require('./characterCreation.js');
 const mainCharacters = require('./mainCharacters.js');
@@ -835,6 +836,13 @@ function sendSpy(entityId, options = {}) {
   return espionage.sendSpy(WorldState, entityId, options);
 }
 
+// Same convention again: a sponsor assembling a real crew from their
+// own real people to rob a real organization's own real assets — see
+// heists.js's own header for the full design.
+function attemptHeist(entityId, options = {}) {
+  return heists.attemptHeist(WorldState, entityId, options);
+}
+
 // Character creation — see characterCreation.js's own header for the
 // full design. `generateNPC`/`generateFamily`/`addFamilyMember` are
 // injected rather than required back from that module, because their
@@ -1113,6 +1121,7 @@ const ACTION_VERBS = {
   broadcastMessage: (...args) => broadcastMessage(...args),
   assignRole: (...args) => assignRole(...args),
   sendSpy: (...args) => sendSpy(...args),
+  attemptHeist: (...args) => attemptHeist(...args),
   addScheduleEvent: (...args) => addScheduleEvent(...args),
   reinforceHabit: (...args) => reinforceHabit(...args),
   resolveContest: (...args) => resolveContest(...args),

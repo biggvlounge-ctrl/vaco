@@ -447,6 +447,20 @@ const ACTIONS = {
     }),
   },
 
+  'attempt-heist': {
+    summary: 'Send a real crew (2-4 of your own people matter most) to rob a real organization\'s '
+      + 'own real assets.',
+    modes: ['citizen', 'leader'],
+    requires: ['crewEntityIds', 'targetOrganizationId'],
+    verbs: ['attemptHeist'],
+    run: (verbs, actorId, body) => verbs.attemptHeist(actorId, {
+      organizationId: body.organizationId != null ? Number(body.organizationId) : null,
+      familyId: body.familyId != null ? Number(body.familyId) : null,
+      crewEntityIds: Array.isArray(body.crewEntityIds) ? body.crewEntityIds.map(Number) : [],
+      targetOrganizationId: Number(body.targetOrganizationId),
+    }),
+  },
+
   'send-spy': {
     summary: 'Send a real member of your organization or family to listen, infiltrate or watch a '
       + 'real community -- a range (close/mid/far), a stance (low_profile/close_watch/'

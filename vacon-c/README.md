@@ -859,6 +859,23 @@ measured answer to "NPCs become main characters... through their
 actions and usage," kept separate from `mainCharacters.js`'s own,
 different use of that term. All three new gates mutation-verified.
 
+## Heists: a real crew robs a real organization's own real assets
+See `CLAUDE.md`'s own eighty-sixth standing rule for the full
+reasoning. By direct instruction: `server/heists.js#attemptHeist`
+closes "bank robberies... crew composition" with no new landmark
+category and no new crime category -- a crew robbing a real business's
+own real `assets` is a bigger instance of the real, already-generated
+`theft` category. Sponsored through the identical real authority and
+per-person compliance draw `assignRole`/`espionage.js` already
+established; `robberyAptitudeOf` is a real, weighted composite
+(Stealth/Deception/Tactical Awareness); crew size helps up to a real
+cap of 4; `targetDefenseOf` counts a target's own real, currently
+employed guards/enforcers rather than the dormant, never-written
+`organizations.security` column. Success (loot splits across the
+crew) and detection (real heat with the specific target) are two
+independent draws -- service is recorded only on a clean, undetected
+success. Three new gates mutation-verified.
+
 ## Rogue ex-state security forces
 See `CLAUDE.md`'s own seventy-ninth standing rule for the full
 reasoning. By direct instruction: once a real local government stops

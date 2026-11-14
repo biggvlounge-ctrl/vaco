@@ -5245,6 +5245,79 @@ confirmed. 11 new tests in `test/espionage.test.js`, 2 more in
 more wiring test in `test/actions.test.js`, full suite 2314/2314 real
 (17 honestly skipped), no regression.
 
+**An eighty-sixth, and it closes the "bank robberies... crew
+composition" half of a request first logged as in progress many
+rounds earlier.** By direct instruction, among a wider list:
+"stealing, robberies, bank robberies... certain tasks, certain people
+will be better and certain people will be worse in your organization,
+gang... if you need to add 2, 3, 4 people for a job or task, all this
+matters." `server/heists.js#attemptHeist` needed no new landmark
+category and no new crime category to do it: `landmarks.js` has no
+`bank` entry and no document names one, so "a bank robbery" here is
+the real, general case — a crew robbing a real business
+organization's own real `assets` column, and §9's `theft` category
+(already generated) covers it without a ninth category invented for
+it.
+
+**Sponsored through the identical real authority three separate rounds
+have now reused rather than duplicated.** `assignRole` (the
+eighty-third standing rule) and `espionage.js#sendSpy` (the
+eighty-fifth) both gate on the real seat
+(`organizations.leader_id`/`families.head_npc_id`) and
+`leadership.complianceDraw`; `attemptHeist` is the third. Each crew
+member complies or refuses INDEPENDENTLY — "whatever they want to
+do," the same per-person agency `sendSpy` already respects, never a
+single roll standing in for the whole crew.
+
+**"Certain people will be better and certain people will be worse" is
+a real, weighted composite, the `influenceRatingOf`/
+`espionageAptitudeOf` shape applied a third time**:
+`robberyAptitudeOf` reads `criminal.Stealth` (0.35), `criminal.
+Deception` (0.35), and `combat.'Tactical Awareness'` (0.3) — three
+real, already-generated traits, never a fourth invented composite.
+"2, 3, 4 people... all this matters" is `CREW_CAP` (4, the user's own
+ceiling) with a real, capped size bonus — mutation-verified that
+removing the cap changes the outcome, confirming it is load-bearing
+rather than decorative.
+
+**A real, found-not-invented defense term.** `organizations.security`
+is a real schema column — `NUMERIC DEFAULT 0`, persisted by
+`migrate.js`'s own round trip — that nothing in `server/` writes a
+real value to or reads, the eleventh standing rule's own shape one
+column over (checked directly with `grep -rn "\.security\b"
+server/*.js` before writing anything, rather than assumed absent).
+Reading it here would have meant reading the identical schema default
+every organization in every world shares, which is not a real
+measurement — `targetDefenseOf` counts a target's own real, currently
+employed `guard`/`enforcer` staff instead, the same real substrate
+`prisonStaffing`'s guards and `securityForces`'s officers already
+populate.
+
+**Success and detection are two different real questions, drawn
+independently, not one roll wearing two names.** A crew can get the
+loot and still be identified, or fail and get away clean — both are
+real, bounded, centred draws (the `espionage.js#detectionChanceFor`
+shape, applied twice). Loot (on success) splits evenly across the
+real crew via the identical two-row finance-append shape
+`fraud.moveSavings`/`engine.js#payMissionReward` already use, debited
+directly from the target's own real `assets` field the same way
+`economy.js`/`investments.js`/`worldgen.js` already adjust it.
+Detection raises real heat (`heat.raiseHeat`) with the specific
+organization that caught the crew — the identical narrow, first-party
+event `espionage.js`'s own header already argues does not reopen
+`heat.js`'s declared "never from passive crime omniscience" scope.
+Service (`leadership.recordService`) is recorded only on a clean
+success — detected or not, a failure is never usage, and a detected
+success is not "came through" either, the identical standard
+`espionage.js` already holds for an undetected spy return.
+
+Three new gates were mutation-verified: the crew-size cap, the
+detection-raises-heat gate, and the clean-success-records-service
+gate — each caught by a real test when removed, each reverted once
+confirmed. 12 new tests in `test/heists.test.js`, 1 more wiring test
+in `test/actions.test.js`, full suite 2327/2327 real (17 honestly
+skipped), no regression.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

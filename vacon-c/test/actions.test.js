@@ -78,7 +78,7 @@ test('every verb an action names is one the engine actually supplies', () => {
   );
   assert.deepEqual(
     actions.REQUIRED_VERBS,
-    ['acceptMission', 'addScheduleEvent', 'assessTakeover', 'assessThreat', 'assignRole', 'attemptTakeover',
+    ['acceptMission', 'addScheduleEvent', 'assessTakeover', 'assessThreat', 'assignRole', 'attemptHeist', 'attemptTakeover',
       'breakDownItem', 'broadcastMessage', 'callBluff', 'canMakeThing', 'directMission', 'findOrCreateContact', 'holdMeeting',
       'intimidate', 'investInTarget', 'makeThing', 'manufactureAmmunition', 'quoteTrade',
       'reinforceHabit', 'repurposeProperty', 'resolveContest', 'searchLocation', 'sendMessage', 'sendSpy',
@@ -188,6 +188,24 @@ test('send-spy reaches espionage.js#sendSpy through the real dispatcher', () => 
   assert.equal(out.result.communityId, community.id);
   assert.ok(out.result.report);
   assert.equal(out.result.report.communityId, community.id);
+});
+
+test('attempt-heist reaches heists.js#attemptHeist through the real dispatcher', () => {
+  const leaderNpc = engine.generateNPC();
+  const crewMember = engine.generateNPC();
+  const org = engine.generateOrganization({ type: 'gang', leaderId: leaderNpc.id });
+  membership.joinOrganization(engine.WorldState, { entityId: crewMember.id, organizationId: org.id });
+  const target = engine.generateOrganization({ type: 'business', leaderId: null });
+  target.assets = 10000;
+  const player = engine.generatePlayer({ linkedEntityId: leaderNpc.id });
+  worldStore.getOrCreateRelationship(engine.WorldState, leaderNpc.id, crewMember.id, 'social').loyalty = 100;
+
+  const out = engine.dispatchAction(player.id, {
+    action: 'attempt-heist', organizationId: org.id,
+    crewEntityIds: [leaderNpc.id, crewMember.id], targetOrganizationId: target.id,
+  });
+  assert.equal(out.result.complied, true);
+  assert.deepEqual(out.result.crew.sort(), [leaderNpc.id, crewMember.id].sort());
 });
 
 // ---------------------------------------------------------------------------
