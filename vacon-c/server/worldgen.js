@@ -210,6 +210,20 @@ const DEFAULTS = {
   // every existing call to `generateWorld()` gets the exact unchanged
   // world the whole test suite already asserts against.
   foundingLeaders: false,
+  // **Opt-in, same posture as the flags just above, for the identical
+  // reason.** `occupations.js#OCCUPATIONS.officer`'s own `employers`
+  // have always included `'government'`, and nothing has ever hired
+  // one there -- the `founding` posts block below this object's own
+  // comment already says why: "an officer belongs to a military
+  // organization, which no world generates yet." That reasoning was
+  // sound on its own terms and is why this is opt-in rather than a
+  // retroactive fix to the same 50+ tests the flags above protect --
+  // but a real security force first requires there to BE one, for
+  // `roguePolice.js`'s rogue-defection mechanic to have anything real
+  // to defect from. Off, every existing call to `generateWorld()` gets
+  // the exact unchanged world the whole test suite already asserts
+  // against -- no officer is ever hired, same as today.
+  securityForces: false,
   businessesPerCommunity: 2,
   factionsPerCity: 2,
   // Homes are generated to house everybody with a margin, which is
@@ -2469,6 +2483,46 @@ function generateWorld(options = {}) {
       });
       summary.employed += 1;
       summary.institutionStaff = (summary.institutionStaff ?? 0) + 1;
+    }
+  }
+
+  // **A real security apparatus, opt-in (`config.securityForces`,
+  // default false) -- see that flag's own comment on `DEFAULTS` for
+  // why this reverses the "no officer because no military org
+  // generates" reasoning just above rather than deleting it.** One
+  // real officer founding post per real city a government's own scope
+  // covers (`politics.scopeCitiesOf`) -- a city-scoped government gets
+  // one, a region- or civilization-scoped one gets as many as it has
+  // real cities, which is the same "small town to country" scaling
+  // `roguePolice.js` needs this apparatus to have in the first place.
+  // Every real government organization, not just `summary.governmentId`
+  // -- `scopedGovernments` can found city- and region-level governments
+  // too, and each one that exists gets its own real officers.
+  if (config.securityForces) {
+    for (const government of (w.governments || [])) {
+      const org = (w.organizations || []).find((o) => o.id === government.organization_id);
+      if (!org) continue;
+      const cities = politics.scopeCitiesOf(w, government);
+      cities.forEach((city, ci) => {
+        const candidate = (w.npcs || []).find(
+          (n) => !economy.getEmployment(w, n.id)
+            && (tick - n.createdTick) / 365 >= 16
+            && occupations.tierReachable(n, occupations.tierOf('officer')),
+        );
+        if (!candidate) return;
+        economy.hireEntity(w, {
+          entityId: candidate.id,
+          employerOrganizationId: org.id,
+          wage: Math.round(random.range(60, 180, 'officer-wage', city.id, ci)),
+          position: 'officer',
+          tick,
+        });
+        membership.joinOrganization(w, {
+          entityId: candidate.id, organizationId: org.id, role: 'employee', tick,
+        });
+        summary.employed += 1;
+        summary.institutionStaff = (summary.institutionStaff ?? 0) + 1;
+      });
     }
   }
 

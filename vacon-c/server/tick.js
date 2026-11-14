@@ -77,6 +77,7 @@ const competition = require('./competition.js');
 const justice = require('./justice.js');
 const recruitment = require('./recruitment.js');
 const households = require('./households.js');
+const roguePolice = require('./roguePolice.js');
 const tribeMissions = require('./tribeMissions.js');
 const migration = require('./migration.js');
 const environment = require('./environment.js');
@@ -846,6 +847,32 @@ function runOrganizationPhase(worldState, options = {}) {
   // candidate list, so the Event phase sees them.
   const political = politics.runPolitics(worldState, worldState.tick);
   events.push(...political.events);
+
+  // **Rogue security forces, before the territory-block loop below so
+  // a freshly formed one's own first claim resolves this same tick.**
+  // `roguePolice.scanForCollapsedPolicing` is a real no-op in every
+  // world that never opted into `config.securityForces` at generation
+  // — see that module's own header — so this is unconditional here the
+  // same way `runPolitics` itself is.
+  if (typeof options.generateFaction === 'function' && typeof options.generateOrganization === 'function') {
+    const rogue = roguePolice.scanForCollapsedPolicing(worldState, {
+      tick: worldState.tick,
+      generateOrganization: options.generateOrganization,
+      generateFaction: options.generateFaction,
+    });
+    for (const formed of rogue) {
+      events.push({
+        type: 'rogue_security_force_formed',
+        severity: 'high',
+        note: `${formed.defectorIds.length} officer(s) defected from government `
+          + `${formed.governmentOrganizationId} to form organization ${formed.organizationId} `
+          + `in community ${formed.communityId}, territory ${formed.territoryStatus}`,
+        tick: worldState.tick,
+        affected_entity_ids: [formed.organizationId, ...formed.defectorIds],
+        global_effects: { ...formed },
+      });
+    }
+  }
 
   for (const block of worldState.territoryBlocks) {
     const priorStatus = block.status;

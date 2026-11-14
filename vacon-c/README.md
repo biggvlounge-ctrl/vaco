@@ -773,6 +773,22 @@ storefront is a real VENVS seller with a runtime id and no separate
 product-id namespace to address. Four real link generators this
 round, not five.
 
+## Rogue ex-state security forces
+See `CLAUDE.md`'s own seventy-ninth standing rule for the full
+reasoning. By direct instruction: once a real local government stops
+reaching an area at all (`authority.writOf` reading `lawless`), its
+own real, already-corrupt officers (`leadership.'Corruption Risk'`,
+generated on every NPC and read by nothing until now) organize into a
+real `'rogue security force'` (`server/roguePolice.js`,
+`orgArchetypes.js`), keep real weapons (an ordinary pistol for every
+defector, an upgraded rifle for the leader only where a real regional
+military-capability gate is open), and immediately try to use that
+force — a real territorial claim, resolved the same tick by the
+ordinary territory-control mechanism every other faction's hold
+already goes through. Gated end to end on a new opt-in
+`config.securityForces` (default false): no world that never turns it
+on has a real officer corps for any of this to act on.
+
 ## V4 and VASH ecosystem link-outs close standing rule 5
 See `CLAUDE.md`'s own seventy-eighth standing rule for the full
 reasoning. Standing rule 5 has always named six apps to link to —

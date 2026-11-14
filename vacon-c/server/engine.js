@@ -782,7 +782,7 @@ function addEnvironmentalCondition(condition) {
 }
 
 function advanceTick() {
-  return tick.advanceTick(WorldState, { generateOrganization });
+  return tick.advanceTick(WorldState, { generateOrganization, generateFaction });
 }
 
 // ---------------------------------------------------------------------------

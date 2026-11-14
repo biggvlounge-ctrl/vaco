@@ -4766,6 +4766,106 @@ no new threshold. Mutation-verified directly: temporarily had
 all, confirmed the dedicated "refused pre-threshold" test caught it
 immediately, then reverted.
 
+**A seventy-ninth, and it is three real gaps closing at once rather
+than one new mechanic: who can go rogue, what they become, and why
+nobody had ever been able to answer the first question at all.** By
+direct instruction: "after the police forces disassemble after the
+chaos... officers who already were crooked... will organize
+underground military and police forces," with real access to
+weaponry, scaling "from small towns all the way to all the
+countries," and who "try to use that force" as soon as they form.
+
+**The real trigger needed no new flag: `authority.writOf` reading
+`lawless` already IS the state's writ collapsing somewhere.** No
+second "the government disbanded" event was invented -- a government
+organization can persist elsewhere in the world while one real
+community it nominally covers simply stops being reached by it,
+exactly the granularity "small towns" asked for.
+
+**Who defects turned out to have nobody to defect, and that was a
+real, already-documented decision, not a bug -- found by trying to
+measure it before building anything.** `occupations.js#OCCUPATIONS
+.officer`'s own `employers` have always included `government`, and a
+direct measurement (`generateWorld` with real population, counted)
+confirmed zero officers in every world, at any size. `worldgen.js`'s
+own `founding` posts block already explained why, in its own words:
+"an officer belongs to a military organization, which no world
+generates yet." That reasoning was sound on its own terms in 29 Aug
+2026 and is why the fix is a NEW opt-in flag (`config.securityForces`,
+default false) rather than a retroactive change to the same posture
+-- one real officer founding post per real city a government's own
+scope covers (`politics.scopeCitiesOf`), the identical "small town to
+country" scaling the request itself asked for. Off, every existing
+call to `generateWorld()` gets the exact unchanged world the whole
+suite already asserts against -- confirmed directly, byte-for-byte,
+same seed, officer count 0 either way until the flag is set.
+
+**"A lot of them already were crooked" is a real trait nothing had
+ever read: `leadership.'Corruption Risk'`, generated on every NPC
+since the twelfth standing rule's own pass.** Measured across ten
+generated worlds (40 real officers, `securityForces: true`): roughly
+uniform 13-95, mean ~56. `CORRUPTION_DEFECTION_THRESHOLD` is the trait
+scale's own neutral centre (50) -- the twelfth standing rule's "centre
+on the average person" read here as a selection cut rather than a
+modifier -- and against the measured distribution it captures a real
+majority, which is what "a lot of them" asked for rather than a rare
+tail.
+
+**What they become is the archetype vocabulary `orgArchetypes.js`
+already built and never called, not a new mechanism.** That file's
+own header already anticipated exactly this: "a scenario that wants a
+specific named organisation supplies the name... nothing here founds
+one." `'rogue security force'` is the new entry, `isFaction: true`
+for the identical reason `militia`/`prison gang` already are -- a
+body that cannot hold a real `territory_blocks` row cannot "try to
+use that force" against anything real. `server/roguePolice.js` is the
+one real, scenario-side caller that file's header always said would
+eventually exist.
+
+**What they keep is gated by the one honest line this engine already
+drew for military-grade weaponry, never a second one.** Every
+defector keeps an ordinary `pistol` (plausible remnant stock for
+anyone who carried one on the job); only the new force's own leader
+-- chosen by the real highest `influence.influenceRatingOf` among the
+defectors, the founding-leaders round's own selection rule, not a
+second "most corrupt wins" rule -- gets an upgraded `rifle`, and only
+where `weapons.regionHasTrackedMilitaryCapability` is real and open.
+Never `machine_gun`: that stays restricted to a government actually
+holding the building, not a faction that has just lost it.
+
+**"Try to use that force" is the real territorial read every other
+faction's hold is already judged by, not a second conquest system.**
+`territory_blocks` already tolerates more than one faction's claim in
+the same community, with `authority.holderOf` already resolving which
+one is actually stronger by real live traits. So the new force's
+first act is exactly a real `generateTerritoryBlock` call, resolved
+the same tick by the real `resolveTerritoryControl` -- no new logic,
+the identical mechanism `tick.js#runOrganizationPhase` already
+resolves every other faction's hold by, now wired to run immediately
+before that same loop so a freshly formed claim is read in its first
+tick rather than its second.
+
+**Idempotence is structural, not a guard that has to be remembered.**
+A community that has already defected has no real officer left
+employed by the government that lost them -- `corruptOfficersOf`
+reads empty the next time the scan runs, the same way `justice.js`'s
+own answered cases cannot be answered twice, because the real
+substrate the check reads has already moved.
+
+**Wired unconditionally into `tick.js#runOrganizationPhase`, the
+identical posture `runPolitics` itself already holds there** -- no
+second opt-in flag at the tick level, because `scanForCollapsedPolicing`
+is a real no-op by construction in every world that never turned on
+`securityForces` at generation: there is no officer corps anywhere
+for it to act on. Confirmed live on a real generated, ticked world
+(two real cities, `securityForces: true`, 20 ticks): two real rogue
+security forces formed, zero crashes.
+
+Mutation-verified: temporarily widened the regime gate from `!==
+'lawless'` to `=== 'governed'` (letting a merely `contested` community
+through), confirmed the dedicated "refuses a merely contested
+community" test caught it, reverted.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

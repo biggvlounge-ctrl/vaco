@@ -221,6 +221,34 @@ const ARCHETYPES = {
     posts: ['enforcer'],
   },
 
+  // **Rogue security force, and it is the SAME archetype shape as
+  // `militia`/`prison gang` once more, for the identical reason:
+  // `isFaction: true` because a body that could not hold a real
+  // `territory_blocks` row could not "try to use that force" against
+  // anything real.** By direct instruction: "officers who already
+  // were crooked... will organize underground military and police
+  // forces" once the real state apparatus they served stops reaching
+  // an area at all (`authority.regimeFor` reading `lawless`).
+  // `server/roguePolice.js` is the real, scenario-side caller this
+  // file's own header already anticipated — nothing here founds one
+  // on its own, same posture every other archetype in this file holds.
+  'rogue security force': {
+    type: 'gang',
+    reach: 'community',
+    note: 'Ex-state security who kept their training and their weapons once the state that '
+      + 'trained and armed them stopped reaching here. Higher `power` than `militia` (real '
+      + 'drilling, not neighbours improvising) and lower `internalLoyalty` (bound by a shared '
+      + 'former employer and a shared defection, not kinship or a neighbourhood).',
+    isFaction: true,
+    traits: {
+      power: [55, 85],
+      territory: [45, 75],
+      internalLoyalty: [40, 70],
+      production: [5, 25],
+    },
+    posts: ['officer', 'enforcer'],
+  },
+
   clan: {
     type: 'club',
     reach: 'community',
