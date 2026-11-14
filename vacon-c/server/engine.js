@@ -819,6 +819,14 @@ function broadcastMessage(entityId, options = {}) {
   return leadership.broadcastMessage(WorldState, entityId, options);
 }
 
+// Same convention again: an organization leader OR a family's own
+// head directing one of their own real people to a real, named task
+// rather than a mission — see leadership.js's own header for why this
+// is a separate verb from directMission, not an option on it.
+function assignRole(entityId, options = {}) {
+  return leadership.assignRole(WorldState, entityId, options);
+}
+
 // Character creation — see characterCreation.js's own header for the
 // full design. `generateNPC`/`generateFamily`/`addFamilyMember` are
 // injected rather than required back from that module, because their
@@ -1095,6 +1103,7 @@ const ACTION_VERBS = {
   resolveMission: (...args) => resolveMission(...args),
   directMission: (...args) => directMission(...args),
   broadcastMessage: (...args) => broadcastMessage(...args),
+  assignRole: (...args) => assignRole(...args),
   addScheduleEvent: (...args) => addScheduleEvent(...args),
   reinforceHabit: (...args) => reinforceHabit(...args),
   resolveContest: (...args) => resolveContest(...args),

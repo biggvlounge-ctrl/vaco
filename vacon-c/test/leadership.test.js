@@ -508,3 +508,236 @@ test('getLeaderDashboard surfaces real, independent per-faction heat -- see serv
   const dashboard = leadership.getLeaderDashboard(w, player.id);
   assert.deepEqual(dashboard.heat, [{ factionOrganizationId: rivalGang.id, heat: 30 }]);
 });
+
+// -- assignRole ---------------------------------------------------------
+// Appended last for the identical id-ordering reason as the test above.
+// "You can assign things... assign them different tasks, and depending
+// on your leadership, if they will follow" -- the real seat is either
+// organizations.leader_id (member.role_in_org, free text for a non-gang
+// org) or families.head_npc_id (member.role, checked against the real
+// five-value family_memberships.role vocabulary), and compliance reuses
+// directMission's own loyalty-gated draw.
+
+function family(worldState, members) {
+  const id = nextId++;
+  worldState.families.push({
+    id, surname: 'Assign', generation: 1, total_members: members.length,
+    head_npc_id: members[0].npc.id, updatedTick: worldState.tick,
+  });
+  for (const m of members) {
+    worldState.familyMemberships.push({
+      entity_id: m.npc.id, family_id: id, role: m.role, generation_number: 1,
+    });
+  }
+  return worldState.families[worldState.families.length - 1];
+}
+
+test('assignRole requires exactly one of organizationId or familyId', () => {
+  const w = world();
+  const leader = person(w);
+  const subordinate = person(w);
+  const org = organization(w, { leaderId: leader.id });
+  join(w, subordinate.id, org.id);
+
+  assert.throws(
+    () => leadership.assignRole(w, leader.id, { subordinateEntityId: subordinate.id, role: 'scout' }),
+    /requires exactly one of organizationId or familyId/,
+  );
+  assert.throws(
+    () => leadership.assignRole(w, leader.id, {
+      organizationId: org.id, familyId: 1, subordinateEntityId: subordinate.id, role: 'scout',
+    }),
+    /requires exactly one of organizationId or familyId/,
+  );
+});
+
+test('assignRole refuses a leader assigning a role to themselves', () => {
+  const w = world();
+  const leader = person(w);
+  const org = organization(w, { leaderId: leader.id });
+  join(w, leader.id, org.id);
+
+  assert.throws(
+    () => leadership.assignRole(w, leader.id, {
+      organizationId: org.id, subordinateEntityId: leader.id, role: 'scout',
+    }),
+    /cannot assign a role to themselves/,
+  );
+});
+
+test('assignRole (organization path) refuses an entity who does not actually lead the named organization', () => {
+  const w = world();
+  const impostor = person(w);
+  const realLeader = person(w);
+  const subordinate = person(w);
+  const org = organization(w, { leaderId: realLeader.id });
+  join(w, subordinate.id, org.id);
+
+  assert.throws(
+    () => leadership.assignRole(w, impostor.id, {
+      organizationId: org.id, subordinateEntityId: subordinate.id, role: 'scout',
+    }),
+    /does not lead organization/,
+  );
+});
+
+test('assignRole (organization path) refuses to assign someone who is not actually a member', () => {
+  const w = world();
+  const leader = person(w);
+  const stranger = person(w);
+  const org = organization(w, { leaderId: leader.id });
+
+  assert.throws(
+    () => leadership.assignRole(w, leader.id, {
+      organizationId: org.id, subordinateEntityId: stranger.id, role: 'scout',
+    }),
+    /is not a member of organization/,
+  );
+});
+
+test('assignRole (organization path) refuses a gang/faction org outright -- its role_in_org is computed every tick, not assignable', () => {
+  const w = world();
+  const leader = person(w);
+  const soldier = person(w);
+  const gang = organization(w, { type: 'gang', leaderId: leader.id });
+  join(w, soldier.id, gang.id);
+  worldStore.getOrCreateRelationship(w, leader.id, soldier.id, 'social').loyalty = 100;
+
+  assert.throws(
+    () => leadership.assignRole(w, leader.id, {
+      organizationId: gang.id, subordinateEntityId: soldier.id, role: 'lookout',
+    }),
+    /is a gang\/faction/,
+  );
+  // Confirmed refused before any compliance draw -- the membership row
+  // is untouched either way.
+  assert.equal(membership.findMembership(w, soldier.id, gang.id).role_in_org, null);
+});
+
+test('assignRole (organization path) writes the real role_in_org for a non-gang org, gated on real loyalty', () => {
+  const w = world();
+  const leader = person(w);
+  const loyalWorker = person(w);
+  const disloyalWorker = person(w);
+  const org = organization(w, { type: 'business', leaderId: leader.id });
+  join(w, loyalWorker.id, org.id);
+  join(w, disloyalWorker.id, org.id);
+  worldStore.getOrCreateRelationship(w, leader.id, loyalWorker.id, 'social').loyalty = 100;
+  worldStore.getOrCreateRelationship(w, leader.id, disloyalWorker.id, 'social').loyalty = 0;
+
+  const complied = leadership.assignRole(w, leader.id, {
+    organizationId: org.id, subordinateEntityId: loyalWorker.id, role: 'security', tick: 1,
+  });
+  assert.equal(complied.complied, true);
+  assert.equal(complied.basis, 'organization');
+  assert.equal(complied.role, 'security');
+  assert.equal(membership.findMembership(w, loyalWorker.id, org.id).role_in_org, 'security');
+
+  const refused = leadership.assignRole(w, leader.id, {
+    organizationId: org.id, subordinateEntityId: disloyalWorker.id, role: 'security', tick: 1,
+  });
+  assert.equal(refused.complied, false);
+  assert.equal(refused.role, null);
+  assert.equal(
+    membership.findMembership(w, disloyalWorker.id, org.id).role_in_org, null,
+    'a refused assignment leaves the real membership row untouched',
+  );
+});
+
+test('assignRole (family path) refuses an entity who does not actually head the named family', () => {
+  const w = world();
+  const impostor = person(w);
+  const realHead = person(w);
+  const child = person(w);
+  family(w, [{ npc: realHead, role: 'parent' }, { npc: child, role: 'child' }]);
+  const fam = w.families[w.families.length - 1];
+
+  assert.throws(
+    () => leadership.assignRole(w, impostor.id, {
+      familyId: fam.id, subordinateEntityId: child.id, role: 'caregiver',
+    }),
+    /does not head family/,
+  );
+});
+
+test('assignRole (family path) refuses someone who is not actually a member of the family', () => {
+  const w = world();
+  const head = person(w);
+  const stranger = person(w);
+  family(w, [{ npc: head, role: 'parent' }]);
+  const fam = w.families[w.families.length - 1];
+
+  assert.throws(
+    () => leadership.assignRole(w, head.id, {
+      familyId: fam.id, subordinateEntityId: stranger.id, role: 'caregiver',
+    }),
+    /is not a member of family/,
+  );
+});
+
+test('assignRole (family path) refuses a role outside the real five-value family_memberships.role vocabulary', () => {
+  const w = world();
+  const head = person(w);
+  const child = person(w);
+  family(w, [{ npc: head, role: 'parent' }, { npc: child, role: 'child' }]);
+  const fam = w.families[w.families.length - 1];
+  worldStore.getOrCreateRelationship(w, head.id, child.id, 'social').loyalty = 100;
+
+  // 'parent'/'child'/'heir'/'leader' are real values in the schema's own
+  // vocabulary, but they are structural facts this engine already
+  // computes (kinship, succession), not a task a head hands out.
+  assert.throws(
+    () => leadership.assignRole(w, head.id, { familyId: fam.id, subordinateEntityId: child.id, role: 'parent' }),
+    /not an assignable family role/,
+  );
+  assert.deepEqual([...leadership.ASSIGNABLE_FAMILY_ROLES].sort(),
+    ['black_sheep', 'caregiver', 'guardian', 'mentor', 'protector']);
+});
+
+test('assignRole (family path) writes the real family_memberships.role, gated on real loyalty -- the user\'s own two examples', () => {
+  const w = world();
+  const head = person(w);
+  const loyalKid = person(w);
+  const disloyalKid = person(w);
+  family(w, [{ npc: head, role: 'parent' }, { npc: loyalKid, role: 'child' }, { npc: disloyalKid, role: 'child' }]);
+  const fam = w.families[w.families.length - 1];
+  worldStore.getOrCreateRelationship(w, head.id, loyalKid.id, 'social').loyalty = 100;
+  worldStore.getOrCreateRelationship(w, head.id, disloyalKid.id, 'social').loyalty = 0;
+
+  // "2 of them take care of the kids" -> caregiver. "on security" ->
+  // protector. Both real values from family_memberships.role's own
+  // schema comment, not invented to fit the example.
+  const complied = leadership.assignRole(w, head.id, {
+    familyId: fam.id, subordinateEntityId: loyalKid.id, role: 'caregiver', tick: 1,
+  });
+  assert.equal(complied.complied, true);
+  assert.equal(complied.basis, 'family');
+  const row = w.familyMemberships.find((m) => m.entity_id === loyalKid.id && m.family_id === fam.id);
+  assert.equal(row.role, 'caregiver');
+
+  const refused = leadership.assignRole(w, head.id, {
+    familyId: fam.id, subordinateEntityId: disloyalKid.id, role: 'protector', tick: 1,
+  });
+  assert.equal(refused.complied, false);
+  const refusedRow = w.familyMemberships.find((m) => m.entity_id === disloyalKid.id && m.family_id === fam.id);
+  assert.equal(refusedRow.role, 'child', 'a refused assignment leaves the real family role untouched');
+});
+
+test('assignRole compliance really raises influence, and a refusal really lowers it -- same shape as directMission', () => {
+  const w = world();
+  const head = person(w);
+  const kid = person(w);
+  family(w, [{ npc: head, role: 'parent' }, { npc: kid, role: 'child' }]);
+  const fam = w.families[w.families.length - 1];
+  worldStore.getOrCreateRelationship(w, head.id, kid.id, 'social').loyalty = 100;
+
+  const before = worldStore.findRelationship(w, head.id, kid.id)?.influence ?? 0;
+  leadership.assignRole(w, head.id, { familyId: fam.id, subordinateEntityId: kid.id, role: 'mentor', tick: 1 });
+  const afterComply = worldStore.findRelationship(w, head.id, kid.id).influence;
+  assert.ok(afterComply > before, 'a complied assignment raises real influence');
+
+  worldStore.getOrCreateRelationship(w, head.id, kid.id, 'social').loyalty = 0;
+  leadership.assignRole(w, head.id, { familyId: fam.id, subordinateEntityId: kid.id, role: 'protector', tick: 1 });
+  const afterRefuse = worldStore.findRelationship(w, head.id, kid.id).influence;
+  assert.ok(afterRefuse < afterComply, 'a refused assignment lowers real influence');
+});

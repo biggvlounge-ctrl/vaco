@@ -433,6 +433,20 @@ const ACTIONS = {
     }),
   },
 
+  'assign-role': {
+    summary: 'Assign one of your own real people -- an organization member or a family member '
+      + 'you head -- to a real, named task rather than a mission.',
+    modes: ['citizen', 'leader'],
+    requires: ['subordinateEntityId', 'role'],
+    verbs: ['assignRole'],
+    run: (verbs, actorId, body) => verbs.assignRole(actorId, {
+      organizationId: body.organizationId != null ? Number(body.organizationId) : null,
+      familyId: body.familyId != null ? Number(body.familyId) : null,
+      subordinateEntityId: Number(body.subordinateEntityId),
+      role: body.role,
+    }),
+  },
+
   'broadcast-message': {
     summary: 'Put a real fact in front of your own outlet\'s audience.',
     modes: ['leader'],

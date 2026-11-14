@@ -5051,6 +5051,64 @@ that value does not** — the twenty-fifth standing rule's shape, a
 measurement (here, a category flag) and a claim about it drifting
 apart, except the claim here was prose rather than an inference.
 
+**An eighty-third, and it is two real, already-named gaps closing
+together because the user's own words treated them as one authority:
+"tribe, organization, delegation."** By direct instruction: "you can
+assign things that can be done from your organization tribe... assign
+them different tasks, and depending on your leadership, if they will
+follow." `leadership.js#directMission` already covered one shape of
+this — order a subordinate onto a real mission, gated on their real
+`relationships.loyalty` — but a mission needs a real artifact or place
+(`missions.js`'s own "never about nothing"), and "take care of the
+kids," "on security" are not that.
+
+`leadership.js#assignRole` is the new, lighter verb, and it adds no
+invented vocabulary on either of its two real paths:
+
+- **Organization path**: `organizations.leader_id` directing a real
+  member's `role_in_org` — already open TEXT for any non-gang org per
+  `membership.js`'s own header ("stores whatever role its own caller
+  passes"). Refused outright for a gang or faction
+  (`membership.isGang`), because `membership.assignGangTiers` runs
+  every tick and would overwrite a player-assigned value on the very
+  next pass — a refusal that says so, not a silent value that cannot
+  stick.
+- **Family path, and this is the real find.** `families.head_npc_id`
+  had no directive of its own at all — Leader mode (the forty-seventh
+  standing rule) is granted only by `organizations.leader_id`, so a
+  pure family head could direct nobody. `family_memberships.role` is
+  open TEXT too, but its OWN schema comment, unlike the organization
+  table's, already names an exact set: "parent|child|grandparent|
+  sibling|partner|guardian|mentor|founder|heir|black_sheep|leader|
+  protector|caregiver." `characterCreation.js` had only ever written
+  two of those (`parent`, `child`) — five real, functional values —
+  `guardian`, `mentor`, `protector`, `caregiver`, `black_sheep` — sat
+  defined and never once written, the eleventh standing rule's exact
+  shape, found in the same table the twelfth and nineteenth rules
+  already mined once each. `protector` is the real substrate for "on
+  security," `caregiver` for "take care of the kids" — the user's own
+  two examples, confirmed to already exist rather than invented to fit
+  them. The other seven stay refused, because they are structural
+  facts this engine already computes (kinship, succession's `heir`,
+  `head_npc_id`'s own `leader`) and not a task a head hands out.
+
+Compliance on both paths reuses `directMission`'s identical
+loyalty-gated `seededDraw`, factored into one shared `complianceDraw`
+rather than copied — the twenty-sixth standing rule's lesson, applied
+to avoid a second, silently-different cutoff rather than to fix one
+after the fact. `assign-role` is a new `actions.js` verb, and unlike
+`direct-mission`/`broadcast-message` it is open to BOTH citizen and
+leader mode — the family path needs no promotion to Leader mode at
+all, the identical precedent `attempt-takeover`/`call-meeting` already
+set for a real seat of authority that is not `organizations.leader_id`.
+Both new refusal gates (the gang/faction check, the family-role
+vocabulary check) were mutation-verified — each one caught by a real
+test when removed, each reverted once confirmed. 10 new tests in
+`test/leadership.test.js`, 2 more wiring tests in `test/actions.test.js`
+(appended at each file's own end, for the same id-ordering reason the
+file's existing comment already states), full suite 2291/2291 real
+(17 honestly skipped), no regression.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

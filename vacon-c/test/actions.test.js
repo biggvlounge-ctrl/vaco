@@ -34,6 +34,8 @@ const actions = require('../server/actions.js');
 const engine = require('../server/engine.js');
 const inventory = require('../server/inventory.js');
 const economy = require('../server/economy.js');
+const membership = require('../server/membership.js');
+const worldStore = require('../server/worldStore.js');
 
 function citizen({ savings = 100 } = {}) {
   const npc = engine.generateNPC();
@@ -76,7 +78,7 @@ test('every verb an action names is one the engine actually supplies', () => {
   );
   assert.deepEqual(
     actions.REQUIRED_VERBS,
-    ['acceptMission', 'addScheduleEvent', 'assessTakeover', 'assessThreat', 'attemptTakeover',
+    ['acceptMission', 'addScheduleEvent', 'assessTakeover', 'assessThreat', 'assignRole', 'attemptTakeover',
       'breakDownItem', 'broadcastMessage', 'callBluff', 'canMakeThing', 'directMission', 'findOrCreateContact', 'holdMeeting',
       'intimidate', 'investInTarget', 'makeThing', 'manufactureAmmunition', 'quoteTrade',
       'reinforceHabit', 'repurposeProperty', 'resolveContest', 'searchLocation', 'sendMessage',
@@ -141,6 +143,31 @@ test('direct-mission does not require organizationId at the dispatcher -- leader
   if (out.result.mission) {
     assert.equal(out.result.mission.issuing_organization_id, null);
   }
+});
+
+test('assign-role is offered to citizen mode too, unlike direct-mission/broadcast-message -- families.head_npc_id needs no promotion', () => {
+  const citizenMenu = engine.listActions('citizen').map((a) => a.action);
+  const leaderMenu = engine.listActions('leader').map((a) => a.action);
+  assert.ok(citizenMenu.includes('assign-role'));
+  assert.ok(leaderMenu.includes('assign-role'));
+});
+
+test('assign-role reaches leadership.js#assignRole through the real dispatcher, organization path', () => {
+  const leaderNpc = engine.generateNPC();
+  const worker = engine.generateNPC();
+  const org = engine.generateOrganization({ type: 'business', leaderId: leaderNpc.id });
+  membership.joinOrganization(engine.WorldState, { entityId: worker.id, organizationId: org.id });
+  const player = engine.generatePlayer({ linkedEntityId: leaderNpc.id });
+  worldStore.getOrCreateRelationship(engine.WorldState, leaderNpc.id, worker.id, 'social').loyalty = 100;
+
+  const out = engine.dispatchAction(player.id, {
+    action: 'assign-role', organizationId: org.id, subordinateEntityId: worker.id, role: 'security',
+  });
+  assert.equal(out.result.complied, true);
+  assert.equal(out.result.basis, 'organization');
+  assert.equal(
+    membership.findMembership(engine.WorldState, worker.id, org.id).role_in_org, 'security',
+  );
 });
 
 // ---------------------------------------------------------------------------

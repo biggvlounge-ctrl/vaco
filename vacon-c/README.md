@@ -809,6 +809,22 @@ than the area-wide one), and releases only that gang's own members,
 never the whole population. Idempotent per prison; mutation-verified
 on both new gates; 4 new tests, full `test/justice.test.js` 47/47.
 
+## Delegation: assigning a real task, not a mission
+See `CLAUDE.md`'s own eighty-third standing rule for the full
+reasoning. By direct instruction: `leadership.js#assignRole` lets
+either real seat of authority this engine has -- `organizations.
+leader_id` or `families.head_npc_id` ("tribe, organization,
+delegation") -- hand one of their own real people a named task,
+gated on the identical loyalty-based compliance draw `directMission`
+already uses. An organization task writes the real, already-open-text
+`role_in_org` (refused outright for a gang/faction, whose role is
+computed every tick); a family task writes `family_memberships.role`,
+checked against five real, previously-unused values the schema's own
+comment already named -- `protector` ("on security"), `caregiver`
+("take care of the kids"), plus `guardian`/`mentor`/`black_sheep`.
+Reachable in both citizen and leader mode, since a family head needs
+no Leader-mode promotion. Both new refusal gates mutation-verified.
+
 ## Rogue ex-state security forces
 See `CLAUDE.md`'s own seventy-ninth standing rule for the full
 reasoning. By direct instruction: once a real local government stops

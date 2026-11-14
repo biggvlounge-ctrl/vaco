@@ -103,6 +103,162 @@ function clamp01(x) {
 }
 
 // ---------------------------------------------------------------------
+// Assigning a task — not every directive is a mission
+// ---------------------------------------------------------------------
+// By direct instruction: "you can assign things that can be done from
+// your organization tribe... assign them different tasks... depending
+// on your leadership, if they will follow." `directMission` already
+// covers "go accept this real mission," which needs a real artifact
+// or place (`missions.js`'s own "a mission is never about nothing").
+// "Take care of the kids," "on security" is a different, lighter kind
+// of directive with no artifact at all, and forcing it through the
+// mission state machine would be fabricating one to satisfy a rule
+// that does not apply here.
+//
+// **Both real seats this engine already has — `organizations.leader_id`
+// and `families.head_npc_id` — can issue one, because the user's own
+// words treat them as the same kind of authority ("tribe, organization,
+// delegation").** `families.head_npc_id` had no directive of its own
+// until now; only `organizations.leader_id` could ever direct anyone.
+//
+// **No invented vocabulary for either seat — both already have one.**
+// `family_memberships.role` is open TEXT in the schema, but its own
+// comment names an exact set: "parent|child|grandparent|sibling|
+// partner|guardian|mentor|founder|heir|black_sheep|leader|protector|
+// caregiver." Seven of those are structural facts this engine already
+// computes (kinship itself, succession's `heir`, `head_npc_id`'s own
+// `leader`) and are not something a tribe head hands out as a task.
+// The remaining five — `guardian`, `mentor`, `protector`, `caregiver`,
+// `black_sheep` — are real, functional, and nothing had ever written
+// them: a second "defined, never used" gap, the eleventh standing
+// rule's own shape, found in the same table `characterCreation.js`
+// already writes `parent`/`child` rows into. `protector` is the real
+// substrate for "on security," `caregiver` for "take care of the
+// kids" — the user's own two examples, not invented to fit them.
+// `organizations.membership.role_in_org` is ALSO already open TEXT —
+// `membership.js`'s own header says a non-gang organization "stores
+// whatever role its own caller passes" — so an organization task
+// takes free text, while a family task is checked against the real
+// five-value list, because only the family table's comment actually
+// names one.
+//
+// **Refused outright for a gang or faction**, never silently
+// overwritten: `membership.assignGangTiers` runs every tick
+// (`tick.js`) and recomputes `role_in_org` from real traits for every
+// gang/faction member, so a player-assigned role there would be
+// clobbered on the very next tick and the refusal says so rather than
+// accepting a value that cannot stick.
+//
+// **The compliance draw is the identical one `directMission` already
+// uses** — a subordinate's own real `relationships.loyalty` toward
+// whoever is asking, mapped straight to a probability, never an
+// invented cutoff (the twenty-sixth standing rule). Reused rather than
+// copied: `complianceDraw` is the one function both verbs call.
+const ASSIGNABLE_FAMILY_ROLES = ['guardian', 'mentor', 'protector', 'caregiver', 'black_sheep'];
+
+function complianceDraw(worldState, leaderEntityId, subordinateId, tag, tick) {
+  const relationship = worldStore.findRelationship(worldState, leaderEntityId, subordinateId);
+  const gatingValue = relationship ? Number(relationship.loyalty) : 50;
+  const complianceChance = clamp01(gatingValue / 100);
+  const draw = seededDraw([
+    worldState.seed ?? 'world', tag, leaderEntityId, subordinateId, tick,
+  ]);
+  return { complied: draw < complianceChance, gatingValue, complianceChance };
+}
+
+function assignRole(worldState, leaderEntityId, options = {}) {
+  const {
+    organizationId = null, familyId = null, subordinateEntityId, role,
+    tick = worldState.tick ?? 0,
+  } = options;
+
+  if (subordinateEntityId == null) throw new Error('assignRole requires a subordinateEntityId.');
+  if (!role) throw new Error('assignRole requires a role.');
+  const subordinateId = Number(subordinateEntityId);
+  if (subordinateId === Number(leaderEntityId)) {
+    throw new Error('assignRole: a leader cannot assign a role to themselves.');
+  }
+  const subordinate = (worldState.npcs || []).find((n) => n.id === subordinateId);
+  if (!subordinate) throw new Error(`assignRole: ${subordinateId} is not among the living.`);
+  if ((organizationId == null) === (familyId == null)) {
+    throw new Error('assignRole requires exactly one of organizationId or familyId.');
+  }
+
+  let basis;
+  let apply;
+
+  if (organizationId != null) {
+    const organization = (worldState.organizations || [])
+      .find((o) => o.id === Number(organizationId));
+    if (!organization) throw new Error(`assignRole: no organization with id ${organizationId}.`);
+    if (organization.leader_id !== Number(leaderEntityId)) {
+      throw new Error(
+        `assignRole: entity ${leaderEntityId} does not lead organization ${organizationId} `
+        + `(organizations.leader_id is ${organization.leader_id ?? 'nobody'}).`,
+      );
+    }
+    if (membership.isGang(organization)) {
+      throw new Error(
+        `assignRole: organization ${organizationId} is a gang/faction — its role_in_org is `
+        + 'computed from real traits every tick (membership.assignGangTiers) and would be '
+        + 'overwritten immediately, not assigned.',
+      );
+    }
+    const membershipRow = membership.findMembership(worldState, subordinateId, organization.id);
+    if (!membershipRow) {
+      throw new Error(
+        `assignRole: entity ${subordinateId} is not a member of organization ${organization.id}.`,
+      );
+    }
+    basis = 'organization';
+    apply = () => membership.joinOrganization(worldState, {
+      entityId: subordinateId, organizationId: organization.id, role, tick,
+    });
+  } else {
+    const family = (worldState.families || []).find((f) => f.id === Number(familyId));
+    if (!family) throw new Error(`assignRole: no family with id ${familyId}.`);
+    if (family.head_npc_id !== Number(leaderEntityId)) {
+      throw new Error(
+        `assignRole: entity ${leaderEntityId} does not head family ${familyId} `
+        + `(families.head_npc_id is ${family.head_npc_id ?? 'nobody'}).`,
+      );
+    }
+    if (!ASSIGNABLE_FAMILY_ROLES.includes(role)) {
+      throw new Error(
+        `assignRole: "${role}" is not an assignable family role. The five are: `
+        + `${ASSIGNABLE_FAMILY_ROLES.join(', ')}.`,
+      );
+    }
+    const familyRow = (worldState.familyMemberships || []).find(
+      (m) => m.entity_id === subordinateId && m.family_id === family.id,
+    );
+    if (!familyRow) {
+      throw new Error(`assignRole: entity ${subordinateId} is not a member of family ${familyId}.`);
+    }
+    basis = 'family';
+    apply = () => { familyRow.role = role; return familyRow; };
+  }
+
+  const { complied, gatingValue, complianceChance } = complianceDraw(
+    worldState, leaderEntityId, subordinateId, 'assign-role', tick,
+  );
+
+  if (complied) {
+    influence.raiseInfluence(worldState, leaderEntityId, subordinateId);
+  } else {
+    influence.lowerInfluence(worldState, leaderEntityId, subordinateId);
+    return {
+      complied: false, basis, gatingValue, complianceChance, refusedBy: subordinateId, role: null,
+    };
+  }
+
+  apply();
+  return {
+    complied: true, basis, gatingValue, complianceChance, refusedBy: null, role,
+  };
+}
+
+// ---------------------------------------------------------------------
 // Who leads what — pure reads over the real column
 // ---------------------------------------------------------------------
 
@@ -375,4 +531,6 @@ module.exports = {
   getLeaderDashboard,
   directMission,
   broadcastMessage,
+  assignRole,
+  ASSIGNABLE_FAMILY_ROLES,
 };
