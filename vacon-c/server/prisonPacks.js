@@ -227,13 +227,14 @@ function describePopulationCaveat() {
     trackedCategories: crime.CRIME_CATEGORIES,
     generatedCategories: crime.GENERATED_CATEGORIES,
     declaredAbsent: crime.CRIME_CATEGORIES.filter((c) => !crime.CATEGORIES[c].generated),
-    note: 'This engine can convict and imprison a person for violent, property, theft, gun or '
-      + 'domestic offences. drug, fraud and sex_offense are real categories in crime.CATEGORIES '
-      + 'and real law categories in politics.LAW_CATEGORIES, carried through justice.js\'s own '
-      + 'LAW_FOR_OFFENCE/SENTENCE_TICKS honestly — but nothing in this engine currently '
-      + 'generates a perpetrator for them, a declared boundary from before this round (see '
-      + 'crime.js\'s own CATEGORIES entries) that this round does not reopen. A population this '
-      + 'engine generates is never a complete picture of who real facilities of this kind hold.',
+    note: 'This engine can convict and imprison a person for violent, property, theft, gun, '
+      + 'domestic or fraud offences (fraud joined once server/fraud.js gave it a real false-sale '
+      + 'object — see crime.js\'s own CATEGORIES entry). drug and sex_offense are real categories '
+      + 'in crime.CATEGORIES and real law categories in politics.LAW_CATEGORIES, carried through '
+      + 'justice.js\'s own LAW_FOR_OFFENCE/SENTENCE_TICKS honestly — but nothing in this engine '
+      + 'currently generates a perpetrator for either, a declared boundary this round does not '
+      + 'reopen. A population this engine generates is never a complete picture of who real '
+      + 'facilities of this kind hold.',
   };
 }
 

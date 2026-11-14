@@ -74,7 +74,10 @@ test('describePopulationCaveat names all eight real crime categories, not a narr
   const caveat = prisonPacks.describePopulationCaveat();
   assert.deepEqual(new Set(caveat.trackedCategories), new Set(Object.keys(crime.CATEGORIES)));
   assert.deepEqual(new Set(caveat.generatedCategories), new Set(crime.GENERATED_CATEGORIES));
-  assert.deepEqual(new Set(caveat.declaredAbsent), new Set(['drug', 'fraud', 'sex_offense']));
+  // fraud joined the generated set once server/fraud.js gave it a real
+  // false-sale object (see crime.js's own CATEGORIES entry) — only
+  // drug and sex_offense stay declared absent now.
+  assert.deepEqual(new Set(caveat.declaredAbsent), new Set(['drug', 'sex_offense']));
   // Every generated category is real and not also declared absent.
   for (const c of caveat.generatedCategories) {
     assert.equal(caveat.declaredAbsent.includes(c), false);

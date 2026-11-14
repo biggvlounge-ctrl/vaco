@@ -152,10 +152,9 @@ const CATEGORIES = {
       + 'schema" — until server/inventory.js gave an offence something to be armed WITH.',
   },
   fraud: {
-    generated: false,
-    substrate: 'market_listings resolve honestly and there is no contract, claim, insurance '
-      + 'or instrument to falsify. employment_records and ownership_records are the nearest '
-      + 'substrate and neither can currently be forged.',
+    generated: true,
+    note: 'a false property sale: a perpetrator offers property they hold no real title to '
+      + '(server/fraud.js), a victim pays a real deposit, and no title ever changes hands.',
   },
   domestic: {
     generated: true,

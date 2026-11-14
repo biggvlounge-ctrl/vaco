@@ -5027,6 +5027,30 @@ and real chaos" test fail — each reverted once confirmed. 4 new tests
 in `test/justice.test.js`, full file 47/47, no regression to the
 pre-existing `runPrisonBreaks`/`release`/`ensurePrisonGang` coverage.
 
+**An eighty-second, and it is a stale declaration my own change left
+behind rather than a pre-existing defect.** `crime.js#CATEGORIES.fraud`
+still read `generated: false` with a `substrate` note saying "no
+contract, claim, insurance or instrument exists to falsify" after
+`server/fraud.js` (the eightieth standing rule) had already built
+exactly that object. This is `gun`'s own precedent exactly — that
+category's comment already records "joined the generated set when
+server/inventory.js gave an offence something to be armed WITH," and
+`fraud` needed the identical correction the moment its own declared
+reason stopped being true, not a separate round to notice it. Flipped
+to `generated: true` with a real `note`; `GENERATED_CATEGORIES` now
+reads `[domestic, fraud, gun, property, theft, violent]`.
+
+Two further callers had the same fact baked into fixed text rather
+than derived from the flag, and both needed a real edit rather than
+updating automatically: `test/crime.test.js`'s own `GENERATED_CATEGORIES`
+assertion, and `prisonPacks.describePopulationCaveat`'s hand-written
+`note` string (its `declaredAbsent` field is computed from the live
+flag and updated itself; the prose beside it did not). **A derived
+value updates itself when its source changes; a sentence describing
+that value does not** — the twenty-fifth standing rule's shape, a
+measurement (here, a category flag) and a claim about it drifting
+apart, except the claim here was prose rather than an inference.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and
