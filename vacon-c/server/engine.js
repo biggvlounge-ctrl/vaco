@@ -72,6 +72,7 @@ const party = require('./party.js');
 const tribeWealth = require('./tribeWealth.js');
 const tacticalAdvisor = require('./tacticalAdvisor.js');
 const craftingAdvisor = require('./craftingAdvisor.js');
+const fugitives = require('./fugitives.js');
 const influence = require('./influence.js');
 const characterCreation = require('./characterCreation.js');
 const mainCharacters = require('./mainCharacters.js');
@@ -899,6 +900,32 @@ function suggestCrafting(options = {}) {
   return craftingAdvisor.suggestCrafting(WorldState, options);
 }
 
+// A real Carmen Sandiego-style pursuit over a real, pre-existing
+// "identified and free" state -- see fugitives.js's own header for
+// the full design.
+function getAtLargeFugitives() {
+  return fugitives.atLargeFugitives(WorldState);
+}
+
+function getFugitiveClue(incidentId) {
+  return fugitives.clueForIncident(WorldState, incidentId);
+}
+
+function guessFugitiveLocation(entityId, incidentId, communityId) {
+  return fugitives.guessLocation(WorldState, entityId, incidentId, communityId);
+}
+
+// Not every search is a chase -- a real relation you have simply
+// lost touch with, never the fugitive-specific evasive-flight
+// behaviour. See fugitives.js's own header.
+function getMissingRelations(entityId) {
+  return fugitives.missingRelationsOf(WorldState, entityId);
+}
+
+function guessMissingRelationLocation(entityId, targetEntityId, communityId) {
+  return fugitives.guessMissingRelationLocation(WorldState, entityId, targetEntityId, communityId);
+}
+
 // Character creation — see characterCreation.js's own header for the
 // full design. `generateNPC`/`generateFamily`/`addFamilyMember` are
 // injected rather than required back from that module, because their
@@ -1188,6 +1215,11 @@ const ACTION_VERBS = {
   recommendSplit: (...args) => recommendSplit(...args),
   applyRecommendedSplit: (...args) => applyRecommendedSplit(...args),
   suggestCrafting: (...args) => suggestCrafting(...args),
+  getAtLargeFugitives: (...args) => getAtLargeFugitives(...args),
+  getFugitiveClue: (...args) => getFugitiveClue(...args),
+  guessFugitiveLocation: (...args) => guessFugitiveLocation(...args),
+  getMissingRelations: (...args) => getMissingRelations(...args),
+  guessMissingRelationLocation: (...args) => guessMissingRelationLocation(...args),
   addScheduleEvent: (...args) => addScheduleEvent(...args),
   reinforceHabit: (...args) => reinforceHabit(...args),
   resolveContest: (...args) => resolveContest(...args),

@@ -79,7 +79,7 @@ test('every verb an action names is one the engine actually supplies', () => {
   assert.deepEqual(
     actions.REQUIRED_VERBS,
     ['acceptMission', 'addScheduleEvent', 'applyRecommendedSplit', 'assembleParty', 'assessTakeover', 'assessThreat', 'assignPartyRole', 'assignRole', 'attemptHeist', 'attemptTakeover',
-      'breakDownItem', 'broadcastMessage', 'callBluff', 'canMakeThing', 'designateStashHouse', 'directMission', 'findOrCreateContact', 'holdMeeting',
+      'breakDownItem', 'broadcastMessage', 'callBluff', 'canMakeThing', 'designateStashHouse', 'directMission', 'findOrCreateContact', 'guessFugitiveLocation', 'guessMissingRelationLocation', 'holdMeeting',
       'intimidate', 'investInTarget', 'makeThing', 'manufactureAmmunition', 'quoteTrade',
       'reinforceHabit', 'releaseFromParty', 'repurposeProperty', 'resolveContest', 'revealCache', 'searchLocation', 'sendMessage', 'sendSpy',
       'stripBuilding', 'resolveMission', 'studySource', 'tradeWith'].sort(),
@@ -266,6 +266,55 @@ test('assemble-party, release-from-party and assign-party-role reach party.js th
     action: 'release-from-party', memberEntityId: escortNpc.id,
   });
   assert.equal(released.result.released, escortNpc.id);
+});
+
+test('guess-fugitive-location reaches fugitives.js#guessLocation through the real dispatcher', () => {
+  const perpetrator = engine.generateNPC();
+  const city1 = engine.generateCity({ name: 'Dispatch Fugitive City' });
+  const comm1 = engine.generateCommunity({ cityId: city1.id });
+  perpetrator.communityId = comm1.id;
+  const incident = {
+    id: engine.WorldState.crimeIncidents.length + 900001,
+    category: 'theft',
+    perpetrator_entity_id: perpetrator.id,
+    victim_entity_id: null,
+    community_id: comm1.id,
+    tick: 0,
+    severity: 50,
+    detail: null,
+    investigated_tick: 0,
+    cleared: true,
+  };
+  engine.WorldState.crimeIncidents.push(incident);
+  engine.WorldState.groupSanctions = engine.WorldState.groupSanctions || [];
+  engine.WorldState.groupSanctions.push({
+    incident_id: incident.id, community_id: comm1.id, category: 'theft',
+    regime: 'lawless', holder_organization_id: null, acts: [], tick: 0,
+  });
+  const leaderNpc = engine.generateNPC();
+  const player = engine.generatePlayer({ linkedEntityId: leaderNpc.id });
+
+  const out = engine.dispatchAction(player.id, {
+    action: 'guess-fugitive-location', incidentId: incident.id, communityId: comm1.id,
+  });
+  assert.equal(out.result.caught, true);
+});
+
+test('guess-missing-relation-location reaches fugitives.js#guessMissingRelationLocation through the real dispatcher', () => {
+  const worldStoreLib = require('../server/worldStore.js');
+  const cityA = engine.generateCity({ name: 'Dispatch Relation City A' });
+  const commA = engine.generateCommunity({ cityId: cityA.id });
+  const cityB = engine.generateCity({ name: 'Dispatch Relation City B' });
+  const commB = engine.generateCommunity({ cityId: cityB.id });
+  const searcherNpc = engine.generateNPC({ communityId: commA.id });
+  const relation = engine.generateNPC({ communityId: commB.id });
+  worldStoreLib.getOrCreateRelationship(engine.WorldState, searcherNpc.id, relation.id, 'family');
+  const player = engine.generatePlayer({ linkedEntityId: searcherNpc.id });
+
+  const out = engine.dispatchAction(player.id, {
+    action: 'guess-missing-relation-location', targetEntityId: relation.id, communityId: commB.id,
+  });
+  assert.equal(out.result.found, true);
 });
 
 // ---------------------------------------------------------------------------

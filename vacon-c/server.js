@@ -333,6 +333,32 @@ app.get('/api/families/:id/suggest-crafting', (req, res) => {
   }
 });
 
+// A real Carmen Sandiego-style pursuit -- see fugitives.js's own
+// header. The list is real, computed, never stored; a clue is a real
+// fact about the fugitive's own current real location, never
+// revealing their actual community id directly.
+app.get('/api/fugitives', (_req, res) => {
+  res.json(engine.getAtLargeFugitives());
+});
+
+app.get('/api/fugitives/:incidentId/clue', (req, res) => {
+  try {
+    res.json(engine.getFugitiveClue(Number(req.params.incidentId)));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Not every search is a chase -- a real relation this entity has
+// simply lost touch with. See fugitives.js's own header.
+app.get('/api/entities/:id/missing-relations', (req, res) => {
+  try {
+    res.json(engine.getMissingRelations(Number(req.params.id)));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // -- Phase 4: Digital Planet (ecosystem link-outs) --------------------------
 // VACANCY_API_ENDPOINT_MAP.md's own words: "outbound link generators,
 // not functional endpoints." Each one refuses rather than guessing

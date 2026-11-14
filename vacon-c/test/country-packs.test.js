@@ -1753,8 +1753,13 @@ test('counterfeitGoodsSeizedByCbpFy2024: a real, cited CBP enforcement fact, pre
 });
 
 test('report-only discipline: nothing outside countryPacks.js itself reads RESOURCE_PROFILES to decide an outcome', () => {
+  // `fugitives.js#countryFlavorFor` is the one real, deliberate second
+  // reader -- real per-country flavour text inside a chase CLUE, never
+  // used to decide success, a destination, or any other real outcome.
+  // See that file's own header. A third reader would need the same
+  // scrutiny before being added here, not a silent widening.
   const { execSync } = require('node:child_process');
   const out = execSync('grep -rln "RESOURCE_PROFILES\\|resourceProfileFor\\|describeResourceProfile" server/ --include=*.js', { cwd: __dirname + '/..' }).toString();
   const files = out.split('\n').filter(Boolean).map((p) => p.replace(/^server\//, ''));
-  assert.deepEqual(files.sort(), ['countryPacks.js'], 'only countryPacks.js itself should reference the new resource-profile symbols this round -- wiring it into a mechanic is separate, future, calibrated work');
+  assert.deepEqual(files.sort(), ['countryPacks.js', 'fugitives.js'], 'only countryPacks.js and fugitives.js (real, report-only clue flavour) should reference the resource-profile symbols');
 });

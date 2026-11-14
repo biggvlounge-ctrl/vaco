@@ -525,6 +525,30 @@ const ACTIONS = {
     run: (verbs, actorId, body) => verbs.applyRecommendedSplit(actorId, { groups: body.groups }),
   },
 
+  'guess-fugitive-location': {
+    summary: 'Guess where a real at-large fugitive is right now -- correct catches them through the '
+      + 'real justice.js chain; wrong gives them one real, bounded chance to run again. '
+      + 'See GET /api/fugitives and GET /api/fugitives/:incidentId/clue.',
+    modes: ['citizen', 'leader'],
+    requires: ['incidentId', 'communityId'],
+    verbs: ['guessFugitiveLocation'],
+    run: (verbs, actorId, body) => verbs.guessFugitiveLocation(
+      actorId, Number(body.incidentId), Number(body.communityId),
+    ),
+  },
+
+  'guess-missing-relation-location': {
+    summary: 'Guess where a real family member or contact you have lost touch with is right now -- '
+      + 'no justice consequence either way; a wrong guess costs nothing and never relocates them. '
+      + 'See GET /api/entities/:id/missing-relations.',
+    modes: ['citizen', 'leader'],
+    requires: ['targetEntityId', 'communityId'],
+    verbs: ['guessMissingRelationLocation'],
+    run: (verbs, actorId, body) => verbs.guessMissingRelationLocation(
+      actorId, Number(body.targetEntityId), Number(body.communityId),
+    ),
+  },
+
   'send-spy': {
     summary: 'Send a real member of your organization or family to listen, infiltrate or watch a '
       + 'real community -- a range (close/mid/far), a stance (low_profile/close_watch/'

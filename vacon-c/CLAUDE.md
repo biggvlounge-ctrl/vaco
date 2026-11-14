@@ -5732,6 +5732,93 @@ reachable read-only via `GET /api/organizations/:id/suggest-crafting`
 and `GET /api/families/:id/suggest-crafting`; the actual craft still
 goes through the existing `make-thing` player verb, unchanged.
 
+**A ninety-second, and it is a real "Where in the World is Carmen
+Sandiego"-style pursuit over a gap this engine's own justice pipeline
+had already left standing.** By direct instruction: "it doesn't have
+to be for the world. It could just be for another town outside of
+that town. It could be for another city, another state. It doesn't
+have to be necessarily going to another country... but it can be for
+another country."
+
+**The real "fugitive" state needed no new field, because `justice.js`
+already computes it and nothing had ever read it back.** `runJustice`
+charges every cleared incident its area's regime prosecutes, and
+where it does not, checks whether the faction holding that ground
+answered instead (`answerByGroup`); when neither happens, it writes a
+real `groupSanctions` row with `holder_organization_id: null` —
+"went unanswered" — and nothing in this engine has done anything
+else with that person since. `server/fugitives.js#atLargeFugitives`
+reads exactly that real, pre-existing, computed condition (standing
+rule 3: never duplicate a computable rollup with a second status
+field) rather than inventing a parallel "wanted" flag.
+
+**Clues are real facts about the fugitive's own current real
+location, never invented.** `landmarks.js`'s own real, NAMED
+landmarks (the twenty-first standing rule's world-layer integration)
+are the clue content — a community with no real named landmark
+honestly reports none. `countryPacks.js`'s real per-country facts are
+additional flavour only, when the world's own real `countryKey` is
+set, and NEVER a claim the fugitive left the simulated world: this
+engine generates exactly one real region per world (the thirty-ninth
+standing rule's own stated limit), so there is no second real country
+to flee to.
+
+**Scale is honest about what is real geography and what is a
+narrative label over it.** "Another town" is a different real
+community; "another city" is a real, different city within the one
+generated region — both genuinely simulated, reachable destinations.
+"Another state" is the identical real mechanism under a different
+label for a distant city, stated plainly rather than implying a
+second real sub-region exists. "Another country" never relocates
+anybody — it is `countryPacks.js`'s own already-established
+report-only posture, reused rather than given a second meaning.
+
+**A wrong guess is not free, and reuses the real movement mechanic
+rather than a second one.** `attemptFlight` is the identical real
+`migration.relocate` call `runMigration` already makes for an
+ordinary move, migration type `'forced'` (already real, already used
+for an unmet housing/safety need — evading apprehension is the same
+kind of involuntary move, not an eighth invented type), to a real
+destination community with a real vacant home. Triggered only from a
+miss, never automatically every tick, so this file adds no new
+tick-pipeline pass and changes no existing world's behaviour that
+does not call it.
+
+**A correct guess reuses the real `justice.js` chain entirely.**
+`justice.judge` (against the ORIGINAL incident, so jurisdiction is
+still "where the offence happened," matching that function's own real
+contract) and, on conviction, `justice.imprison` — the identical two
+real calls `runJustice` itself makes for a governed area's own
+cleared incident. No second conviction or sentencing model invented
+for a manual capture. Both the unanswered-sanction gate and the
+correct/incorrect gate were mutation-verified.
+
+`guess-fugitive-location` is a new `actions.js` verb;
+`GET /api/fugitives` and `GET /api/fugitives/:incidentId/clue` are
+two new, real, computed reads — a clue never reveals the fugitive's
+actual current community id directly, only a real fact about it.
+
+**Not only a criminal chase, by direct follow-up instruction: "it
+doesn't necessarily have to be a fugitive too. It could just be
+somebody trying to find somebody, or locate an area, or locate a
+family member."** "Locate an area" needed no new code at all —
+`discovery.js`'s own `search-location` player verb already answers
+it. Locating a real PERSON who is not a criminal did: `missingRelationsOf`/
+`guessMissingRelationLocation` reuse `clueFor`'s identical real
+landmark-clue mechanism over ANY real relationship
+(`worldStore.findRelationship`), not only `characterCreation.js`'s
+extended family. **Deliberately does NOT reuse `attemptFlight` on a
+wrong guess** — a fugitive has a real, rational reason to run once a
+pursuer gets close; an ordinary family member or contact does not
+know they are being searched for, and any real movement they make is
+`migration.runMigration`'s own, unrelated business. Reusing the
+evasive-flight behaviour here would have silently given every
+missing-relation search the exact fugitive-specific shape the request
+explicitly said this did not have to be. A miss costs the searcher
+nothing but a try. `guess-missing-relation-location` is a new
+`actions.js` verb; `GET /api/entities/:id/missing-relations` is a new
+real, computed read.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

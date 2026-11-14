@@ -985,6 +985,33 @@ glass into different items" needed no new recipe at all, since
 `scrap_metal`/`glass` were already real `salvage.js` materials. One
 gate mutation-verified.
 
+## Carmen Sandiego-style fugitive pursuit
+See `CLAUDE.md`'s own ninety-second standing rule for the full
+reasoning. By direct instruction: "it doesn't have to be for the
+world... another town... another city... another state... it can be
+for another country." **`server/fugitives.js`** reads a real,
+pre-existing gap in `justice.js`'s own pipeline rather than inventing
+a new "wanted" field: a cleared crime incident whose real
+`groupSanctions` row went genuinely unanswered IS a real fugitive,
+identified and free. Clues are real, named `landmarks.js` landmarks
+in their own current real community (honestly null where none
+exists), plus optional `countryPacks.js` flavour that never claims
+they left the simulated world. A wrong guess reuses the real
+`migration.relocate` mechanic to flee to a different real community
+with a real vacant home; a correct guess reuses `justice.judge`/
+`justice.imprison` entirely -- the identical real chain
+`runJustice` itself uses for a governed area's own cleared incident.
+"Town"/"city" are real, actually-simulated scales; "state"/"country"
+are honest narrative labels over the same real mechanism, since this
+engine generates exactly one real region per world. Two gates
+mutation-verified. By direct follow-up instruction ("it doesn't
+necessarily have to be a fugitive too... locate a family member"),
+`missingRelationsOf`/`guessMissingRelationLocation` apply the
+identical real landmark-clue mechanism to any real relationship,
+deliberately without the fugitive-specific evasive flight on a wrong
+guess -- an ordinary relation has no reason to run from a search they
+don't know is happening.
+
 ## Rogue ex-state security forces
 See `CLAUDE.md`'s own seventy-ninth standing rule for the full
 reasoning. By direct instruction: once a real local government stops
