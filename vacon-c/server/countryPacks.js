@@ -5561,6 +5561,30 @@ const RESOURCE_PROFILES = {
       { item: 'petroleum gases', year: 2024, confidence: 'secondary-estimate' },
     ],
     source: 'andaman-partners-2025; tendata; worldstopexports',
+    // Real, cited, and specifically about the US SIDE of the trade --
+    // every field above is China's own GLOBAL export/import profile;
+    // this is the narrower "into America" figure the request asked
+    // for directly, kept separate rather than conflated with the
+    // global one. US Census Bureau Foreign Trade data, 2024.
+    usBilateralTrade2024: {
+      smartphonesImportedToUsUsdBillion: { value: 45, confidence: 'secondary-estimate', note: 'over 75% of all US smartphone imports by value came from China in 2024' },
+      note: 'China is one of the US\'s top three trading partners by import value (with Mexico and Canada, together 39.1% of total US import value in 2024); a full China-specific bilateral total was not confirmed this round',
+      source: 'us-census-bureau-foreign-trade-highlights-2024',
+    },
+    // Real, current, and reachable without a login -- CBP's own
+    // annual Intellectual Property Rights Seizure Statistics report.
+    // The one clean, structured, real source found for "illegal
+    // imports by country" beyond the narcotics `drugTrade.js`
+    // already covers. China and Hong Kong together are roughly 90%
+    // of all counterfeit goods CBP seizes by quantity -- reported as
+    // a real customs-enforcement fact, never wired into any crime or
+    // trust mechanic (the same report-only boundary every other field
+    // in this file holds).
+    counterfeitGoodsSeizedByCbpFy2024: {
+      itemsSeized: 22470000, estimatedMsrpUsd: 4150000000,
+      note: 'the largest single source of counterfeit goods seized entering the US by quantity and by MSRP; Hong Kong (5.45M items, $872M MSRP) is a distant second, India third (1.71M items, $113M)',
+      source: 'cbp-ipr-seizure-statistics-fy2024',
+    },
   },
   india: {
     country: 'India',
@@ -5588,7 +5612,36 @@ const RESOURCE_PROFILES = {
     topImports: null,
     totalExportsUsdBillion: { value: 617, year: 2024, confidence: 'official', source: 'mexico-inegi', note: 'a record, +4.1% YoY' },
     destinationNote: 'the United States receives over 80% of all Mexican exports',
+    // The real "into America" bilateral figure, separate from the
+    // global export profile above -- US Census Bureau Foreign Trade
+    // data, 2024. Mexico was the US's #1 trading partner by total
+    // trade value in 2024.
+    usBilateralTrade2024: {
+      usImportsFromMexicoUsdBillion: 505.9,
+      usExportsToMexicoUsdBillion: 334.0,
+      rank: { value: 1, note: 'the US\'s #1 trading partner by total trade value, 2024' },
+      source: 'us-census-bureau-foreign-trade-highlights-2024',
+    },
     source: 'mexico-inegi-via-mexico-news-daily-2024; volza',
+  },
+  canada: {
+    country: 'Canada',
+    knownFor: ['crude oil and mineral fuels', 'motor vehicles', 'lumber and forest products'],
+    topExports: [
+      { item: 'crude oil and mineral fuels', valueUsdBillion: 125, year: 2024, confidence: 'secondary-estimate', note: 'this is the real bilateral-to-US figure (US Census); a separate global total was not confirmed this round, though roughly 97% of Canadian crude oil exports go to the US, so this is a reasonable real proxy for the global figure too, not just the US-bound one' },
+    ],
+    topImports: null,
+    note: 'a fuller global export/import product breakdown for Canada beyond the bilateral-to-US figure above was not confirmed this round',
+    // The real "into America" bilateral figure -- US Census Bureau
+    // Foreign Trade data, 2024. Canada is one of the US's top three
+    // trading partners (with Mexico and China, together 39.1% of
+    // total US import value in 2024).
+    usBilateralTrade2024: {
+      mineralFuelsImportedToUsUsdBillion: { value: 125, note: 'overwhelmingly crude oil and refined petroleum -- nearly 7.5x Mexico\'s mineral-fuels figure to the US the same year ($16.85B)' },
+      note: 'a full Canada-specific bilateral total was not confirmed this round',
+      source: 'us-census-bureau-foreign-trade-highlights-2024',
+    },
+    source: 'us-census-bureau-foreign-trade-highlights-2024',
   },
   egypt: {
     country: 'Egypt',

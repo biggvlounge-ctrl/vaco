@@ -282,6 +282,57 @@ app.get('/api/entities/:id/family-tree', (req, res) => {
   res.json(engine.getFamilyTree(Number(req.params.id)));
 });
 
+// Real, live roster of who is currently escorting this entity -- see
+// party.js's own header. Never stored; recomputed from
+// worldState.partyMemberships on every call.
+app.get('/api/entities/:id/party', (req, res) => {
+  res.json({ leaderEntityId: Number(req.params.id), party: engine.getPartyOf(Number(req.params.id)) });
+});
+
+// Real, computed rollup -- property + inventory + a notable-people
+// roster for a real organization or family, never a stored or
+// invented composite score. See tribeWealth.js's own header.
+app.get('/api/organizations/:id/tribe-wealth', (req, res) => {
+  res.json(engine.getTribeWealth({ organizationId: Number(req.params.id) }));
+});
+
+app.get('/api/families/:id/tribe-wealth', (req, res) => {
+  res.json(engine.getTribeWealth({ familyId: Number(req.params.id) }));
+});
+
+// A real, trait-weighted split recommendation over this leader's own
+// real party -- pure read, never stored. See tacticalAdvisor.js's own
+// header. `targetPropertyId` is optional (`?targetPropertyId=123`).
+app.get('/api/entities/:id/recommend-split', (req, res) => {
+  const targetPropertyId = req.query.targetPropertyId != null
+    ? Number(req.query.targetPropertyId) : null;
+  try {
+    res.json(engine.recommendSplit(Number(req.params.id), { targetPropertyId }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// A real, trait-gated "what can we make from what we have"
+// suggestion over a real organization's or family's own pooled
+// inventory -- pure read, never stored. See craftingAdvisor.js's own
+// header.
+app.get('/api/organizations/:id/suggest-crafting', (req, res) => {
+  try {
+    res.json(engine.suggestCrafting({ organizationId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/families/:id/suggest-crafting', (req, res) => {
+  try {
+    res.json(engine.suggestCrafting({ familyId: Number(req.params.id) }));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // -- Phase 4: Digital Planet (ecosystem link-outs) --------------------------
 // VACANCY_API_ENDPOINT_MAP.md's own words: "outbound link generators,
 // not functional endpoints." Each one refuses rather than guessing

@@ -1643,9 +1643,9 @@ test('regionalContextFor resolves every twenty-first-round country through the p
 // above the RESOURCE_PROFILES declaration for the full account.
 // ---------------------------------------------------------------------
 
-test('RESOURCE_PROFILES covers exactly the 23 real countries this round researched', () => {
+test('RESOURCE_PROFILES covers exactly the 24 real countries this round researched', () => {
   const keys = Object.keys(countryPacks.RESOURCE_PROFILES);
-  assert.equal(keys.length, 23, 'this round covers 23 real countries, not an unverified round number');
+  assert.equal(keys.length, 24, 'this round covers 24 real countries, not an unverified round number');
   for (const key of keys) {
     const entry = countryPacks.RESOURCE_PROFILES[key];
     assert.ok(typeof entry.country === 'string' && entry.country.length > 0, `${key}: country name must be stated`);
@@ -1696,11 +1696,11 @@ test('describeResourceProfile wraps the real entry with its own lookup key, the 
   assert.ok(Array.isArray(described.topImports) && described.topImports.length > 0, 'China is one of the 5 countries with real researched imports this round');
 });
 
-test('only 5 of the 23 entries have real researched topImports -- the other 18 are an honest, named gap, not a silent omission', () => {
+test('only 5 of the 24 entries have real researched topImports -- the other 19 are an honest, named gap, not a silent omission', () => {
   const withImports = Object.values(countryPacks.RESOURCE_PROFILES).filter((e) => e.topImports !== null);
   const withoutImports = Object.values(countryPacks.RESOURCE_PROFILES).filter((e) => e.topImports === null);
   assert.equal(withImports.length, 5, 'exactly United States, China, Germany, Saudi Arabia, India should have real topImports');
-  assert.equal(withoutImports.length, 18);
+  assert.equal(withoutImports.length, 19);
   const importedCountries = withImports.map((e) => e.country).sort();
   assert.deepEqual(importedCountries, ['China', 'Germany', 'India', 'Saudi Arabia', 'United States']);
 });
@@ -1729,6 +1729,27 @@ test('disagreeing real sources are kept side by side with a note, never silently
   assert.equal(crudeEntry.shareOfExportsPct, 63.5);
   assert.match(crudeEntry.note, /71\.39%/, 'the disagreeing 71.39% figure must be stated in the note, not discarded');
   assert.match(crudeEntry.note, /88\.26%/, 'the disagreeing 88.26% wider-category figure must also be stated');
+});
+
+test('usBilateralTrade2024: real US Census bilateral-trade figures, kept separate from each country\'s own global export/import profile', () => {
+  const mexico = countryPacks.resourceProfileFor('mexico');
+  assert.equal(mexico.usBilateralTrade2024.usImportsFromMexicoUsdBillion, 505.9);
+  assert.equal(mexico.usBilateralTrade2024.usExportsToMexicoUsdBillion, 334.0);
+  assert.equal(mexico.usBilateralTrade2024.rank.value, 1);
+
+  const canada = countryPacks.resourceProfileFor('canada');
+  assert.equal(canada.usBilateralTrade2024.mineralFuelsImportedToUsUsdBillion.value, 125);
+
+  const china = countryPacks.resourceProfileFor('china');
+  assert.equal(china.usBilateralTrade2024.smartphonesImportedToUsUsdBillion.value, 45);
+});
+
+test('counterfeitGoodsSeizedByCbpFy2024: a real, cited CBP enforcement fact, present only on China -- not wired into any crime/trust mechanic', () => {
+  const china = countryPacks.resourceProfileFor('china');
+  assert.equal(china.counterfeitGoodsSeizedByCbpFy2024.itemsSeized, 22470000);
+  assert.ok(china.counterfeitGoodsSeizedByCbpFy2024.estimatedMsrpUsd > 0);
+  assert.equal(countryPacks.resourceProfileFor('mexico').counterfeitGoodsSeizedByCbpFy2024, undefined,
+    'this is a real, specific CBP fact about China -- not a field every country gets a value for');
 });
 
 test('report-only discipline: nothing outside countryPacks.js itself reads RESOURCE_PROFILES to decide an outcome', () => {

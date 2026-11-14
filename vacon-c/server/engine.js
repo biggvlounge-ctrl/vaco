@@ -68,6 +68,10 @@ const leadership = require('./leadership.js');
 const espionage = require('./espionage.js');
 const heists = require('./heists.js');
 const hiddenCaches = require('./hiddenCaches.js');
+const party = require('./party.js');
+const tribeWealth = require('./tribeWealth.js');
+const tacticalAdvisor = require('./tacticalAdvisor.js');
+const craftingAdvisor = require('./craftingAdvisor.js');
 const influence = require('./influence.js');
 const characterCreation = require('./characterCreation.js');
 const mainCharacters = require('./mainCharacters.js');
@@ -855,6 +859,46 @@ function designateStashHouse(entityId, options = {}) {
   return hiddenCaches.designateStashHouse(WorldState, entityId, options);
 }
 
+// Persistent escort/party roster and "tribe wealth" reporting — see
+// party.js's and tribeWealth.js's own headers for the full design.
+function assembleParty(entityId, options = {}) {
+  return party.assembleParty(WorldState, entityId, options);
+}
+
+function releaseFromParty(entityId, memberEntityId) {
+  return party.releaseFromParty(WorldState, entityId, memberEntityId);
+}
+
+function assignPartyRole(entityId, memberEntityId, role) {
+  return party.assignPartyRole(WorldState, entityId, memberEntityId, role);
+}
+
+function getPartyOf(entityId) {
+  return party.partyOf(WorldState, entityId);
+}
+
+function getTribeWealth(options = {}) {
+  return tribeWealth.tribeWealthOf(WorldState, options);
+}
+
+// A real, trait-weighted split recommendation over a leader's own
+// real party -- see tacticalAdvisor.js's own header for the full
+// design.
+function recommendSplit(entityId, options = {}) {
+  return tacticalAdvisor.recommendSplit(WorldState, entityId, options);
+}
+
+function applyRecommendedSplit(entityId, recommendation, tick) {
+  return tacticalAdvisor.applyRecommendedSplit(WorldState, entityId, recommendation, tick);
+}
+
+// A real, trait-gated "what can we make from what we have" suggestion
+// over a real organization's or family's own pooled inventory -- see
+// craftingAdvisor.js's own header for the full design.
+function suggestCrafting(options = {}) {
+  return craftingAdvisor.suggestCrafting(WorldState, options);
+}
+
 // Character creation — see characterCreation.js's own header for the
 // full design. `generateNPC`/`generateFamily`/`addFamilyMember` are
 // injected rather than required back from that module, because their
@@ -1136,6 +1180,14 @@ const ACTION_VERBS = {
   attemptHeist: (...args) => attemptHeist(...args),
   revealCache: (...args) => revealCache(...args),
   designateStashHouse: (...args) => designateStashHouse(...args),
+  assembleParty: (...args) => assembleParty(...args),
+  releaseFromParty: (...args) => releaseFromParty(...args),
+  assignPartyRole: (...args) => assignPartyRole(...args),
+  getPartyOf: (...args) => getPartyOf(...args),
+  getTribeWealth: (...args) => getTribeWealth(...args),
+  recommendSplit: (...args) => recommendSplit(...args),
+  applyRecommendedSplit: (...args) => applyRecommendedSplit(...args),
+  suggestCrafting: (...args) => suggestCrafting(...args),
   addScheduleEvent: (...args) => addScheduleEvent(...args),
   reinforceHabit: (...args) => reinforceHabit(...args),
   resolveContest: (...args) => resolveContest(...args),

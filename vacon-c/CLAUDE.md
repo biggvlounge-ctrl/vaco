@@ -5498,6 +5498,240 @@ the exact unchanged world the whole suite already asserts against.
 mutation-verified. Full suite 2357/2357 real (17 honestly skipped),
 no regression.
 
+**An eighty-ninth, and it is two systems built together from one
+message, because the second half was a standing mechanic this session
+had previously declared out of scope.** By direct instruction, in the
+same breath as a "barter era" request: "at the beginning there is no
+cash... that's where your wealth will accumulate at the beginning of
+the game, is in your organization, your tribe, your gang, and then
+what they have accumulated through property and inventory... also
+strength, power, security, and the people you have... doctors,
+lawyers, matriarchs, elders, leaders, teachers, nurses... you also can
+have them all walk with you or escort each other, however many you
+need to come on a mission with you... depending on your leadership,
+it'll show you that you can take NPCs with you and control them."
+
+**The "no cash" half was checked against the model before anything
+was built, and the obvious build was the wrong one.** `economy
+.getNetWorth` is unconditionally `liquid + ownedPropertyValue +
+heldInventoryValue` from tick 1, confirmed by reading it directly —
+there is no "monetary era" concept anywhere in this engine to gate.
+Retroactively suppressing cash on a new era flag would reach into the
+twenty-fifth standing rule's own relative poverty line, both of
+`crime.js`'s deprivation checks, and the seventeenth standing rule's
+four-attempt-calibrated `resolveAggression` — none of which this
+request asked to touch, and the twenty-fifth standing rule's own
+lesson ("a measurement is not its consequence") applies here before
+the mistake rather than after it. `server/tribeWealth.js` reports the
+real fact the request actually names instead: what a real organization
+or family has itself accumulated. `propertyValue`/`inventoryValue` are
+the identical real `property.currentValue`/`barter.valueOfHoldings`
+reads `economy.ownedPropertyValue`/`heldInventoryValue` already use for
+one person, summed across the group's own real members. `notablePeople`
+is a real roster, never a score: real leadership (`organizations
+.leader_id`/`families.head_npc_id`), the real `physician`/`lawyer`/
+`teacher`/`nurse` occupations the request itself named (all four
+already existed in `occupations.js`, confirmed by grep before writing
+anything), family elders — the group's OWN oldest real
+`generation_number` present among its current members, never a fixed
+age cutoff (a single-generation family correctly has no elder distinct
+from anyone else) — and real assigned family roles
+(`leadership.ASSIGNABLE_FAMILY_ROLES`'s own `protector`/`caregiver`/
+`guardian`/`mentor`, not an invented "matriarch"/"elder" role string
+nothing writes). Nothing here touches `getNetWorth`; a mutation test
+confirms reading tribe wealth has no side effect on an individual's own
+net worth.
+
+**The escort half generalizes a mechanic this session had explicitly
+closed the door on, and says so.** `espionage.js`'s own header
+declared "accompany" out of scope at the time it was written — a
+single crew for a single mission was as far as that request went.
+This one is different in the one way that matters: "escort each
+other... however many you need," asked as a STANDING arrangement, not
+a one-off. `server/party.js#assembleParty` reuses the identical real
+sponsor/compliance shape `heists.js#attemptHeist` already established
+— exactly one of `organizationId`/`familyId`, a real membership check,
+each candidate complying or refusing independently via
+`leadership.complianceDraw` — but the resulting roster
+(`worldState.partyMemberships`) persists until `releaseFromParty` is
+called or `assembleParty` is called again, rather than existing only
+for the one call. "Play different roles as you go" added no second
+role vocabulary: `assignPartyRole` checks only that the target is a
+real CURRENT escort, then hands the entire decision to the real,
+already-built `leadership.assignRole` — the identical compliance draw
+and influence consequence an ordinary org/family role assignment
+already gets, never a disagreeing system invented one file over (the
+third standing rule's shape). A person can only ever escort one leader
+at a time, by construction rather than by convention: a candidate
+already escorting someone else is reported `unavailable`, a real,
+distinct outcome from a loyalty refusal — the same care the heists.js
+build already took keeping success and detection as two separate real
+questions rather than collapsing them into one. Mutation-verified:
+disabling the one-leader-at-a-time check and the family-elder
+single-generation guard both caused a real test to fail; both were
+confirmed clean on revert.
+
+`worldState.partyMemberships` is in-memory only, the same declared
+posture `city.healthBaseline`/`city.hazardRisk` already carry — no
+column in `VACANCY_POSTGRESQL_SCHEMA.sql` holds it, and a world
+restored from Postgres loses an active party the same documented way.
+`assemble-party`/`release-from-party`/`assign-party-role` are three new
+`actions.js` verbs; `GET /api/entities/:id/party`,
+`GET /api/organizations/:id/tribe-wealth` and
+`GET /api/families/:id/tribe-wealth` are three new, real, computed
+reads, never stored, same posture as `net-worth`/`influence-rating`.
+16 new tests between `test/party.test.js` and `test/tribeWealth.test.js`,
+plus a real dispatcher-wiring test in `test/actions.test.js`. Two gates
+mutation-verified.
+
+**A ninetieth, and it is two more systems from one message: a real
+"AI" squad-split advisor, and real "into America" trade data.** By
+direct instruction: "make sure everything is AI activated so that...
+let's say they're breaking into or they're going to invade a hotel,
+but you want to send two to the back door, three to a window. These
+are all options provided to you by AI, depending on what your team
+characteristics and statistics look like," and, separately, "different
+countries and see what their import-exports are into America, whether
+they're specialized items, illegal and legal."
+
+**"AI" is the identical real, weighted composite this engine already
+uses for every other recommendation, never a dice roll.**
+`server/tacticalAdvisor.js#approachAptitudeOf` is the fourth real
+instance of the `influenceRatingOf`/`espionageAptitudeOf`/`heists.js#
+robberyAptitudeOf` shape — real, already-generated traits, weighted to
+sum to 1.0 — applied over three real, bounded approach TYPES
+(`stealth_entry`/`forced_entry`/`social_entry`) rather than one single
+score. "Back door" and "window" are the player's OWN narrative labels
+for those types, never a new building schema: nothing in
+`VACANCY_POSTGRESQL_SCHEMA.sql` names a door or a window on any
+property, and inventing one would assert a floor plan nobody modelled.
+A target property's own real `floors` is read only to REPORT how many
+separate physical approach points a building that size plausibly has
+(`physicalApproachSlots`), never to fabricate that it has exactly one
+of each. `recommendSplit` is a pure read over a leader's own real
+`party.partyOf` roster, assigning each person to whichever approach
+type they measure best at, ties broken toward whichever group
+currently has the fewest members. `applyRecommendedSplit` reuses
+`party.assignPartyRole`/`leadership.assignRole` entirely rather than a
+second compliance or storage mechanism — and that reuse surfaced a
+real, correct, PRE-EXISTING constraint rather than a bug: a gang's
+`role_in_org` is always computed from real traits
+(`membership.assignGangTiers`, every tick) and `assignRole` already
+refuses to let anything overwrite it, so a gang's tactical split stays
+advisory-only, honestly, the same way it already was for an ordinary
+org role. A test confirms this refusal is preserved rather than
+special-cased around. Two gates mutation-verified.
+
+**"Into America" trade data closes against real sources, checked
+first rather than assumed reachable — and it found this engine had
+already answered most of "specialized items" in an earlier round.**
+`countryPacks.js`'s own `RESOURCE_PROFILES` table (confirmed by direct
+read before writing anything) already carries real, heavily-cited
+`topExports`/`topImports` for 23 countries — each country's own GLOBAL
+export/import profile, not specifically the US-bound figure the
+request asked for. The real gap was narrower than it first looked:
+`usBilateralTrade2024`, a new field on `mexico` and `china` (and a
+brand-new `canada` entry — Canada had no `RESOURCE_PROFILES` row at
+all) carrying the real, cited "into America" bilateral figures found
+this round (US Census Bureau Foreign Trade, 2024): Mexico is the US's
+#1 trading partner by total trade ($505.9B US imports / $334.0B US
+exports); Canada's real $125B mineral-fuels-to-US figure (crude oil
+and refined petroleum, nearly 7.5x Mexico's own mineral-fuels figure
+to the US); China's real $45B smartphone-to-US figure (over 75% of
+all US smartphone imports). Kept as a SEPARATE field from each
+country's global profile rather than conflated with it — the two
+describe different real facts.
+
+**The illegal half closes with the one clean, structured, reachable
+real source found, and two real ones that were checked and explicitly
+NOT wired in because the research itself found them too thin or
+stale to report as current.** CBP's own annual Intellectual Property
+Rights Seizure Statistics report (FY2024, a direct government PDF, no
+login) is real, current, and specific: China and Hong Kong together
+are roughly 90% of all counterfeit goods CBP seizes by quantity, with
+China alone at 22.47M items / $4.15B MSRP — `china
+.counterfeitGoodsSeizedByCbpFy2024`, present only on China, never a
+field every country gets a value for. Wildlife-trafficking origin
+data (the clearest table found covers 2007-2017, Mexico first at 57%)
+and contraband-cigarette/illegal-firearms origin countries were
+checked and NOT wired in — the twenty-ninth standing rule's own
+distinction, applied again: a real source that is too stale or was not
+found this round is a declared gap, not a guess dressed up as one.
+Also checked and confirmed real but NOT independently wired as new
+fields: the popular "country X is known for Y" framing is frequently
+wrong on magnitude once checked against OEC.world (Switzerland's
+actual top export is gold, not watches; Italy's is machinery, not
+wine) — existing entries were left as they were rather than retrofit
+from this round's narrower research pass, since they already carry
+their own real citations.
+
+Report-only, the same posture every `countryPacks.js` field already
+holds: nothing outside `countryPacks.js` itself reads
+`RESOURCE_PROFILES`, confirmed by the same allowlist test every prior
+round already runs. 2 new tests in `test/country-packs.test.js`; 7 new
+tests in `test/tacticalAdvisor.test.js`.
+
+**A ninety-first, and it is the fifth real "AI" advisor this engine
+builds, closing both halves of the request in the same real
+substrate.** By direct instruction: "the different inventory from
+food to things will also expand into things to sell as long as the
+right person is around... somebody has excess of cereal... might
+choose to make granola bars... those who have oranges will start to
+sell orange juice... turning something, making something out of
+nothing through the different pieces... is what the AI has. It looks
+at your inventory, it looks at your group members, and it looks what
+it has, and the AI will make an NPC make a suggestion... by the
+accumulation of what you have."
+
+**"Aluminum and glass into different items" needed no new mechanism —
+checked before building anything.** `salvage.js`'s existing
+`scrap_metal`/`glass` materials already become `blade`/`club`/
+`zip_gun`/`shield`/`hand_tool`/`container`, real recipes since earlier
+rounds. The two concretely NAMED conversions that genuinely did not
+exist — "cereal into granola bars," "oranges into orange juice" — are
+two new, real `salvage.PRODUCTS`/`RECIPES` entries
+(`granola_bar`/`orange_juice`), the identical "cook, Tier 1" shape
+`bread` already holds, and one new `produce.PRIMARY_PRODUCE` crop
+(`oranges`, the real farmer/Tier 2/Agriculture gate `wheat`/
+`vegetables` already have) — not a fourth mechanism invented for an
+idea this engine already had two working examples of.
+
+**Found and fixed in the same pass, not introduced by it: a stale
+count, the eighty-second standing rule's own shape, in this file's own
+inventory table.** `salvage.js`'s row claimed "fifteen products,
+fifteen recipes" — measured directly before adding anything, the real
+count was already sixteen. Corrected to the real, re-measured number
+(eighteen, after this round's two additions) rather than silently
+carried forward a second time.
+
+**`server/craftingAdvisor.js` is the actual answer to "the AI... will
+make an NPC make a suggestion... depending on what your team
+characteristics and statistics look like"** — the IDENTICAL real,
+weighted-trait-gate shape `influenceRatingOf`/`espionageAptitudeOf`/
+`heists.js#robberyAptitudeOf`/`tacticalAdvisor.js#approachAptitudeOf`
+already establish, a fifth time, pointed at `salvage.canMake` instead
+of combat. **The one real design decision that had to be made rather
+than found: `salvage.canMake` checks ONE entity's own inventory, by
+design, and nothing in this engine pools several people's holdings
+into a single craft** — `make` consumes from exactly the holder who
+passes the check. Rather than inventing a pooled-crafting mechanic
+nobody asked for, `suggestCrafting` reports two distinct, honest
+facts: `readyNow` (a real member who personally both qualifies and
+already personally holds enough — `canMake` says yes, right now) and
+`possibleIfPooled` (the GROUP's own real holdings, summed across every
+real member the identical way `tribeWealth.js#tribeWealthOf` already
+sums inventory value, would be enough — but somebody still has to
+physically move the materials together first, through the real
+`inventory.transfer` this engine already has). Collapsing the two
+into one claim would assert a mechanic that does not exist; keeping
+them separate is the honest version of "by the accumulation of what
+you have." One gate mutation-verified.
+
+Advisory only, same posture as `tacticalAdvisor.recommendSplit` —
+reachable read-only via `GET /api/organizations/:id/suggest-crafting`
+and `GET /api/families/:id/suggest-crafting`; the actual craft still
+goes through the existing `make-thing` player verb, unchanged.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

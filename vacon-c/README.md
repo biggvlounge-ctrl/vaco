@@ -913,6 +913,78 @@ ties into the real prison-gang pipeline a corrupt guard already
 exploits elsewhere in this engine. Opt-in (`config.drugTrafficking`),
 one organization per city. Four new gates mutation-verified.
 
+## Tribe wealth and the standing escort/party
+See `CLAUDE.md`'s own eighty-ninth standing rule for the full
+reasoning. By direct instruction, two systems from one message.
+**`server/tribeWealth.js`** answers "at the beginning there is no
+cash... your wealth accumulates in your organization, your tribe,
+your gang... property and inventory... the people you have" without
+touching `economy.getNetWorth` at all -- there is no monetary-era
+concept anywhere in this engine to gate, and retroactively suppressing
+cash would reach into the poverty line and both of `crime.js`'s
+deprivation checks. `tribeWealthOf` sums real property and inventory
+value across a real organization's or family's own members and names
+a real `notablePeople` roster -- leadership, the real `physician`/
+`lawyer`/`teacher`/`nurse` occupations, a family's own oldest real
+generation (elders, never a fixed age cutoff), and real assigned
+family roles (`protector`/`caregiver`/`guardian`/`mentor`) -- never a
+single invented composite score. **`server/party.js`** generalizes the
+one-shot crew mechanic `heists.js`/`espionage.js` already use into a
+STANDING escort: `assembleParty` gathers real org/family members via
+the identical real sponsor/compliance draw, and the roster persists
+until released. A person can only ever escort one leader at a time.
+"Play different roles as you go" needed no second role system --
+`assignPartyRole` checks the target is a real current escort, then
+hands the decision entirely to the existing `leadership.assignRole`.
+Two gates mutation-verified.
+
+## AI tactical squad-split advisor, and real trade data "into America"
+See `CLAUDE.md`'s own ninetieth standing rule for the full reasoning.
+By direct instruction, two more systems from one message.
+**`server/tacticalAdvisor.js`** answers "send two to the back door,
+three to a window... options provided to you by AI, depending on what
+your team's statistics look like" with the same real, weighted-trait
+composite `influenceRatingOf`/`espionageAptitudeOf`/`heists.js
+#robberyAptitudeOf` already use, applied over three real, bounded
+approach types (`stealth_entry`/`forced_entry`/`social_entry`) rather
+than one score -- "back door"/"window" are the player's own narrative
+labels, never a new invented building schema. `recommendSplit` places
+each real party member where they measure best; `applyRecommendedSplit`
+reuses the real `party.assignPartyRole`/`leadership.assignRole` chain
+rather than a second compliance system, which correctly preserves the
+pre-existing rule that a gang's trait-computed `role_in_org` can never
+be overwritten. **`countryPacks.js`** gained real "into America"
+bilateral trade data (US Census Bureau Foreign Trade, 2024) --
+Mexico's real #1-trading-partner figures, Canada's real mineral-fuels
+figure (plus a brand-new Canada entry), China's real smartphone
+figure -- kept separate from each country's own global export
+profile, plus a real illegal-imports fact beyond narcotics: CBP's own
+FY2024 counterfeit-goods seizure statistics (China + Hong Kong ~90%
+of all seizures by quantity). Two gates mutation-verified.
+
+## AI crafting advisor: turning excess inventory into something else
+See `CLAUDE.md`'s own ninety-first standing rule for the full
+reasoning. By direct instruction: "somebody has excess of cereal...
+might choose to make granola bars... those who have oranges will
+start to sell orange juice... the AI looks at your inventory, your
+group members, and what it has, and will make an NPC make a
+suggestion... by the accumulation of what you have."
+**`server/craftingAdvisor.js`** is the fifth real "AI" advisor this
+engine builds -- the identical real, weighted-trait-gate shape
+`influenceRatingOf`/`espionageAptitudeOf`/`heists.js`/
+`tacticalAdvisor.js` already use, pointed at `salvage.canMake` instead
+of combat. It reports two honest, distinct facts rather than one:
+`readyNow` (a real member who personally qualifies and already
+personally holds enough) and `possibleIfPooled` (the group's own real
+holdings, summed, would be enough, but nobody has moved the materials
+together yet -- `salvage.make` only ever consumes from one holder, by
+design). `granola_bar`/`orange_juice` are two new, real
+`salvage.RECIPES` -- the request's own named examples -- built the
+identical "cook, Tier 1" shape `bread` already has; "aluminum and
+glass into different items" needed no new recipe at all, since
+`scrap_metal`/`glass` were already real `salvage.js` materials. One
+gate mutation-verified.
+
 ## Rogue ex-state security forces
 See `CLAUDE.md`'s own seventy-ninth standing rule for the full
 reasoning. By direct instruction: once a real local government stops

@@ -483,6 +483,48 @@ const ACTIONS = {
     }),
   },
 
+  'assemble-party': {
+    summary: 'Gather real members of your organization or family into a standing escort that '
+      + 'travels with you until released -- each complies or refuses on their own real loyalty.',
+    modes: ['citizen', 'leader'],
+    requires: ['memberEntityIds'],
+    verbs: ['assembleParty'],
+    run: (verbs, actorId, body) => verbs.assembleParty(actorId, {
+      organizationId: body.organizationId != null ? Number(body.organizationId) : null,
+      familyId: body.familyId != null ? Number(body.familyId) : null,
+      memberEntityIds: Array.isArray(body.memberEntityIds) ? body.memberEntityIds.map(Number) : [],
+    }),
+  },
+
+  'release-from-party': {
+    summary: 'Release a real member of your own standing escort.',
+    modes: ['citizen', 'leader'],
+    requires: ['memberEntityId'],
+    verbs: ['releaseFromParty'],
+    run: (verbs, actorId, body) => verbs.releaseFromParty(actorId, Number(body.memberEntityId)),
+  },
+
+  'assign-party-role': {
+    summary: 'Give a real member of your own standing escort a role -- '
+      + 'routes through the same real leadership.assignRole an ordinary org/family member gets.',
+    modes: ['citizen', 'leader'],
+    requires: ['memberEntityId', 'role'],
+    verbs: ['assignPartyRole'],
+    run: (verbs, actorId, body) => verbs.assignPartyRole(
+      actorId, Number(body.memberEntityId), body.role,
+    ),
+  },
+
+  'apply-recommended-split': {
+    summary: 'Assign each real member of your own party the real tactical approach type the AI '
+      + 'advisor (GET /api/entities/:id/recommend-split) recommended for them -- routes through '
+      + 'the real party.assignPartyRole/leadership.assignRole chain, one real compliance draw per person.',
+    modes: ['citizen', 'leader'],
+    requires: ['groups'],
+    verbs: ['applyRecommendedSplit'],
+    run: (verbs, actorId, body) => verbs.applyRecommendedSplit(actorId, { groups: body.groups }),
+  },
+
   'send-spy': {
     summary: 'Send a real member of your organization or family to listen, infiltrate or watch a '
       + 'real community -- a range (close/mid/far), a stance (low_profile/close_watch/'

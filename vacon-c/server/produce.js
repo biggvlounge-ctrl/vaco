@@ -66,6 +66,11 @@ const PRIMARY_PRODUCE = {
   raw_fish: { category: 'fish', occupation: 'fisher' },
   raw_meat: { category: 'livestock', occupation: 'hunter' },
   raw_fiber: { category: 'textiles', occupation: 'farmer' },
+  // By direct instruction, among a wider "excess inventory becomes
+  // something else" request: "those who have oranges will start to
+  // sell orange juice." A real crop, the same farmer/Tier 2/
+  // Agriculture gate `wheat`/`vegetables` already have.
+  oranges: { category: 'crops', occupation: 'farmer' },
   salt: { category: 'spices', occupation: null },
   clean_water: { category: 'water', occupation: null },
 };

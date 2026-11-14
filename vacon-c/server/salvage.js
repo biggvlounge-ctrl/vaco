@@ -147,6 +147,14 @@ const PRODUCTS = {
   woven_garment: { category: 'clothing', origin: 'producible' },
   sewing_kit: { category: 'repair', origin: 'producible' },
   repair_kit: { category: 'repair', origin: 'producible' },
+  // By direct instruction: "somebody has excess of cereal... might
+  // choose to make granola bars... those who have oranges will start
+  // to sell orange juice and trade orange juice." The identical
+  // "excess primary produce -> a sellable crafted product" shape
+  // `bread`/`preserved_vegetables` already hold, not a fourth
+  // mechanism invented for the idea.
+  granola_bar: { category: 'food', origin: 'producible' },
+  orange_juice: { category: 'food', origin: 'producible' },
 };
 
 const PRODUCT_NAMES = Object.keys(PRODUCTS);
@@ -271,6 +279,21 @@ const RECIPES = {
     skill: 'Technology',
     tier: 3,
     note: 'mechanic, Tier 3 — occupations.js',
+  },
+  // Excess cereal grain (`produce.js`'s own `wheat`) turned into a
+  // shelf-stable, sellable bar -- the same "cook, Tier 1" conversion
+  // `bread` already is, a different product from the same real crop.
+  granola_bar: {
+    from: [{ wheat: 2 }],
+    skill: 'Crafting',
+    tier: 1,
+    note: 'cook, Tier 1 — occupations.js',
+  },
+  orange_juice: {
+    from: [{ oranges: 3 }],
+    skill: 'Crafting',
+    tier: 1,
+    note: 'cook, Tier 1 — occupations.js',
   },
 };
 

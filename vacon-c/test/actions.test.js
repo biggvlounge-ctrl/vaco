@@ -78,10 +78,10 @@ test('every verb an action names is one the engine actually supplies', () => {
   );
   assert.deepEqual(
     actions.REQUIRED_VERBS,
-    ['acceptMission', 'addScheduleEvent', 'assessTakeover', 'assessThreat', 'assignRole', 'attemptHeist', 'attemptTakeover',
+    ['acceptMission', 'addScheduleEvent', 'applyRecommendedSplit', 'assembleParty', 'assessTakeover', 'assessThreat', 'assignPartyRole', 'assignRole', 'attemptHeist', 'attemptTakeover',
       'breakDownItem', 'broadcastMessage', 'callBluff', 'canMakeThing', 'designateStashHouse', 'directMission', 'findOrCreateContact', 'holdMeeting',
       'intimidate', 'investInTarget', 'makeThing', 'manufactureAmmunition', 'quoteTrade',
-      'reinforceHabit', 'repurposeProperty', 'resolveContest', 'revealCache', 'searchLocation', 'sendMessage', 'sendSpy',
+      'reinforceHabit', 'releaseFromParty', 'repurposeProperty', 'resolveContest', 'revealCache', 'searchLocation', 'sendMessage', 'sendSpy',
       'stripBuilding', 'resolveMission', 'studySource', 'tradeWith'].sort(),
   );
 });
@@ -242,6 +242,30 @@ test('designate-stash-house reaches hiddenCaches.js#designateStashHouse through 
     action: 'designate-stash-house', propertyId: stashProperty.id, organizationId: org.id,
   });
   assert.equal(out.result.organizationId, org.id);
+});
+
+test('assemble-party, release-from-party and assign-party-role reach party.js through the real dispatcher', () => {
+  const leaderNpc = engine.generateNPC();
+  const escortNpc = engine.generateNPC();
+  const org = engine.generateOrganization({ type: 'business', leaderId: leaderNpc.id });
+  membership.joinOrganization(engine.WorldState, { entityId: escortNpc.id, organizationId: org.id });
+  worldStore.getOrCreateRelationship(engine.WorldState, leaderNpc.id, escortNpc.id, 'social').loyalty = 100;
+  const player = engine.generatePlayer({ linkedEntityId: leaderNpc.id });
+
+  const assembled = engine.dispatchAction(player.id, {
+    action: 'assemble-party', organizationId: org.id, memberEntityIds: [escortNpc.id],
+  });
+  assert.deepEqual(assembled.result.complied, [escortNpc.id]);
+
+  const roled = engine.dispatchAction(player.id, {
+    action: 'assign-party-role', memberEntityId: escortNpc.id, role: 'scout',
+  });
+  assert.equal(roled.result.complied, true);
+
+  const released = engine.dispatchAction(player.id, {
+    action: 'release-from-party', memberEntityId: escortNpc.id,
+  });
+  assert.equal(released.result.released, escortNpc.id);
 });
 
 // ---------------------------------------------------------------------------
