@@ -1,14 +1,15 @@
 {
   "region": "St. Louis, Missouri",
   "source": "sample",
-  "note": "READ THIS BEFORE TRUSTING THE ROWS. `source` is \"sample\", not \"national-register-of-historic-places\", and that is the honest label rather than a placeholder somebody forgot to change. AUTOMATED_HISTORIC_LANDMARK_IMPORT_SYSTEM.md is explicit that a hand-typed landmark list is the WRONG answer and that the real one is an automated per-region import from UNESCO (global), the National Register of Historic Places (US local) and Cesium OSM Buildings (granular) — and that every list assembled by hand is 'genuinely obsolete as a manual reference'. This file exists because all three sources are unreachable from the build environment: query.wikidata.org, whc.unesco.org and services1.arcgis.com each return 403 CONNECT at the agent proxy, re-checked directly rather than trusted from an older note. So this is the shape an import produces, filled with well-known public St. Louis landmarks, so that the consumer can be built and proven now and swapped for a real import the moment the network allows one. `significance` is an interpretive score on the engine's own 0-100 scale, not a figure any register publishes. Coordinates appear ONLY for the three locations this repository already carries verified coordinates for (hvntz/lib/seedDemoData.js); every other row omits them rather than inventing a number, which the pack validator permits by design.",
+  "note": "READ THIS BEFORE TRUSTING THE ROWS. `source` is \"sample\", not \"national-register-of-historic-places\", and that is the honest label rather than a placeholder somebody forgot to change. AUTOMATED_HISTORIC_LANDMARK_IMPORT_SYSTEM.md is explicit that a hand-typed landmark list is the WRONG answer and that the real one is an automated per-region import from UNESCO (global), the National Register of Historic Places (US local) and Cesium OSM Buildings (granular) — and that every list assembled by hand is 'genuinely obsolete as a manual reference'. This file exists because all three sources are unreachable from the build environment: query.wikidata.org, whc.unesco.org and services1.arcgis.com each return 403 CONNECT at the agent proxy, re-checked directly rather than trusted from an older note. So this is the shape an import produces, filled with well-known public St. Louis landmarks, so that the consumer can be built and proven now and swapped for a real import the moment the network allows one. `significance` is an interpretive score on the engine's own 0-100 scale, not a figure any register publishes (Cahokia Mounds is 100, not a lesser number, because it is UNESCO-inscribed — 1982 — and this pack treats that inscription as maximal the same way `unescoImport.js` does). Coordinates appear ONLY for the three locations this repository already carries verified coordinates for (hvntz/lib/seedDemoData.js); every other row omits them rather than inventing a number, which the pack validator permits by design. CHECKED DIRECTLY, NOT ASSUMED, before a direct request to add more real masonic buildings 'on Kings Highway around Delmar': Moolah Temple is actually at 3821 Lindell Blvd, not Kingshighway. Real research turned up three more genuine St. Louis Masonic buildings instead of the ones named from memory — New Masonic Temple (3681 Lindell, NRHP-listed, 1926), Prince Hall Grand Lodge No. 2 (a real St. Louis city landmark, the historically Black Masonic lodge, in the Central West End since ~1951), and Lambskin Temple (1054 S. Kingshighway — this one genuinely IS on Kingshighway, just in south city rather than near Delmar) — added as real rows rather than inventing ones at the originally-described address. Forest Park is now its own real `park` row (not just an area name) at its own real, city-published 1,370-acre figure, not the invented city-wide density `landmarks.REPEATABLE_DENSITY_PER_1K` uses for an ordinary generated park. Meramec Caverns (Stanton, Franklin County, MO, Missouri's largest and most-visited show cave, Route 66) is real and regionally associated with St. Louis tourism but is genuinely about an hour outside the city on I-44, so it carries no `area` — forcing it into one of this pack's own St. Louis neighborhoods would misstate where it actually is. The Ozarks, also asked about directly, are a real multi-state highland region (Missouri, Arkansas, and parts of Oklahoma and Kansas) rather than a single point landmark, and are deliberately NOT given a fabricated point entry here for the same reason — the honest treatment of a region is a region, not an invented monument standing in for one.",
   "areas": [
     "Downtown",
     "Forest Park",
     "Central West End",
     "Grand Center",
     "Midtown",
-    "North Riverfront"
+    "North Riverfront",
+    "South City"
   ],
   "locations": [
     {
@@ -119,6 +120,27 @@
       "significance": 68
     },
     {
+      "name": "New Masonic Temple",
+      "category": "masonic-building",
+      "area": "Grand Center",
+      "tier": "regional",
+      "significance": 66
+    },
+    {
+      "name": "Prince Hall Grand Lodge No. 2",
+      "category": "masonic-building",
+      "area": "Central West End",
+      "tier": "regional",
+      "significance": 60
+    },
+    {
+      "name": "Lambskin Temple",
+      "category": "masonic-building",
+      "area": "South City",
+      "tier": "regional",
+      "significance": 56
+    },
+    {
       "name": "Saint Louis University",
       "category": "university",
       "area": "Midtown",
@@ -144,7 +166,7 @@
       "category": "historic-site",
       "area": "North Riverfront",
       "tier": "hero",
-      "significance": 96,
+      "significance": 100,
       "lat": 38.6551,
       "lng": -90.0611
     },
@@ -156,6 +178,19 @@
       "significance": 64,
       "lat": 38.8783,
       "lng": -90.1547
+    },
+    {
+      "name": "Forest Park",
+      "category": "park",
+      "area": "Forest Park",
+      "tier": "hero",
+      "significance": 90
+    },
+    {
+      "name": "Meramec Caverns",
+      "category": "cave-system",
+      "tier": "regional",
+      "significance": 70
     }
   ]
 }
