@@ -1250,6 +1250,64 @@ search. `POST /api/players/:id/action` verbs `guess-fugitive-
 location-with-party`/`guess-missing-relation-location-with-party`,
 no new routes. Five new gates mutation-verified.
 
+## Vehicles: cars, motorcycles, scooters, fuel, theft and restoration
+See `CLAUDE.md`'s own hundred-and-first standing rule for the full
+reasoning. By direct instruction, closing the rest of "the Oregon
+Trail travel and off-grid camps... and the rest": a real vehicle
+system built almost entirely out of substrate this engine already had
+sitting unused. `car`/`motorcycle`/`scooter` are three new real
+`salvage.js` PRODUCTS/RECIPES (mechanic, Tier 3, Technology) --
+crafting one from nothing is already `salvage.make`, no second
+crafting path. Closes a real teardown gap for free:
+`salvage.CATEGORY_TEARDOWNS.transport` had existed since that table
+was written, with no real `transport`-category item ever registered
+to exercise it.
+
+`server/vehicles.js` adds three genuinely new things over that real
+substrate: real pace (400/350/150 km/day for car/motorcycle/scooter,
+flagged interpretive, scaled by the vehicle's own already-tracked
+inventory `condition`), real fuel (the real `fuel` resource-type name
+`items.RESOURCE_TYPES` had carried since that list was written and
+nothing had ever generated or consumed -- registered as its own real
+item under that same name), real theft (`heists.robberyAptitudeOf` is
+the identical real composite that file already built for exactly this
+shape of crime; success transfers the item and writes a real
+`crime.recordCrime` incident, category `theft`), and real restoration
+(repairing an already-held vehicle's condition from real salvaged
+materials, at half the matching recipe's cost, through the identical
+Tier/skill gate building one from scratch needs -- refuses outright,
+never half-applies, when the materials cannot be afforded).
+
+**A real bug found and fixed before shipping, not after**: the first
+version of `stealVehicle` picked whichever holder of the named type
+happened to be first in `worldState.inventory`, not the actually-named
+victim -- harmless with one real vehicle in the world, silently wrong
+the moment a second person held the same type. Caught by testing two
+real simultaneous holders, not assumed safe from one; fixed with an
+explicit, required `victimEntityId` argument and a self-theft guard.
+
+`travel.js`'s own journeys are the real fuel consumer: an optional
+`vehicleType` on `beginJourney` replaces the walking pace with the
+held vehicle's real km/day rate (read once, at the journey's start,
+never re-read mid-journey -- a real, named scope boundary), and each
+real travelling day draws one real fuel item from the leader's own
+inventory and applies real wear to the held vehicle. Out of fuel
+stalls the day (the vehicle does not move, `daysElapsed` does not
+advance) rather than harming anybody -- running out of gas is a pace
+problem, not the deprivation `travel.js` already models for food and
+water, which keep drawing normally on a stalled day.
+
+**Declared, not built**: no carry-capacity limit exists anywhere in
+this engine (there is no weight cap on a holder's own inventory to
+raise), so "a vehicle increases carry capacity" is stated as a real
+gap rather than a number with nothing real to multiply.
+
+`POST /api/players/:id/action` verbs `steal-vehicle`/`restore-vehicle`,
+no new routes -- the same "write-only player verb, no GET needed"
+posture `establish-camp`/`begin-journey` already have. All real gates
+mutation-verified, including the theft-targeting bug's own regression
+test and the travel.js fuel-stall/wear-application integration points.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

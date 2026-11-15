@@ -6294,6 +6294,109 @@ posture every other recent verb here holds. Five new gates mutation-
 verified, including that the real coverage cap actually refuses an
 over-named search.
 
+**A hundred-and-first, closing the vehicle half of "build the Oregon
+Trail travel and off-grid camps next and the rest" — a real vehicle
+system built almost entirely out of substrate this engine already had
+sitting unused, plus one real theft bug found and fixed before it
+shipped.**
+
+**Crafting a vehicle needed no new mechanism.** `car`/`motorcycle`/
+`scooter` are three new `salvage.js` PRODUCTS/RECIPES (mechanic,
+Tier 3, Technology, the identical "mechanic, Tier 3" gate `repair_kit`
+already established) — building one from nothing is already
+`salvage.make`. **And it closed a real gap for free**:
+`salvage.CATEGORY_TEARDOWNS.transport` (`scrap_metal: 4, rubber: 2,
+glass: 2`) had existed since that table was written, with no real
+`transport`-category item ever registered to exercise it — the
+eleventh standing rule's own shape, a teardown row with nothing real
+to tear down, closed the moment a real item existed rather than by
+writing a new row.
+
+**Fuel is the real §28 resource-type name nothing had ever used.**
+`items.RESOURCE_TYPES` has named `fuel` since that list was written;
+`grep -rn "'fuel'" server/*.js` before this file found exactly one
+match, its own definition. **Checked directly rather than assumed**:
+`items.TRADE_CATEGORIES` (the sibling item-CATEGORY list) has no
+`fuel` entry at all, so there was no existing item to reuse — `fuel`
+is registered as its own real item, under its own name as its own
+category, the real §28 word taken from the sibling list rather than
+an invented one.
+
+**Restoration is genuinely new; crafting is not, and the file's own
+header says so rather than leaving the distinction implicit.**
+Repairing an ALREADY-HELD vehicle's condition from real materials has
+no precedent anywhere in this engine — `property.js`'s own
+maintenance repairs a BUILDING, a different real mechanism entirely.
+`restoreVehicle` reuses the identical Tier/skill gate the matching
+`salvage.js` recipe already defines and the same recipe's real
+materials, at half the quantity rounded up — refuses outright, never
+half-applies, when the materials cannot be afforded, the same
+discipline `control.js`'s own takeover composition already holds.
+
+**Theft reuses the real robbery composite and the real crime ledger —
+and this is where a genuine, pre-ship correctness bug was found and
+fixed, not a mutation-test artifact.** `heists.robberyAptitudeOf` is
+the identical real composite that file already built for exactly this
+shape of crime; `crime.recordCrime` (category `theft`) is the one real
+choke point every other crime in this engine already writes through.
+The first version of `stealVehicle` picked whichever holder of the
+NAMED TYPE happened to be first in `worldState.inventory`, never the
+actually-intended victim — harmless with exactly one real vehicle in
+the world, and silently wrong the moment a second person held the
+same real type: a thief targeting a specific person's car could end
+up robbing an unrelated stranger across the map while the real,
+intended victim's own vehicle sat untouched. This was caught by
+writing a realistic two-simultaneous-holders test, not a trivial
+single-entity one — the eighth standing rule's own lesson about a
+fixture whose SUBJECT is too simple to exercise the real bug, one
+level over. Fixed with an explicit, required `victimEntityId`
+argument and a self-theft guard, propagated through `engine.js` and
+`actions.js`'s `steal-vehicle` verb, and recorded permanently in this
+file's own header.
+
+**`travel.js`'s own journeys are the real fuel consumer, additive and
+opt-in.** An optional `vehicleType` on `beginJourney` is every
+existing call with no vehicle byte-for-byte unaffected; when given, it
+replaces the walking pace with the held vehicle's real km/day rate —
+read once, at the journey's start, **never re-read mid-journey**, the
+identical "fixed for the journey" posture `totalDays` already takes
+for distance, and a real, named scope boundary rather than a silently
+assumed one. Each real travelling day draws one real fuel item from
+the leader's own inventory and applies real wear to the held vehicle;
+out of fuel stalls the day (the vehicle does not move, `daysElapsed`
+does not advance) rather than harming anybody — this is a pace
+problem, not the deprivation `travel.js` already models for food and
+water, which keep drawing normally on a stalled day.
+
+**Carry capacity is declared, not built, and said so in the file's own
+header rather than silently omitted.** No carry-capacity LIMIT exists
+anywhere in this engine — there is no weight cap on a holder's own
+inventory to raise — so "a vehicle increases carry capacity" would be
+a real number with nothing real to multiply. This file's real
+contribution is pace and fuel cost, honestly, not a capacity bonus
+grafted onto a cap that does not exist.
+
+**A test-isolation gap found and fixed in the same pass, the
+twenty-fourth standing rule's own shape in a new place.** The first
+`restoreVehicle` skill-floor test built its fixture with no
+`education` set at all, so `occupations.tierReachable` already failed
+and threw the TIER error before the code ever reached the separate
+skill-floor check — the test asserted `/Tier 3 work/` and passed, but
+it was only ever exercising the tier gate, never the skill gate it
+named. Mutation-tested directly: deleting the skill-floor check block
+entirely was NOT caught by any test until a second, separate fixture
+was added — real `education: 'basic'` (passes tier) paired with a low
+Technology skill (fails the floor specifically) — asserting on the
+skill-specific error message instead. **When a test's own fixture can
+satisfy an earlier gate than the one it names, it is testing the
+earlier gate, not the one in its own title.**
+
+All real gates mutation-verified: the theft-targeting bug's own
+regression test, the self-theft guard, the corrected skill-floor test,
+and `travel.js`'s own fuel-stall and wear-application integration
+points (neither had any test coverage before this pass — added and
+confirmed to fail when each is removed).
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

@@ -155,6 +155,16 @@ const PRODUCTS = {
   // mechanism invented for the idea.
   granola_bar: { category: 'food', origin: 'producible' },
   orange_juice: { category: 'food', origin: 'producible' },
+  // By direct instruction: "vehicle crafting/restoration from salvaged
+  // parts." The real §28 `transport` category — the identical one
+  // `CATEGORY_TEARDOWNS.transport` below already names, unexercised
+  // until a real transport item existed to tear down. Built, not
+  // repaired: a REPAIR to an already-held vehicle's condition is
+  // `vehicles.js#restoreVehicle`'s own job, since nothing here creates
+  // a second copy of a thing somebody already has.
+  car: { category: 'transport', origin: 'producible' },
+  motorcycle: { category: 'transport', origin: 'producible' },
+  scooter: { category: 'transport', origin: 'producible' },
 };
 
 const PRODUCT_NAMES = Object.keys(PRODUCTS);
@@ -294,6 +304,33 @@ const RECIPES = {
     skill: 'Crafting',
     tier: 1,
     note: 'cook, Tier 1 — occupations.js',
+  },
+  // By direct instruction: "vehicle crafting/restoration from salvaged
+  // parts." The identical real `repair_kit` gate (mechanic, Tier 3,
+  // Technology) — a mechanic who can already build a repair kit from
+  // scrap is exactly who can build a working vehicle from more of it.
+  // Quantities scale with real relative complexity (a scooter is the
+  // simplest of the three, a car the most material-intensive), the
+  // same relative-not-absolute honesty this file's own header already
+  // holds for every other recipe here — no document gives a real bill
+  // of materials for any of this.
+  scooter: {
+    from: [{ scrap_metal: 3, rubber: 1 }],
+    skill: 'Technology',
+    tier: 3,
+    note: 'mechanic, Tier 3 — occupations.js',
+  },
+  motorcycle: {
+    from: [{ scrap_metal: 5, rubber: 2, wire: 1 }],
+    skill: 'Technology',
+    tier: 3,
+    note: 'mechanic, Tier 3 — occupations.js',
+  },
+  car: {
+    from: [{ scrap_metal: 8, rubber: 3, glass: 2, wire: 2 }],
+    skill: 'Technology',
+    tier: 3,
+    note: 'mechanic, Tier 3 — occupations.js',
   },
 };
 

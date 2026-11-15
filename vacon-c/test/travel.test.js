@@ -18,6 +18,8 @@ const geo = require('../server/geo.js');
 const inventory = require('../server/inventory.js');
 const party = require('../server/party.js');
 const worldStore = require('../server/worldStore.js');
+const vehicles = require('../server/vehicles.js');
+const salvage = require('../server/salvage.js');
 
 const w = engine.WorldState;
 
@@ -100,6 +102,84 @@ test('beginJourney\'s group is the leader plus their real, already-assembled par
 
   const journey = travel.beginJourney(w, leader.id, { destinationCityId: cities[1].id, tick: 0 });
   assert.deepEqual([...journey.memberEntityIds].sort((a, b) => a - b), [leader.id, member.id].sort((a, b) => a - b));
+});
+
+// ---------------------------------------------------------------------
+// beginJourney + a real vehicle -- see vehicles.js's own header
+// ---------------------------------------------------------------------
+
+test('beginJourney, given a real vehicleType the leader actually holds, uses its real km/day pace instead of walking', () => {
+  worldgen.generateWorld({ seed: 'travel-vehicle-1', cities: 2, communitiesPerCity: 1, populationPerCommunity: 5 });
+  const cities = w.cities.slice(-2);
+  const leader = leaderInCity(cities[0].id);
+  salvage.registerItems(w);
+  inventory.give(w, { entityId: leader.id, itemName: 'scooter', quantity: 1, condition: 100, tick: 0 });
+
+  const journey = travel.beginJourney(w, leader.id, { destinationCityId: cities[1].id, tick: 0, vehicleType: 'scooter' });
+  const realDistance = geo.distanceMetres(geo.positionOf(cities[0]), geo.positionOf(cities[1]));
+  const expectedMetresPerDay = vehicles.KM_PER_DAY_BY_TYPE.scooter * 1000;
+  assert.equal(journey.metresPerDay, expectedMetresPerDay);
+  assert.equal(journey.totalDays, Math.max(1, Math.ceil(realDistance / expectedMetresPerDay)));
+  assert.equal(journey.vehicleType, 'scooter');
+});
+
+test('beginJourney refuses a real vehicleType the leader does not actually hold', () => {
+  worldgen.generateWorld({ seed: 'travel-vehicle-2', cities: 2, communitiesPerCity: 1, populationPerCommunity: 5 });
+  const cities = w.cities.slice(-2);
+  const leader = leaderInCity(cities[0].id);
+  assert.throws(
+    () => travel.beginJourney(w, leader.id, { destinationCityId: cities[1].id, tick: 0, vehicleType: 'car' }),
+    /does not hold a real car/,
+  );
+});
+
+test('beginJourney refuses a real vehicle too damaged to move at all', () => {
+  worldgen.generateWorld({ seed: 'travel-vehicle-3', cities: 2, communitiesPerCity: 1, populationPerCommunity: 5 });
+  const cities = w.cities.slice(-2);
+  const leader = leaderInCity(cities[0].id);
+  salvage.registerItems(w);
+  inventory.give(w, { entityId: leader.id, itemName: 'scooter', quantity: 1, condition: 0, tick: 0 });
+  assert.throws(
+    () => travel.beginJourney(w, leader.id, { destinationCityId: cities[1].id, tick: 0, vehicleType: 'scooter' }),
+    /too damaged to move/,
+  );
+});
+
+// ---------------------------------------------------------------------
+// advanceJourneys + a real vehicle -- real fuel, real wear, real stall
+// ---------------------------------------------------------------------
+
+test('advanceJourneys, on a real vehicle journey, consumes one real fuel item and applies real wear each travelling day', () => {
+  worldgen.generateWorld({ seed: 'travel-vehicle-4', cities: 2, communitiesPerCity: 1, populationPerCommunity: 5 });
+  const cities = w.cities.slice(-2);
+  const leader = leaderInCity(cities[0].id);
+  salvage.registerItems(w);
+  inventory.give(w, { entityId: leader.id, itemName: 'scooter', quantity: 1, condition: 100, tick: 0 });
+  inventory.give(w, { entityId: leader.id, itemName: 'bread', quantity: 10, tick: 0 });
+  inventory.give(w, { entityId: leader.id, itemName: 'bottled_water', quantity: 10, tick: 0 });
+  travel.beginJourney(w, leader.id, { destinationCityId: cities[1].id, tick: 0, vehicleType: 'scooter' });
+  inventory.give(w, { entityId: leader.id, itemName: vehicles.FUEL_ITEM_NAME, quantity: 10, tick: 0 });
+
+  travel.advanceJourneys(w, 0);
+  assert.equal(inventory.quantityOf(w, leader.id, vehicles.FUEL_ITEM_NAME), 9);
+  const holding = inventory.findHolding(w, leader.id, 'scooter');
+  assert.equal(holding.condition, 100 - vehicles.WEAR_PER_TRAVEL_DAY);
+});
+
+test('advanceJourneys: running out of real fuel stalls the real vehicle journey rather than harming anybody', () => {
+  worldgen.generateWorld({ seed: 'travel-vehicle-5', cities: 2, communitiesPerCity: 1, populationPerCommunity: 5 });
+  const cities = w.cities.slice(-2);
+  const leader = leaderInCity(cities[0].id);
+  salvage.registerItems(w);
+  inventory.give(w, { entityId: leader.id, itemName: 'scooter', quantity: 1, condition: 100, tick: 0 });
+  inventory.give(w, { entityId: leader.id, itemName: 'bread', quantity: 10, tick: 0 });
+  inventory.give(w, { entityId: leader.id, itemName: 'bottled_water', quantity: 10, tick: 0 });
+  const journey = travel.beginJourney(w, leader.id, { destinationCityId: cities[1].id, tick: 0, vehicleType: 'scooter' });
+  // Deliberately no real fuel given at all.
+
+  const events = travel.advanceJourneys(w, 0);
+  assert.ok(events.some((e) => e.type === 'journey-stalled' && e.reason === 'out of fuel'));
+  assert.equal(travel.journeyOf(w, journey.id).daysElapsed, 0, 'a stalled day must not advance real progress');
 });
 
 // ---------------------------------------------------------------------

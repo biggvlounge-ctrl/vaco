@@ -72,6 +72,7 @@ const party = require('./party.js');
 const travel = require('./travel.js');
 const camps = require('./camps.js');
 const nomadic = require('./nomadic.js');
+const vehicles = require('./vehicles.js');
 const tribeWealth = require('./tribeWealth.js');
 const tacticalAdvisor = require('./tacticalAdvisor.js');
 const craftingAdvisor = require('./craftingAdvisor.js');
@@ -939,6 +940,18 @@ function getOrganizationNomadicStatus(organizationId) {
   return nomadic.isNomadicOrganization(WorldState, organizationId);
 }
 
+// A real vehicle system -- see vehicles.js's own header. Crafting a
+// new one reuses the existing make-thing/salvage.make verb directly
+// (car/motorcycle/scooter are real salvage.js PRODUCTS); these two
+// are the genuinely new real actions, theft and restoration.
+function stealVehicle(entityId, victimEntityId, vehicleType) {
+  return vehicles.stealVehicle(WorldState, entityId, victimEntityId, vehicleType, { tick: WorldState.tick });
+}
+
+function restoreVehicle(entityId, vehicleType) {
+  return vehicles.restoreVehicle(WorldState, entityId, vehicleType, { tick: WorldState.tick });
+}
+
 // A real, trait-weighted split recommendation over a leader's own
 // real party -- see tacticalAdvisor.js's own header for the full
 // design.
@@ -1320,6 +1333,8 @@ const ACTION_VERBS = {
   leaveCamp: (...args) => leaveCamp(...args),
   breakCamp: (...args) => breakCamp(...args),
   getActiveCamp: (...args) => getActiveCamp(...args),
+  stealVehicle: (...args) => stealVehicle(...args),
+  restoreVehicle: (...args) => restoreVehicle(...args),
 };
 
 function dispatchAction(playerId, body) {

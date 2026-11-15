@@ -81,8 +81,8 @@ test('every verb an action names is one the engine actually supplies', () => {
     ['acceptMission', 'addScheduleEvent', 'applyRecommendedSplit', 'assembleParty', 'assessTakeover', 'assessThreat', 'assignPartyRole', 'assignRole', 'attemptHeist', 'attemptTakeover',
       'beginJourney', 'breakCamp', 'breakDownItem', 'broadcastMessage', 'callBluff', 'canMakeThing', 'designateStashHouse', 'directMission', 'establishCamp', 'findOrCreateContact', 'guessFugitiveLocation', 'guessFugitiveLocationWithParty', 'guessMissingRelationLocation', 'guessMissingRelationLocationWithParty', 'holdMeeting',
       'intimidate', 'investInTarget', 'joinCamp', 'leaveCamp', 'makeThing', 'manufactureAmmunition', 'quoteTrade',
-      'reinforceHabit', 'releaseFromParty', 'repurposeProperty', 'resolveContest', 'revealCache', 'searchLocation', 'sendMessage', 'sendSpy',
-      'stripBuilding', 'resolveMission', 'studySource', 'tradeWith'].sort(),
+      'reinforceHabit', 'releaseFromParty', 'repurposeProperty', 'resolveContest', 'restoreVehicle', 'revealCache', 'searchLocation', 'sendMessage', 'sendSpy',
+      'stealVehicle', 'stripBuilding', 'resolveMission', 'studySource', 'tradeWith'].sort(),
   );
 });
 

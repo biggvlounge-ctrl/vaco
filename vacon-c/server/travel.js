@@ -19,9 +19,28 @@
 // `geo.CITY_SPREAD_M` is — a real, cited historical pace borrowed as
 // this engine's own travel-speed CONSTANT, never a claim that any
 // generated world's own terrain or trail conditions were measured.
-// Carry weight, vehicles and terrain difficulty are all explicitly
-// out of scope here — see `VACANCY_INVENTORY.md`'s own notes on the
-// still-unbuilt carry-capacity and vehicle systems.
+// Carry weight and terrain difficulty are still explicitly out of
+// scope here — see `VACANCY_INVENTORY.md`'s own note on the still-
+// unbuilt carry-capacity system.
+//
+// ---------------------------------------------------------------------
+// A real vehicle, when the leader actually has one
+// ---------------------------------------------------------------------
+// `options.vehicleType` is optional and additive — every existing
+// call with no vehicle is byte-for-byte unaffected. When given,
+// `vehicles.js`'s own real km/day rate (scaled by that specific held
+// vehicle's own real, already-tracked inventory `condition`) replaces
+// the walking pace for computing `totalDays`, read once at the
+// journey's start — never re-read mid-journey, a real, named scope
+// boundary `vehicles.js`'s own header states directly. Each real
+// travelling day also draws one real `fuel`-category item from the
+// LEADER's own inventory (closing `items.RESOURCE_TYPES.fuel`'s own
+// "written by nothing" gap) — out of fuel stalls that day (the vehicle
+// simply does not move, `daysElapsed` does not advance) rather than
+// harming anybody, since running out of gas is an inconvenience, not
+// the deprivation this file's own food/water term already models.
+// Food and water still draw normally on a stalled day; only the
+// vehicle's own motion stops.
 //
 // ---------------------------------------------------------------------
 // Consumption: real items, real categories, no ration invented
@@ -91,6 +110,7 @@ const inventory = require('./inventory.js');
 const items = require('./items.js');
 const mortality = require('./mortality.js');
 const migration = require('./migration.js');
+const vehicles = require('./vehicles.js');
 const { seededDraw } = require('./seeded.js');
 
 //: See this file's own header. A real, cited historical pace, not a
@@ -137,13 +157,26 @@ function journeyOf(worldState, journeyId) {
 }
 
 function beginJourney(worldState, leaderEntityId, options = {}) {
-  const { destinationCityId, tick = worldState.tick ?? 0, roundTrip = false } = options;
+  const { destinationCityId, tick = worldState.tick ?? 0, roundTrip = false, vehicleType = null } = options;
   if (destinationCityId == null) {
     throw new Error('beginJourney requires options.destinationCityId.');
   }
 
   const leader = (worldState.npcs || []).find((n) => n.id === Number(leaderEntityId));
   if (!leader) throw new Error(`beginJourney: entity ${leaderEntityId} is not among the living.`);
+
+  let metresPerDay = METRES_PER_DAY;
+  if (vehicleType !== null) {
+    const kmPerDay = vehicles.kmPerDayFor(worldState, leaderEntityId, vehicleType);
+    if (kmPerDay === null) {
+      throw new Error(`beginJourney: entity ${leaderEntityId} does not hold a real ${vehicleType} to drive.`);
+    }
+    if (kmPerDay <= 0) {
+      throw new Error(`beginJourney: this real ${vehicleType} is too damaged to move at all.`);
+    }
+    metresPerDay = kmPerDay * 1000;
+    vehicles.registerFuelItem(worldState);
+  }
 
   const members = membersFor(worldState, leaderEntityId);
   for (const id of members) {
@@ -169,7 +202,7 @@ function beginJourney(worldState, leaderEntityId, options = {}) {
     throw new Error('beginJourney: one of these two real cities has no real geographic position to measure a distance from.');
   }
 
-  const totalDays = Math.max(1, Math.ceil(distanceMetres / METRES_PER_DAY));
+  const totalDays = Math.max(1, Math.ceil(distanceMetres / metresPerDay));
 
   worldState.journeys = worldState.journeys || [];
   const journey = {
@@ -179,6 +212,8 @@ function beginJourney(worldState, leaderEntityId, options = {}) {
     originCityId,
     destinationCityId: Number(destinationCityId),
     distanceMetres,
+    metresPerDay,
+    vehicleType,
     totalDays,
     daysElapsed: 0,
     roundTrip: !!roundTrip,
@@ -270,6 +305,21 @@ function advanceJourneys(worldState, tick = worldState.tick ?? 0) {
     }
     if (lost.length > 0) {
       journeyEntry.memberEntityIds = journeyEntry.memberEntityIds.filter((id) => !lost.includes(id));
+    }
+
+    // A vehicle journey needs real fuel from its own real driver (the
+    // leader) every real travelling day — out of fuel stalls the day
+    // rather than harming anybody, since this is a pace problem, not a
+    // deprivation one. See this file's own header.
+    if (journeyEntry.vehicleType !== null && journeyEntry.memberEntityIds.includes(journeyEntry.leaderEntityId)) {
+      const hadFuel = consumeOneUnitOfCategory(worldState, journeyEntry.leaderEntityId, vehicles.FUEL_ITEM_NAME);
+      vehicles.applyDailyWear(worldState, journeyEntry.leaderEntityId, journeyEntry.vehicleType);
+      if (!hadFuel) {
+        events.push({
+          type: 'journey-stalled', journeyId: journeyEntry.id, reason: 'out of fuel', tick,
+        });
+        continue;
+      }
     }
 
     journeyEntry.daysElapsed += 1;

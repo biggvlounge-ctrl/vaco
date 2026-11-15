@@ -633,7 +633,31 @@ const ACTIONS = {
     run: (verbs, actorId, body) => verbs.beginJourney(actorId, {
       destinationCityId: Number(body.destinationCityId),
       roundTrip: !!body.roundTrip,
+      vehicleType: body.vehicleType ?? null,
     }),
+  },
+
+  // **`vehicles.js`'s own two genuinely new real actions** — crafting
+  // a new car/motorcycle/scooter already goes through `make-thing`
+  // (they are real `salvage.js` PRODUCTS); see that file's own header
+  // for why theft and restoration are not.
+  'steal-vehicle': {
+    summary: 'Attempt to steal a real car, motorcycle or scooter a specific real person currently '
+      + 'holds -- a real chance from your own real robbery aptitude, a real named technique either '
+      + 'way, and a real crime.js incident on success.',
+    modes: ['citizen', 'leader'],
+    requires: ['victimEntityId', 'vehicleType'],
+    verbs: ['stealVehicle'],
+    run: (verbs, actorId, body) => verbs.stealVehicle(actorId, Number(body.victimEntityId), body.vehicleType),
+  },
+
+  'restore-vehicle': {
+    summary: 'Repair a real vehicle you already hold, from real salvaged materials -- the same real '
+      + 'mechanic Tier-3/Technology gate building one from scratch needs, at half the materials.',
+    modes: ['citizen', 'leader'],
+    requires: ['vehicleType'],
+    verbs: ['restoreVehicle'],
+    run: (verbs, actorId, body) => verbs.restoreVehicle(actorId, body.vehicleType),
   },
 
   // **`camps.js`'s real player-facing half** — off-grid wilderness
