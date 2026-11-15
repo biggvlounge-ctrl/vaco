@@ -1534,6 +1534,38 @@ real generated world: all four bases placed, staffed with real
 garrison occupations, and produced sensible finds; the four natural
 categories placed with no operator, exactly as designed.
 
+## St. Louis hospitals/universities, the Civil Courts Building, and Confluence Point
+Ten more real landmarks, by direct instruction. Civil Courts Building
+(Downtown, a 1928-1930 step-pyramid building modeled on the Mausoleum
+at Halicarnassus, genuinely distinct from the already-present Old
+Courthouse); Harris-Stowe State University (real public HBCU,
+Midtown); Fontbonne University -- CORRECTED to `historic-site` rather
+than an active `university`, because its Board voted in March 2024 to
+close after the 2025 summer term and sold the campus to Washington
+University, so marking it an operating university would auto-hire
+real faculty there; Memorial Hospital Belleville (the real "hospital
+in Belleville" -- HSHS St. Elizabeth's, the other Belleville name,
+actually moved to O'Fallon, IL in 2017); St. Louis Children's
+Hospital, SSM Health Cardinal Glennon Children's Hospital, SSM Health
+DePaul Hospital, Mercy Hospital St. Louis, and the St. Louis VA
+Medical Center's John Cochran Division.
+
+CHECKED AND DECLINED: Lincoln University is a real HBCU, but it is in
+Jefferson City, MO, roughly 130 miles from St. Louis -- not added,
+same as Meramec Caverns and the Ozarks were kept out of a St. Louis
+neighborhood they are not actually in.
+
+Confluence Point and the "hard to open... have the key... hold things
+on the inside" request both needed no new code, only verification.
+Confluence Point's category (`natural-formation`) is already
+hero-tier, so it is already placed as a real property with a real
+community -- the one precondition `missionTriggers.maybeTriggerMission`
+needs to fire there. And `server/hiddenCaches.js` already gives any
+real landmark (these ten included) a real, gated, key-locked chance of
+holding a real find -- built earlier for a different direct
+instruction, and this round found it already covers the Civil Courts
+Building and every hospital/university added here too.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

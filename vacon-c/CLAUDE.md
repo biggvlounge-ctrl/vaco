@@ -6950,6 +6950,93 @@ in Missouri per the park's own trail map); and Rockwoods Reservation
 (a real 1,843-1,880-acre Missouri Department of Conservation forest, a
 new "Eureka" area).
 
+**A hundred-and-ninth, and it is mostly a verification round — two
+real mechanisms this project already had turned out to already cover
+most of what was asked for, and the two real additions that were
+needed are both corrections rather than straightforward additions.**
+
+Asked for "every hospital... the Central West End area to
+downtown... Fontbonne University... Lincoln University... Harris
+Stowe University... take the most unusual buildings in the city,
+similar to how the Civil Courts building... is like one of the eight
+wonders of the world... should be a mission, and it should be hard to
+open and get those things available or have the key... and they
+should also hold things on the inside," two of the four parts needed
+no new mechanism at all, checked directly rather than assumed:
+
+- **Confluence Point's "hot spot... a lot of missions... should have
+  power" is already true, mechanically.** Its category,
+  `natural-formation`, is already a hero-tier category
+  (`landmarks.isHeroTier`) — `worldgen.js`'s own pack-driven placement
+  already turns every hero-tier pack entry into a real property with
+  a real `community_id`, which is the one precondition
+  `missionTriggers.maybeTriggerMission` checks before it can fire
+  anywhere. Confirmed in a real generated world: Confluence Point
+  placed with a real `community_id`, same as every other hero-tier
+  entry.
+- **"Hard to open... have the key... hold things on the inside" is
+  `server/hiddenCaches.js`, built for an earlier, separate direct
+  instruction ("safes... secret compartments... old Masonic
+  buildings... historic buildings") and never re-checked against this
+  later, differently-worded request for the same thing.** It already
+  gives ANY real landmark property a real 35% chance of a gated cache
+  needing a real key item (plus a further +25% for its own
+  `HISTORIC_CATEGORIES`), which already covers the Civil Courts
+  Building and every hospital/university added in this round the
+  moment they exist as real properties — no new mechanic needed, only
+  the landmarks themselves.
+
+The two real corrections, both found by checking rather than trusting
+the request's own placement:
+
+- **Lincoln University is real and is a real HBCU, and it is not in
+  St. Louis.** It is in Jefferson City, MO — roughly 130 miles away,
+  its own distinct region — so it is not added to this pack, the same
+  "a region is a region, don't force a real place into a neighborhood
+  it is not in" discipline Meramec Caverns and the Ozarks already
+  got here.
+- **Fontbonne University is real, and is not currently an operating
+  university.** Its Board of Trustees voted 10 Mar 2024 to close after
+  the 2025 summer term, citing declining enrollment and budget
+  problems, and Washington University purchased its 16-acre campus.
+  Categorizing it as an active `university` the way Harris-Stowe
+  genuinely is would have the engine's own "every hero-tier university
+  gets real staff" pass auto-hire real faculty at a school that, as of
+  this pass, no longer runs one — so it is added as `historic-site`
+  instead, the same honest category-correction shape Hop Alley already
+  got for being a real place that no longer stands the way a landmark
+  row would imply.
+
+**And one "Belleville hospital" name confusion, resolved by checking
+the two real candidates rather than picking the one named from
+memory.** HSHS St. Elizabeth's — the name that comes to mind first for
+"the hospital in Belleville" — actually relocated to O'Fallon, IL in
+2017 after 142 years in Belleville. Memorial Hospital Belleville (BJC
+HealthCare, 4500 Memorial Drive) is the real hospital still actually
+operating in Belleville, and is the one added.
+
+Six more real, straightforwardly-added landmarks round out the
+Central-West-End-to-downtown request and the hospital audit: the
+Civil Courts Building itself (Downtown, 1928-1930, Klipstein &
+Rathmann, a step-pyramid roof modeled on the Mausoleum at
+Halicarnassus — one of the Seven Wonders of the Ancient World — and
+genuinely distinct from the already-present Old Courthouse, which has
+no pyramid); Harris-Stowe State University; St. Louis Children's
+Hospital and SSM Health Cardinal Glennon Children's Hospital (both
+real, both nationally ranked); SSM Health DePaul Hospital and Mercy
+Hospital St. Louis (two new real areas, Bridgeton and Creve Coeur);
+and the St. Louis VA Medical Center's John Cochran Division.
+Missouri Baptist Medical Center and St. Luke's Hospital are a stated
+gap, not an oversight — this pass added what was named directly or
+surfaced as clearly major, never an exhaustive hospital registry.
+Confirmed in a real generated world: all ten new properties placed
+with a real `community_id`, Fontbonne correctly typed `historical_site`
+rather than `government` (so no faculty are hired there), and every
+other new hospital/university correctly typed `government` and
+eligible for the real "every hero-tier institution gets real staff"
+pass the same way Barnes-Jewish and Washington University already
+are.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and
