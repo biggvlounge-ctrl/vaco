@@ -86,6 +86,7 @@ const justice = require('./justice.js');
 const migration = require('./migration.js');
 const countryPacks = require('./countryPacks.js');
 const worldStore = require('./worldStore.js');
+const party = require('./party.js');
 const { seededDraw } = require('./seeded.js');
 
 // Flagged interpretive — no document gives a real "how often does a
@@ -204,6 +205,21 @@ function attemptFlight(worldState, perpetratorId, options = {}) {
   return { fled: true, toCommunityId };
 }
 
+// The one real place a guess is actually resolved, win or lose --
+// shared by a solo guess and a party-covered one so neither path can
+// drift from the other's real consequences.
+function resolveGuess(worldState, incident, perpetrator, correct, tick) {
+  if (!correct) {
+    const flight = attemptFlight(worldState, perpetrator.id, { tick });
+    return { caught: false, correct: false, ...flight };
+  }
+  const caseRow = justice.judge(worldState, { incident, tick });
+  if (caseRow && caseRow.status === 'convicted') {
+    justice.imprison(worldState, caseRow, { tick });
+  }
+  return { caught: true, correct: true, case: caseRow };
+}
+
 // The chase's one real decision point. `communityIdGuess` is the
 // player's answer; correct catches them through the real
 // justice.js chain, wrong gives them one real, bounded chance to run
@@ -218,17 +234,51 @@ function guessLocation(worldState, guesserEntityId, incidentId, communityIdGuess
 
   const perpetrator = (worldState.npcs || []).find((n) => n.id === incident.perpetrator_entity_id);
   const correct = perpetrator.communityId === Number(communityIdGuess);
+  return resolveGuess(worldState, incident, perpetrator, correct, tick);
+}
 
-  if (!correct) {
-    const flight = attemptFlight(worldState, perpetrator.id, { tick });
-    return { caught: false, correct: false, ...flight };
+// ---------------------------------------------------------------------
+// Party integration — by direct instruction: "integrate party/escort
+// with search-and-locate mechanics."
+// ---------------------------------------------------------------------
+// A real party (`party.partyOf`'s own roster) lets a leader cover more
+// than one real candidate community in the SAME attempt — one real
+// person per place — rather than guessing them one at a time. This is
+// deliberately ONE real correctness check and, on a miss, ONE real
+// flight draw, never N independent re-rolls for N named communities:
+// letting a party farm extra flight attempts inside a single
+// simultaneous search would misrepresent what "simultaneous" means,
+// and could catch a fugitive who, honestly, only ever fled once. The
+// real cap on how many communities a search may cover is exactly how
+// many real people are actually there to send — the searcher plus
+// their real party, never an invented search-radius bonus.
+function maxCoverageFor(worldState, searcherEntityId) {
+  return 1 + party.partyOf(worldState, searcherEntityId).length;
+}
+
+function guessLocationWithParty(worldState, guesserEntityId, incidentId, communityIdGuesses, options = {}) {
+  const { tick = worldState.tick ?? 0 } = options;
+  if (!Array.isArray(communityIdGuesses) || communityIdGuesses.length === 0) {
+    throw new Error('guessLocationWithParty requires a non-empty communityIdGuesses array.');
+  }
+  const unique = [...new Set(communityIdGuesses.map(Number))];
+  const maxCoverage = maxCoverageFor(worldState, guesserEntityId);
+  if (unique.length > maxCoverage) {
+    throw new Error(
+      `guessLocationWithParty: ${unique.length} real communities named, but entity ${guesserEntityId} `
+      + `only has ${maxCoverage} real people (themselves plus their real party) to send.`,
+    );
   }
 
-  const caseRow = justice.judge(worldState, { incident, tick });
-  if (caseRow && caseRow.status === 'convicted') {
-    justice.imprison(worldState, caseRow, { tick });
+  const incident = (worldState.crimeIncidents || []).find((i) => i.id === Number(incidentId));
+  if (!incident) throw new Error(`guessLocationWithParty: no crime incident with id ${incidentId}.`);
+  if (!isAtLarge(worldState, incident)) {
+    throw new Error(`guessLocationWithParty: incident ${incidentId} has no real at-large fugitive to chase.`);
   }
-  return { caught: true, correct: true, case: caseRow };
+
+  const perpetrator = (worldState.npcs || []).find((n) => n.id === incident.perpetrator_entity_id);
+  const correct = unique.includes(perpetrator.communityId);
+  return { ...resolveGuess(worldState, incident, perpetrator, correct, tick), coveredCommunities: unique.length };
 }
 
 // ---------------------------------------------------------------------
@@ -287,6 +337,39 @@ function guessMissingRelationLocation(worldState, searcherEntityId, targetEntity
   return { found: correct, correct };
 }
 
+// The real party version of the above — see this file's own "Party
+// integration" header. No flight consequence exists for this search
+// either way, so this is simpler than `guessLocationWithParty`: one
+// real correctness check against every named community, capped at how
+// many real people are actually there to send.
+function guessMissingRelationLocationWithParty(worldState, searcherEntityId, targetEntityId, communityIdGuesses) {
+  if (!Array.isArray(communityIdGuesses) || communityIdGuesses.length === 0) {
+    throw new Error('guessMissingRelationLocationWithParty requires a non-empty communityIdGuesses array.');
+  }
+  const unique = [...new Set(communityIdGuesses.map(Number))];
+  const maxCoverage = maxCoverageFor(worldState, searcherEntityId);
+  if (unique.length > maxCoverage) {
+    throw new Error(
+      `guessMissingRelationLocationWithParty: ${unique.length} real communities named, but entity `
+      + `${searcherEntityId} only has ${maxCoverage} real people (themselves plus their real party) to send.`,
+    );
+  }
+
+  const target = (worldState.npcs || []).find((n) => n.id === Number(targetEntityId));
+  if (!target || target.status !== 'active') {
+    throw new Error(`guessMissingRelationLocationWithParty: no living entity ${targetEntityId}.`);
+  }
+  const relationship = worldStore.findRelationship(worldState, Number(searcherEntityId), target.id);
+  if (!relationship) {
+    throw new Error(
+      `guessMissingRelationLocationWithParty: entity ${searcherEntityId} has no real relationship `
+      + `with ${targetEntityId} to search for them over.`,
+    );
+  }
+  const correct = unique.includes(target.communityId);
+  return { found: correct, correct, coveredCommunities: unique.length };
+}
+
 module.exports = {
   FLIGHT_CHANCE,
   isAtLarge,
@@ -297,6 +380,9 @@ module.exports = {
   clueForIncident,
   attemptFlight,
   guessLocation,
+  maxCoverageFor,
+  guessLocationWithParty,
   missingRelationsOf,
   guessMissingRelationLocation,
+  guessMissingRelationLocationWithParty,
 };

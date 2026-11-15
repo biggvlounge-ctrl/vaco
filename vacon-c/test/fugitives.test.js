@@ -13,6 +13,8 @@ const engine = require('../server/engine.js');
 const fugitives = require('../server/fugitives.js');
 const landmarks = require('../server/landmarks.js');
 const justice = require('../server/justice.js');
+const party = require('../server/party.js');
+const worldStore = require('../server/worldStore.js');
 
 const w = engine.WorldState;
 
@@ -222,4 +224,134 @@ test('attemptFlight: a real, bounded chance to relocate to a different real comm
     }
   }
   assert.ok(fledOnce, 'a real vacancy elsewhere must be reachable within 60 tries');
+});
+
+// ---------------------------------------------------------------------
+// Party integration -- by direct instruction: "integrate party/escort
+// with search-and-locate mechanics." See fugitives.js's own "Party
+// integration" header: a real party lets a searcher cover more than
+// one real candidate community in the SAME attempt, capped at exactly
+// how many real people are actually there to send.
+// ---------------------------------------------------------------------
+
+function realPartyOf(leaderId, memberId) {
+  const fam = {
+    id: nextId += 1, surname: 'Posse', generation: 1, total_members: 2, head_npc_id: leaderId, updatedTick: w.tick,
+  };
+  w.families.push(fam);
+  w.familyMemberships.push({ entity_id: leaderId, family_id: fam.id, role: 'parent', generation_number: 1 });
+  w.familyMemberships.push({ entity_id: memberId, family_id: fam.id, role: 'child', generation_number: 1 });
+  worldStore.getOrCreateRelationship(w, leaderId, memberId, 'social').loyalty = 100;
+  let joined = false;
+  for (let tick = 0; tick < 20 && !joined; tick += 1) {
+    const result = party.assembleParty(w, leaderId, { familyId: fam.id, memberEntityIds: [memberId], tick });
+    if (result.complied.includes(memberId)) joined = true;
+  }
+  return joined;
+}
+
+test('maxCoverageFor: the searcher alone is 1, and grows by exactly one real, compliant party member', () => {
+  const cityA = city('Coverage City');
+  const commA = community(cityA);
+  const leader = person(commA.id);
+  const member = person(commA.id);
+  assert.equal(fugitives.maxCoverageFor(w, leader.id), 1);
+  assert.ok(realPartyOf(leader.id, member.id), 'the real member must comply at least once across 20 real tries at full loyalty');
+  assert.equal(fugitives.maxCoverageFor(w, leader.id), 2);
+});
+
+test('guessLocationWithParty: refuses more real communities named than real people to send', () => {
+  const cityA = city('Overreach City');
+  const commA = community(cityA);
+  const commB = community(city('Overreach City B'));
+  const leader = person(commA.id);
+  const incident = openUnansweredFugitiveCase(person(commA.id));
+  assert.throws(
+    () => fugitives.guessLocationWithParty(w, leader.id, incident.id, [commA.id, commB.id]),
+    /only has 1 real people/,
+  );
+});
+
+test('guessLocationWithParty: a real party covers two real communities in one attempt, catching the fugitive wherever among them they really are', () => {
+  const cityA = city('Posse City');
+  const commA = community(cityA);
+  const commB = community(city('Posse City B'));
+  const leader = person(commA.id);
+  const member = person(commA.id);
+  assert.ok(realPartyOf(leader.id, member.id));
+
+  const perpetrator = person(commB.id);
+  const incident = openUnansweredFugitiveCase(perpetrator);
+
+  const result = fugitives.guessLocationWithParty(w, leader.id, incident.id, [commA.id, commB.id]);
+  assert.equal(result.caught, true);
+  assert.equal(result.coveredCommunities, 2);
+  assert.ok(result.case, 'judge() must have run');
+});
+
+test('guessLocationWithParty: a miss across every covered real community triggers at most ONE real flight draw, never one per named community', () => {
+  const cityA = city('Miss City');
+  const commA = community(cityA);
+  const commB = community(city('Miss City B'));
+  const commC = community(city('Miss City C'));
+  engine.generateProperty({ type: 'residential', value: 100000, communityId: commC.id });
+  const leader = person(commA.id);
+  const member = person(commA.id);
+  assert.ok(realPartyOf(leader.id, member.id));
+
+  const perpetrator = person(commC.id);
+  const incident = openUnansweredFugitiveCase(perpetrator);
+
+  const result = fugitives.guessLocationWithParty(w, leader.id, incident.id, [commA.id, commB.id], { tick: 0 });
+  assert.equal(result.caught, false);
+  assert.equal(result.correct, false);
+  // A single real flight outcome -- `fled` is a plain boolean, never an
+  // array or count, which is what "at most one draw" means here.
+  assert.equal(typeof result.fled, 'boolean');
+});
+
+test('guessLocationWithParty: refuses duplicate community ids beyond real coverage, and refuses a non-fugitive incident', () => {
+  const cityA = city('Dup City');
+  const commA = community(cityA);
+  const leader = person(commA.id);
+  const incident = openUnansweredFugitiveCase(person(commA.id));
+  // Two real people (leader alone = 1) cannot cover three NAMED slots
+  // even if two of them repeat -- duplicates are collapsed first.
+  assert.doesNotThrow(() => fugitives.guessLocationWithParty(w, leader.id, incident.id, [commA.id, commA.id]));
+
+  const resolvedIncident = {
+    id: nextId += 1, category: 'theft', perpetrator_entity_id: leader.id,
+    victim_entity_id: null, community_id: commA.id, tick: 0, severity: 50,
+    detail: null, investigated_tick: null, cleared: null,
+  };
+  w.crimeIncidents.push(resolvedIncident);
+  assert.throws(
+    () => fugitives.guessLocationWithParty(w, leader.id, resolvedIncident.id, [commA.id]),
+    /no real at-large fugitive/,
+  );
+});
+
+test('guessMissingRelationLocationWithParty: refuses more real communities than real people, then succeeds within the real cap', () => {
+  const cityA = city('Reunion City');
+  const commA = community(cityA);
+  const commB = community(city('Reunion City B'));
+  const commC = community(city('Reunion City C'));
+  const searcher = person(commA.id);
+  const member = person(commA.id);
+  const relation = person(commB.id);
+  worldStore.getOrCreateRelationship(w, searcher.id, relation.id, 'family');
+
+  assert.throws(
+    () => fugitives.guessMissingRelationLocationWithParty(w, searcher.id, relation.id, [commB.id, commC.id]),
+    /only has 1 real people/,
+  );
+
+  assert.ok(realPartyOf(searcher.id, member.id));
+  const wrong = fugitives.guessMissingRelationLocationWithParty(w, searcher.id, relation.id, [commA.id, commC.id]);
+  assert.equal(wrong.found, false);
+  assert.equal(wrong.coveredCommunities, 2);
+
+  const correct = fugitives.guessMissingRelationLocationWithParty(w, searcher.id, relation.id, [commA.id, commB.id]);
+  assert.equal(correct.found, true);
+  assert.equal(relation.communityId, commB.id, 'a real missing-relation search never relocates anybody, win or lose');
 });

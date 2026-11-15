@@ -1167,6 +1167,89 @@ never gets a second one stacked on top. Dedicated fishing-spot
 landmarks and gating by habit name are named as deliberately
 out of scope, not silently missing.
 
+## Oregon Trail-style group travel
+See `CLAUDE.md`'s own ninety-seventh standing rule for the full
+reasoning. By direct instruction: Oregon Trail-style group travel,
+"resource consumption over distance/time." `server/travel.js` is a
+real haversine distance (`geo.distanceMetres`/`positionOf`) between
+two real generated cities, covered at the National Park Service/
+Oregon-California Trails Association's own documented historical
+wagon-train pace (~24 km/day), by the leader plus their real,
+already-assembled `party.partyOf` roster -- never a second group
+mechanic. Each real travelling day consumes one real `food`-category
+and one real `water`-category item from whatever a member actually
+carries; running short does not kill outright, it adds one real,
+independent deprivation draw alongside a traveler's own ordinary
+home-city mortality risk, through the one real `mortality.recordDeath`
+choke point. Arrival relocates every real survivor through
+`migration.relocate` into a real community of the destination city --
+arriving with no real property yet is an honest landing in this
+engine's own already-real homelessness substrate, not a second
+invented status. `roundTrip: true` turns around at the destination and
+brings the group home with no second migration event, closing
+`migration.js`'s own declared "nothing returns somebody to where they
+came from" gap for the first time. Runs as a fourth cross-cutting tick
+layer right after mortality. `POST /api/players/:id/action` verb
+`begin-journey`; `GET /api/entities/:id/journey` is the real, live
+read. Carry weight, vehicles and terrain are explicitly out of scope,
+left for their own still-unbuilt rounds. Three new gates
+mutation-verified.
+
+## Off-grid wilderness camps: woods, caves, lakes
+See `CLAUDE.md`'s own ninety-eighth standing rule for the full
+reasoning. By direct instruction: off-grid wilderness camps after the
+chaos hits. `server/camps.js` reuses the identical "group" concept
+`travel.js` just established (the founder plus their real, already-
+assembled `party.partyOf` roster) rather than inventing a second one.
+`cave` is gated on a real, already-generated `cave-system`/
+`natural-formation` landmark actually existing in the named community
+-- refused outright when none does. `woods` closes a second real
+"generator nothing calls" gap in the same round: `city.landCoverClass`
+(a real EarthEnv Consensus Land-Cover class) had been written at
+generation and read by nothing in `server/*.js` until now --
+`camps.js` checks it against `landCoverPacks.FOREST_CLASSES`,
+narrowing a real signal rather than requiring one, so a city with no
+land-cover pack is never refused. `lake` is honestly left ungated,
+checked rather than assumed: the twelve published Consensus Land-Cover
+classes have no open-water class at all, so there is no real signal
+here to gate it on. Deliberately adds no resource-consumption pass
+(that answers a different request, already closed by `travel.js`) and
+makes no change to `motivation.js`'s housing need. `POST
+/api/players/:id/action` verbs `establish-camp`/`join-camp`/
+`leave-camp`/`break-camp`; `GET /api/entities/:id/camp` is the real,
+live read. Three new gates mutation-verified.
+
+## Nomadic groups, families and organizations
+See `CLAUDE.md`'s own ninety-ninth standing rule for the full
+reasoning. By direct instruction: "a lot of groups and families and
+organizations will become nomadic after the chaos hits."
+`server/nomadic.js` is a real, computed, never-stored read over the
+two mechanics this round already built (`travel.js`/`camps.js`), not a
+third one: a family or organization is nomadic right now when its own
+real head/leader is on a real journey or at a real camp, checked
+against that one real person rather than every member individually.
+`GET /api/entities/:id/nomadic-status`, `GET /api/families/:id/
+nomadic-status`, `GET /api/organizations/:id/nomadic-status`.
+
+## Party-integrated search-and-locate
+See `CLAUDE.md`'s own hundredth standing rule for the full reasoning.
+By direct instruction: "integrate party/escort with search-and-locate
+mechanics." `fugitives.js`'s two real search-and-locate functions
+(the Carmen Sandiego-style fugitive chase, and an ordinary lost
+relation) each gained a party-aware sibling --
+`guessLocationWithParty`/`guessMissingRelationLocationWithParty` --
+letting a searcher cover more than one real candidate community in
+one attempt, one real person per place (themselves plus their real
+`party.partyOf` roster), capped at exactly how many real people are
+actually there to send. Deliberately ONE real correctness check and
+at most one real flight draw per attempt, never one per named
+community -- both the solo and party-aware guesses now share a single
+real `resolveGuess` choke point, so a party can never farm extra
+flight attempts inside what is supposed to be one simultaneous
+search. `POST /api/players/:id/action` verbs `guess-fugitive-
+location-with-party`/`guess-missing-relation-location-with-party`,
+no new routes. Five new gates mutation-verified.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

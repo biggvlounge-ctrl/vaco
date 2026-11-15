@@ -59,6 +59,7 @@ const membership = require('./membership.js');
 const politics = require('./politics.js');
 const technology = require('./technology.js');
 const mortality = require('./mortality.js');
+const travel = require('./travel.js');
 const births = require('./births.js');
 const crime = require('./crime.js');
 const infrastructure = require('./infrastructure.js');
@@ -1587,6 +1588,17 @@ function advanceTick(worldState, options = {}) {
   // consequence of every stage, which is exactly what a cross-cutting
   // layer is for. See server/mortality.js.
   candidateEvents.push(...mortality.runMortality(worldState, worldState.tick).events);
+
+  // Oregon Trail-style group travel, the fourth cross-cutting layer and
+  // in the same slot for the same structural reason: a day on the road
+  // is not a stage of a tick, it is a consequence of every tick for
+  // whoever is travelling. Runs AFTER mortality on purpose, for the
+  // identical reason births does: a member mortality already took this
+  // same tick is gone from `worldState.npcs` before travel's own
+  // consumption/deprivation pass ever reaches them, and a deprivation
+  // death travel itself causes becomes an event and a historical record
+  // on the tick it happened. See server/travel.js.
+  candidateEvents.push(...travel.advanceJourneys(worldState, worldState.tick));
 
   // Births, in the same cross-cutting slot and for the same reason: a
   // birth and a death are the same kind of event about the same

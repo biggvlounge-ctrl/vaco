@@ -289,6 +289,34 @@ app.get('/api/entities/:id/party', (req, res) => {
   res.json({ leaderEntityId: Number(req.params.id), party: engine.getPartyOf(Number(req.params.id)) });
 });
 
+// Real, live journey status for whoever is actually travelling right
+// now -- `null` for anyone not currently on the road. See travel.js's
+// own header.
+app.get('/api/entities/:id/journey', (req, res) => {
+  res.json({ entityId: Number(req.params.id), journey: engine.getActiveJourney(Number(req.params.id)) });
+});
+
+// Real, live off-grid camp status -- `null` for anyone not currently
+// camped. See camps.js's own header.
+app.get('/api/entities/:id/camp', (req, res) => {
+  res.json({ entityId: Number(req.params.id), camp: engine.getActiveCamp(Number(req.params.id)) });
+});
+
+// Real, computed nomadic status -- never stored. See nomadic.js's own
+// header: a family/organization is nomadic right now when its own
+// real head/leader is on a real journey or at a real camp.
+app.get('/api/entities/:id/nomadic-status', (req, res) => {
+  res.json({ entityId: Number(req.params.id), status: engine.getNomadicStatus(Number(req.params.id)) });
+});
+
+app.get('/api/families/:id/nomadic-status', (req, res) => {
+  res.json({ familyId: Number(req.params.id), nomadic: engine.getFamilyNomadicStatus(Number(req.params.id)) });
+});
+
+app.get('/api/organizations/:id/nomadic-status', (req, res) => {
+  res.json({ organizationId: Number(req.params.id), nomadic: engine.getOrganizationNomadicStatus(Number(req.params.id)) });
+});
+
 // Real, computed rollup -- property + inventory + a notable-people
 // roster for a real organization or family, never a stored or
 // invented composite score. See tribeWealth.js's own header.

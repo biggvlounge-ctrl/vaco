@@ -6093,6 +6093,207 @@ town's history. Mutation-verified three ways: removing the
 `inventory.give` call, and loosening the community-match check to
 accept any community, each independently made a real test fail.
 
+**A ninety-seventh, and it is the first "group travel" mechanic this
+engine has had — by direct instruction, Oregon Trail-style group
+travel, "resource consumption over distance/time."** Two already-real
+things compose into it rather than a new one being invented:
+`geo.distanceMetres`/`positionOf`'s real haversine distance between
+two generated cities (each independently placed at a believable
+global position, per `geo.js`'s own header) and `party.partyOf`'s
+real, persistent escort roster — "group" is this engine's own party,
+never reinvented. The pace itself is real and cited rather than
+chosen: the National Park Service/Oregon-California Trails
+Association's own documented figure for a historical wagon train,
+roughly 24 km (15 miles) a day, flagged interpretive the identical way
+`geo.CITY_SPREAD_M` already is, since no generated world's own terrain
+was measured.
+
+**Consumption reuses the real item categories already on file, never
+a ration item invented for this.** Each real travelling day, every
+real surviving member consumes one real `food`-category item and one
+real `water`-category item from whatever they actually carry — the
+exact vocabulary `produce.js`/`salvage.js` already register bread,
+canned food, clean water and bottled water under. One unit per
+category per day is flagged interpretive, the same honest-default
+posture `discovery.js`'s own `FINDS_PER_SIGNIFICANCE` takes: no
+document gives a real caloric or hydration value for anything this
+catalogue defines.
+
+**Running out does not kill outright, and the reason is a correction
+caught before it shipped: a traveler's home city does not stop being
+real just because they are on the road.** `mortality.runMortality`
+reads `npc.communityId` every tick regardless of where a journey has
+them, so wiring `mortality.annualDeathRisk`'s full formula into a
+travel check would have double-counted the base, age and disease terms
+that same tick's ordinary mortality pass already applies. Instead,
+deprivation from travel is one ADDITIONAL, independent daily draw
+built from exactly the two real pieces that describe TOTAL
+deprivation — `mortality.scarcityRisk(1)` and that entity's own real
+`hardinessFactor` — through the one real choke point every other
+death in this engine already goes through, `mortality.recordDeath`,
+cause `'deprivation'`, the identical cause `mortality.js`'s own header
+already named as the real, reusable value for exactly this rather than
+an eighth invented one.
+
+**Arrival reuses `migration.relocate`, never a second move mechanism,
+and lands a survivor in the identical real substrate the ninety-
+fourth standing rule's own homelessness statistics already measure.**
+A one-way journey's survivors are relocated into a real, seeded-pick
+community of the destination city with no `toPropertyId` — arriving
+with nowhere real to live yet is not a gap, it is the honest, already-
+real condition `populationPacks.homelessnessRateFor` describes.
+
+**A round trip is the first thing in this engine that has ever
+actually returned somebody to where they came from — closing a real,
+already-declared gap rather than opening a new question.**
+`migration.js`'s own `TYPES_NOT_MODELLED.temporary` says plainly:
+"nothing in the engine returns somebody to where they came from."
+`roundTrip: true` turns the party around at the real destination and
+the second leg ends with every survivor simply arriving back at their
+own unchanged home — no `migration.relocate` call at all, because
+there is nothing to move, and no `migration_events` row either,
+because this schema's own definition of a migration event is a move
+and a return to an unchanged home is not one. The real outcome — the
+traveler is actually home — is what the declared gap asked for, not a
+log entry, and `travel.js`'s own header says so rather than
+overclaiming a `temporary` row that was never written.
+
+Runs as a fourth cross-cutting tick layer (`travel.advanceJourneys`),
+right after `mortality.runMortality` and before `births.runBirths`,
+for the identical ordering reason mortality's own header already
+gives for its place in the pipeline: a member mortality already took
+that same tick is gone from `worldState.npcs` before travel's own
+consumption pass ever reaches them, and a deprivation death travel
+itself causes becomes an event and a historical record on the tick it
+happened. `POST /api/players/:id/action` verb `begin-journey` is the
+real player-facing start; `GET /api/entities/:id/journey` is the real,
+live, never-stored read, same posture `GET /api/entities/:id/party`
+already has. Carry weight, vehicles and terrain difficulty are all
+explicitly out of scope here, named rather than silently assumed —
+left for the still-unbuilt carry-capacity and vehicle systems.
+Mutation-verified three ways: removing the already-on-a-journey guard,
+removing the round trip's no-relocate-on-return branch, and disabling
+the deprivation draw, each independently made a real test fail.
+
+**A ninety-eighth, and it is a second real "generator nothing calls"
+gap closed inside the same round — by direct instruction, off-grid
+wilderness camps: woods, caves, lakes, after the chaos hits.** The
+real group is `party.partyOf`'s own roster — the identical "group"
+the ninety-seventh standing rule's `travel.js` already established,
+never a second one built for this.
+
+**`cave` is gated on a real, already-generated landmark, checked
+rather than invented.** `landmarks.js` already carries `'cave-system'`/
+`'natural-formation'` as real Key categories with real `properties`
+rows, each with the same `community_id` field `hiddenCaches.js`
+already reads to place a cache. A `cave` camp is refused outright when
+no such landmark exists in the named community.
+
+**`woods` is the second time this round a field written at generation
+and read by nothing became real.** `grep -rn "landCoverClass"
+server/*.js` before this file found exactly two matches: the comment
+documenting the gap, and `worldgen.js`'s own writer — confirming the
+forty-third standing rule's `city.landCoverClass` (a real EarthEnv
+Consensus Land-Cover class) had never been read anywhere since. A
+`woods` camp is `camps.js`'s first real reader, checked against
+`landCoverPacks.FOREST_CLASSES` — a real, disagreeing class refuses; a
+city with no real land-cover pack at all is not refused, the same
+"narrow a real signal, never require one" posture `riskPacks.js`/
+`crimeHotspotPacks.js` already hold for their own real multipliers.
+
+**`lake` is honestly ungated, and checking that was the point, not an
+afterthought.** Tuanmu & Jetz's twelve published Consensus Land-Cover
+classes — the same twelve `landCoverPacks.LAND_COVER_CLASSES`
+duplicates — have no open-water class at all, because satellite land
+cover classifies LAND and masks water out of the product entirely.
+There is nothing in this registry's own real sources for a `lake` camp
+to check against, so it is declared ungated in this file's own header
+rather than quietly checked against a class that does not mean what
+the label would imply.
+
+**Two things this file deliberately does not add, named rather than
+silently missing.** No resource-consumption pass for an existing camp
+— `travel.js`'s own daily food/water draw answers "resource
+consumption over distance/TIME" while in transit, a different request
+from "a real place to be off-grid," and inventing ongoing survival
+pressure nobody asked for here would be exactly the kind of mechanic
+this registry's own discipline exists to avoid adding uninvited. No
+change to `motivation.js`'s housing need — whether living at a camp
+should satisfy it is a real design question of its own, and answering
+it silently would recalibrate a system the twelfth standing rule
+already warns against touching without measuring first.
+
+`POST /api/players/:id/action` verbs `establish-camp`/`join-camp`/
+`leave-camp`/`break-camp`; `GET /api/entities/:id/camp` is the real,
+live, never-stored read, same posture `GET /api/entities/:id/journey`
+just above already has. Mutation-verified three ways: removing the
+`cave` gate, removing the `woods` gate, and removing the already-
+camped guard, each independently made a real test fail.
+
+**A ninety-ninth, and it is deliberately the smallest of this round's
+four — a real, computed READ over two real mechanics, not a third
+one.** By direct instruction: "a lot of groups and families and
+organizations will become nomadic after the chaos hits." `travel.js`
+(the ninety-seventh standing rule) and `camps.js` (the ninety-eighth)
+are the two real things that already make a group's life nomadic;
+`nomadic.js` only reports it, through `nomadicStatusOf`, checked
+against the family's own real `head_npc_id`/the organization's own
+real `leader_id` — not every member individually, since this engine's
+travel/camp groups are never required to be a family or org's full
+roster, so the honest question is whether the real person who would
+actually call `beginJourney`/`establishCamp` is doing exactly that
+right now. Deliberately NOT folded into `statistics.js`'s own
+catalogue: every entry there is a community-scoped aggregate over
+residents, and a family or organization is a different grain
+entirely — the identical "a different grain" reasoning
+`migrationPathwayPacks.js`'s own `dominantPathway` already gives for
+staying out of it. `GET /api/entities/:id/nomadic-status`, `GET
+/api/families/:id/nomadic-status`, `GET /api/organizations/:id/
+nomadic-status` — real, computed, never stored, same posture `GET
+/api/entities/:id/party` already holds. Mutation-verified: collapsing
+`nomadicStatusOf` to always return `false` made four real tests fail
+at once, across both the direct read and both rollups built on it.
+
+**A hundredth, closing the one item left from an older backlog rather
+than opening a new one — by direct instruction: "integrate party/
+escort with search-and-locate mechanics."** `fugitives.js`'s own two
+real search-and-locate decision points — `guessLocation` (the Carmen
+Sandiego-style chase) and `guessMissingRelationLocation` (an ordinary
+lost relation) — each gained a real party-aware sibling,
+`guessLocationWithParty`/`guessMissingRelationLocationWithParty`,
+rather than a change to either existing one: a real party
+(`party.partyOf`'s own roster) lets a searcher cover more than one
+real candidate community in the SAME attempt, one real person per
+place, never a second search mechanism.
+
+**The real cap is exactly how many real people are there to send, and
+it is checked, not assumed generous.** `maxCoverageFor` is
+`1 + party.partyOf(worldState, searcherEntityId).length` — the
+searcher plus their real, already-compliant party, never an invented
+search-radius bonus scaling with anything else.
+
+**The sharper design decision: one real correctness check and at most
+ONE real flight draw per attempt, never one per named community.** The
+first shape considered was calling the existing single-guess function
+once per community in the covered set — rejected before it shipped,
+because a wrong guess already calls `attemptFlight`, and the fugitive
+relocates on a hit; re-checking a SECOND named community against the
+NEW post-flight location inside what is supposed to be one
+simultaneous search would let a party farm extra flight attempts, and
+could "catch" a fugitive who only ever fled once as if the party had
+cornered them twice. `resolveGuess` is the one real choke point both
+the solo and party-aware guesses now share, called exactly once per
+attempt either way — the identical "a pass run twice must behave like
+once" discipline the fifteenth standing rule already holds for a
+different kind of double-application.
+
+No new routes: both party-aware functions reach the player only
+through `POST /api/players/:id/action` (`guess-fugitive-location-
+with-party`/`guess-missing-relation-location-with-party`), the same
+posture every other recent verb here holds. Five new gates mutation-
+verified, including that the real coverage cap actually refuses an
+over-named search.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

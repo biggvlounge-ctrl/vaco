@@ -69,6 +69,9 @@ const espionage = require('./espionage.js');
 const heists = require('./heists.js');
 const hiddenCaches = require('./hiddenCaches.js');
 const party = require('./party.js');
+const travel = require('./travel.js');
+const camps = require('./camps.js');
+const nomadic = require('./nomadic.js');
 const tribeWealth = require('./tribeWealth.js');
 const tacticalAdvisor = require('./tacticalAdvisor.js');
 const craftingAdvisor = require('./craftingAdvisor.js');
@@ -887,6 +890,55 @@ function getTribeWealth(options = {}) {
   return tribeWealth.tribeWealthOf(WorldState, options);
 }
 
+// Oregon Trail-style group travel — see travel.js's own header. The
+// leader plus their real, already-assembled party (if any) is the
+// group; `tick.js#advanceJourneys` is what actually moves the clock
+// and consumes supplies, this is only the real player-facing start.
+function beginJourney(entityId, options = {}) {
+  return travel.beginJourney(WorldState, entityId, options);
+}
+
+function getActiveJourney(entityId) {
+  return travel.activeJourneyFor(WorldState, entityId);
+}
+
+// Off-grid wilderness camps — see camps.js's own header. The founder
+// plus their real party (if any) is the group, same posture
+// travel.js's own beginJourney already holds.
+function establishCamp(entityId, options = {}) {
+  return camps.establishCamp(WorldState, entityId, options);
+}
+
+function joinCamp(entityId, campId) {
+  return camps.joinCamp(WorldState, campId, entityId);
+}
+
+function leaveCamp(entityId) {
+  return camps.leaveCamp(WorldState, entityId);
+}
+
+function breakCamp(entityId, campId) {
+  return camps.breakCamp(WorldState, campId, entityId);
+}
+
+function getActiveCamp(entityId) {
+  return camps.activeCampFor(WorldState, entityId);
+}
+
+// Nomadic family/organization status — see nomadic.js's own header.
+// Real, computed, never stored.
+function getNomadicStatus(entityId) {
+  return nomadic.nomadicStatusOf(WorldState, entityId);
+}
+
+function getFamilyNomadicStatus(familyId) {
+  return nomadic.isNomadicFamily(WorldState, familyId);
+}
+
+function getOrganizationNomadicStatus(organizationId) {
+  return nomadic.isNomadicOrganization(WorldState, organizationId);
+}
+
 // A real, trait-weighted split recommendation over a leader's own
 // real party -- see tacticalAdvisor.js's own header for the full
 // design.
@@ -920,6 +972,14 @@ function guessFugitiveLocation(entityId, incidentId, communityId) {
   return fugitives.guessLocation(WorldState, entityId, incidentId, communityId);
 }
 
+// Party-integrated search-and-locate -- see fugitives.js's own "Party
+// integration" header. `communityIds` lets the searcher cover as many
+// real candidate communities as they have real people (themselves
+// plus their real party) to send, in one real attempt.
+function guessFugitiveLocationWithParty(entityId, incidentId, communityIds) {
+  return fugitives.guessLocationWithParty(WorldState, entityId, incidentId, communityIds);
+}
+
 // Not every search is a chase -- a real relation you have simply
 // lost touch with, never the fugitive-specific evasive-flight
 // behaviour. See fugitives.js's own header.
@@ -929,6 +989,10 @@ function getMissingRelations(entityId) {
 
 function guessMissingRelationLocation(entityId, targetEntityId, communityId) {
   return fugitives.guessMissingRelationLocation(WorldState, entityId, targetEntityId, communityId);
+}
+
+function guessMissingRelationLocationWithParty(entityId, targetEntityId, communityIds) {
+  return fugitives.guessMissingRelationLocationWithParty(WorldState, entityId, targetEntityId, communityIds);
 }
 
 // Character creation — see characterCreation.js's own header for the
@@ -1223,8 +1287,10 @@ const ACTION_VERBS = {
   getAtLargeFugitives: (...args) => getAtLargeFugitives(...args),
   getFugitiveClue: (...args) => getFugitiveClue(...args),
   guessFugitiveLocation: (...args) => guessFugitiveLocation(...args),
+  guessFugitiveLocationWithParty: (...args) => guessFugitiveLocationWithParty(...args),
   getMissingRelations: (...args) => getMissingRelations(...args),
   guessMissingRelationLocation: (...args) => guessMissingRelationLocation(...args),
+  guessMissingRelationLocationWithParty: (...args) => guessMissingRelationLocationWithParty(...args),
   addScheduleEvent: (...args) => addScheduleEvent(...args),
   reinforceHabit: (...args) => reinforceHabit(...args),
   resolveContest: (...args) => resolveContest(...args),
@@ -1247,6 +1313,13 @@ const ACTION_VERBS = {
   intimidate: (...args) => intimidate(...args),
   assessThreat: (...args) => assessThreat(...args),
   callBluff: (...args) => callBluff(...args),
+  beginJourney: (...args) => beginJourney(...args),
+  getActiveJourney: (...args) => getActiveJourney(...args),
+  establishCamp: (...args) => establishCamp(...args),
+  joinCamp: (...args) => joinCamp(...args),
+  leaveCamp: (...args) => leaveCamp(...args),
+  breakCamp: (...args) => breakCamp(...args),
+  getActiveCamp: (...args) => getActiveCamp(...args),
 };
 
 function dispatchAction(playerId, body) {

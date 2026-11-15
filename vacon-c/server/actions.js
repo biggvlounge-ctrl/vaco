@@ -549,6 +549,38 @@ const ACTIONS = {
     ),
   },
 
+  // **`fugitives.js`'s own "Party integration" half** -- cover as many
+  // real candidate communities as you have real people (yourself plus
+  // your real party, `party.partyOf`) to send, in one real attempt,
+  // rather than guessing one at a time. One real correctness check and
+  // at most one real flight draw either way -- see that file's own
+  // header for why N guesses never means N independent flight rolls.
+  'guess-fugitive-location-with-party': {
+    summary: 'Cover several real candidate communities at once for a real at-large fugitive, one real '
+      + 'person per place (yourself plus your real party) -- correct catches them through the real '
+      + 'justice.js chain; wrong gives them one real, bounded chance to run again.',
+    modes: ['citizen', 'leader'],
+    requires: ['incidentId', 'communityIds'],
+    verbs: ['guessFugitiveLocationWithParty'],
+    run: (verbs, actorId, body) => verbs.guessFugitiveLocationWithParty(
+      actorId, Number(body.incidentId),
+      Array.isArray(body.communityIds) ? body.communityIds.map(Number) : [],
+    ),
+  },
+
+  'guess-missing-relation-location-with-party': {
+    summary: 'Cover several real candidate communities at once for a real family member or contact you '
+      + 'have lost touch with, one real person per place (yourself plus your real party) -- no justice '
+      + 'consequence either way.',
+    modes: ['citizen', 'leader'],
+    requires: ['targetEntityId', 'communityIds'],
+    verbs: ['guessMissingRelationLocationWithParty'],
+    run: (verbs, actorId, body) => verbs.guessMissingRelationLocationWithParty(
+      actorId, Number(body.targetEntityId),
+      Array.isArray(body.communityIds) ? body.communityIds.map(Number) : [],
+    ),
+  },
+
   'send-spy': {
     summary: 'Send a real member of your organization or family to listen, infiltrate or watch a '
       + 'real community -- a range (close/mid/far), a stance (low_profile/close_watch/'
@@ -581,6 +613,70 @@ const ACTIONS = {
       cityId: body.cityId != null ? Number(body.cityId) : null,
       channel: body.channel ?? null,
     }),
+  },
+
+  // **`travel.js`'s real player-facing half** — Oregon Trail-style
+  // group travel: a real haversine distance between two real cities at
+  // a real, cited historical pace, consuming real food/water from
+  // whatever the leader and their own real party (`party.partyOf`)
+  // actually carry. `roundTrip: true` turns around at the destination
+  // and comes home, closing `migration.js`'s own declared "nothing
+  // returns somebody to where they came from" gap. See that file's own
+  // header for the full design.
+  'begin-journey': {
+    summary: 'Set out overland for a real city with your own real party (if you have one) -- real '
+      + 'food/water consumed per day, real risk of not making it, real resettlement on arrival '
+      + 'unless roundTrip is set, in which case the group comes back home instead.',
+    modes: ['citizen', 'leader'],
+    requires: ['destinationCityId'],
+    verbs: ['beginJourney'],
+    run: (verbs, actorId, body) => verbs.beginJourney(actorId, {
+      destinationCityId: Number(body.destinationCityId),
+      roundTrip: !!body.roundTrip,
+    }),
+  },
+
+  // **`camps.js`'s real player-facing half** — off-grid wilderness
+  // camps: woods, caves, lakes. `cave` requires a real, already-
+  // generated cave-system/natural-formation landmark; `woods` checks
+  // this community's own real land-cover class when one exists;
+  // `lake` is honestly ungated, since no real signal for it exists in
+  // this registry. See that file's own header.
+  'establish-camp': {
+    summary: 'Set up a real off-grid camp (woods, cave, or lake) in a community, with your own '
+      + 'real party if you have one -- a cave camp needs a real cave/natural-formation landmark '
+      + 'there, a woods camp is checked against real land-cover data where it exists.',
+    modes: ['citizen', 'leader'],
+    requires: ['communityId', 'campType'],
+    verbs: ['establishCamp'],
+    run: (verbs, actorId, body) => verbs.establishCamp(actorId, {
+      communityId: Number(body.communityId),
+      campType: body.campType,
+    }),
+  },
+
+  'join-camp': {
+    summary: 'Join an existing real camp -- a free act, not a persuasion draw.',
+    modes: ['citizen', 'leader'],
+    requires: ['campId'],
+    verbs: ['joinCamp'],
+    run: (verbs, actorId, body) => verbs.joinCamp(actorId, Number(body.campId)),
+  },
+
+  'leave-camp': {
+    summary: 'Leave the real camp you are currently at.',
+    modes: ['citizen', 'leader'],
+    requires: [],
+    verbs: ['leaveCamp'],
+    run: (verbs, actorId) => verbs.leaveCamp(actorId),
+  },
+
+  'break-camp': {
+    summary: 'Strike a real camp you founded, for everyone still there.',
+    modes: ['citizen', 'leader'],
+    requires: ['campId'],
+    verbs: ['breakCamp'],
+    run: (verbs, actorId, body) => verbs.breakCamp(actorId, Number(body.campId)),
   },
 };
 
