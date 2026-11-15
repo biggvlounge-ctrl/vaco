@@ -1488,6 +1488,28 @@ real per-NPC ethnicity system already assigns real Census data by
 tract position, never by neighborhood name, and the §9 firewall is
 unchanged.
 
+## Dock/port cargo: a false claim, closed for real
+`landmarks.js`'s own `port-terminal` comment has claimed since the
+casino round that cargo "arrives through" `trade.js`/`barter.js` --
+checked directly and found false (`grep -rn "port\|cargo\|dockworker"
+server/trade.js server/barter.js` returns nothing). `config.
+portCargoImports` (opt-in, default `false`) closes it for real: a real
+`port-terminal` boosts its own city's real `food` resource supply by a
+flagged-interpretive, bounded 1.15x -- checked rather than guessed
+which resource, using USACE's own 2023 Mississippi-basin commodity
+data (Missouri 42%/Illinois 38% of commodity value is grain, not metal
+or ore) rather than inventing a new `metals` resource type that would
+misstate what a real river port actually ships most of.
+
+A real idempotence bug was caught writing the test for this, not
+reasoned out in advance: the first version re-boosted every earlier
+call's already-boosted port city on each new `generateWorld()` call,
+since nothing marked a resource as already handled. Fixed with
+`resource.portCargoBoosted`, the same real marker shape
+`institutionStaffing`'s own `landmarkProperty.staffed` already uses.
+Three new tests, one gate mutation-verified by deleting the marker's
+own check and confirming the exact failure reproduces.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

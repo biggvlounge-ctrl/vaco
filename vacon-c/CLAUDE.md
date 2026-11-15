@@ -6830,6 +6830,53 @@ round is real, cited, geographic CONTEXT for the landmark pack's own
 `regionalTemperamentPacks.js` already hold for a real fact reported
 and never wired to decide an outcome — not a new per-NPC rule.
 
+**A hundred-and-seventh, closing "dock/port workers and cargo" — and
+it is a false claim caught in this project's own code, plus a real
+idempotence bug found writing the test that closes it.**
+
+`landmarks.js`'s own `port-terminal` comment has, since the hundred-
+and-second standing rule, claimed cargo "arrives through" `trade.js`/
+`barter.js`. Checked directly rather than trusted — this file's own
+opening line about "citation is not presence" — and false: `grep -rn
+"port\|cargo\|dockworker" server/trade.js server/barter.js` returns
+nothing. A real port-terminal has been staffed (dockworkers, via
+`institutionStaffing`) and searchable (`discovery.js`'s own real
+materials/metals/textiles pool) all along, but nothing it generated
+had ever touched this engine's own resource supply — the actual bulk
+cargo a real inland port moves.
+
+**Checked rather than guessed which resource.** The St. Louis worked
+example this registry keeps using is itself the answer: USACE's own
+2023 state commodity-value data for the Mississippi River basin shows
+grain, not metal or ore, as the dominant real cargo — Missouri 42% of
+commodity value, Illinois 38%, both grain, with ores/minerals a minor
+few percent by comparison. `config.portCargoImports` (opt-in, default
+`false`) boosts a city's own real `food` resource supply (already a
+real `CITY_RESOURCES` entry, covering grain among other staples) by a
+flagged-interpretive, bounded 1.15× for a city that generated a real
+`port-terminal` — never an invented `metals` resource type that would
+misstate what a real river port actually ships most of.
+
+**The real bug, caught by writing the test rather than reasoning about
+it in advance.** The first version scanned the WHOLE accumulated
+`w.resources`/`w.properties` for every call, with no idempotency
+marker — harmless-looking, because within one call a resource is only
+visited once. But this file's own `delta()` testing pattern calls
+`generateWorld()` repeatedly against one shared, growing world, and so
+does any real session that generates cities in batches. A second call
+with the flag on re-found every earlier call's own already-boosted
+port city and multiplied its `food` supply AGAIN — the fifteenth
+standing rule's own "a delivery pass run twice on an unchanged world
+must leave the world unchanged," in a fourth place. Caught by a test
+asserting "a city with no real port-terminal gets no boost" failing
+with `3` instead of `undefined` — three EARLIER tests' own port cities
+were being re-boosted by this LATER test's own call. Fixed with
+`resource.portCargoBoosted`, the identical real marker shape
+`landmarkProperty.staffed` already uses for `institutionStaffing`.
+Mutation-verified: removing the marker's own early-return reproduced
+the exact failure, confirming the test actually exercises the gate
+rather than passing by accident.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

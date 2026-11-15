@@ -1111,3 +1111,76 @@ test('realLandmarkDensity never touches a city driven by a real landmark pack', 
     delete w.landmarkPack;
   }
 });
+
+test('portCargoImports defaults to false -- every existing call to generateWorld() is byte-for-byte unaffected', () => {
+  const pack = {
+    region: 'port-cargo-default-off-region', source: 'sample',
+    locations: [{ category: 'port-terminal', name: 'Real Pack Port', area: null }],
+  };
+  landmarkPacks.assertPack(pack);
+  w.landmarkPack = pack;
+  try {
+    const summary = worldgen.generateWorld({
+      cities: 1, communitiesPerCity: 5, populationPerCommunity: 500, seed: 'port-cargo-default-off',
+    });
+    assert.equal(summary.portCargoBoosted, undefined,
+      'with the flag left off, the port-cargo pass must not run at all -- not even to find zero real ports');
+  } finally {
+    delete w.landmarkPack;
+  }
+});
+
+test('portCargoImports boosts a real port city\'s food supply by the real cited factor, and nothing else', () => {
+  // The real finding this closes: `landmarks.js`'s own `port-terminal`
+  // comment claims cargo "arrives through" `trade.js`/`barter.js`, and
+  // `grep -rn "port\|cargo\|dockworker" server/trade.js server/barter.js`
+  // returns nothing -- that claim was false until this flag existed.
+  const pack = {
+    region: 'port-cargo-boost-region', source: 'sample',
+    locations: [{ category: 'port-terminal', name: 'Real Pack Port', area: null }],
+  };
+  landmarkPacks.assertPack(pack);
+  w.landmarkPack = pack;
+  try {
+    // Same seed, same city index (`c` resets to 0 every call), so the
+    // base `random.range(60, 140, 'res', c, resourceType)` draw for
+    // EVERY resource type is bit-identical both times -- only
+    // `portCargoImports` differs, so a difference in `food`'s own
+    // supply and nothing else is attributable to this flag alone.
+    const base = (() => {
+      const { before } = delta(() => worldgen.generateWorld({
+        cities: 1, communitiesPerCity: 5, populationPerCommunity: 500, seed: 'port-cargo-same-seed',
+      }));
+      return Object.fromEntries(
+        w.resources.slice(before.resources).map((r) => [r.resource_type, r.supply]),
+      );
+    })();
+    const boosted = (() => {
+      const { before } = delta(() => worldgen.generateWorld({
+        cities: 1, communitiesPerCity: 5, populationPerCommunity: 500, seed: 'port-cargo-same-seed',
+        portCargoImports: true,
+      }));
+      return Object.fromEntries(
+        w.resources.slice(before.resources).map((r) => [r.resource_type, r.supply]),
+      );
+    })();
+    assert.equal(boosted.food, Math.round(base.food * 1.15), 'a real port city\'s own food supply must be boosted by exactly the real cited factor');
+    for (const type of ['water', 'medicine', 'energy', 'wood']) {
+      assert.equal(boosted[type], base[type], `${type} is not real port cargo and must be completely untouched`);
+    }
+  } finally {
+    delete w.landmarkPack;
+  }
+});
+
+test('portCargoImports never touches a city with no real port-terminal', () => {
+  // `landmarksPerCity: 0` rather than trusting a seed to not draw one --
+  // port-terminal is one of 33 real hero categories and the default
+  // draw (6 of them) would otherwise make this test flaky.
+  const summary = worldgen.generateWorld({
+    cities: 1, communitiesPerCity: 5, populationPerCommunity: 500, seed: 'port-cargo-no-port',
+    landmarksPerCity: 0, portCargoImports: true,
+  });
+  assert.equal(summary.portCargoBoosted, undefined,
+    'a city with no real port-terminal at all must get no boost, not a boost applied to the wrong city');
+});

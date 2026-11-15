@@ -305,6 +305,31 @@ const DEFAULTS = {
   // already asserts against -- every repeatable category still draws
   // at most once, same as today.
   realLandmarkDensity: false,
+  // **Opt-in, same posture.** `landmarks.js`'s own `port-terminal`
+  // comment claims cargo "arrives through" `trade.js`/`barter.js` --
+  // checked directly rather than trusted, and false: `grep -rn "port\|
+  // cargo\|dockworker" server/trade.js server/barter.js` returns
+  // nothing. A real port-terminal is staffed (dockworkers, by
+  // `institutionStaffing` above) and searchable (`discovery.js`'s own
+  // materials/metals/textiles pool), but nothing it generates had ever
+  // touched this engine's own resource supply -- the actual bulk cargo
+  // a real inland port moves. Checked rather than guessed WHICH
+  // resource: USACE's own 2023 state commodity-value data for the
+  // Mississippi River basin (the real St. Louis worked example's own
+  // river) shows grain, not metal or ore, as the dominant real cargo --
+  // Missouri 42% of commodity value, Illinois 38%, both grain, with
+  // ores/minerals a minor few percent by comparison. `food` (already
+  // a real `CITY_RESOURCES` entry, covering grain among other staples)
+  // is the honest match, not an invented `metals` resource type that
+  // would misstate what a real river port actually ships most of.
+  // `PORT_CARGO_FOOD_SUPPLY_BOOST` is flagged interpretive -- no
+  // document gives a real ratio for how much a port raises a city's
+  // own food supply, so a modest, bounded nudge is used, the same
+  // honesty posture `landCoverPacks.js`'s own ±15% nudges already
+  // hold rather than an invented precise figure. Off, every existing
+  // call to `generateWorld()` gets the exact unchanged world the whole
+  // suite already asserts against -- no resource supply is touched.
+  portCargoImports: false,
   businessesPerCommunity: 2,
   factionsPerCity: 2,
   // Homes are generated to house everybody with a margin, which is
@@ -417,6 +442,16 @@ const CITY_INSTITUTIONS = [
 // drawn FROM that list rather than written out again, so a typo is a
 // crash rather than a fourth quiet vocabulary.
 const CITY_RESOURCES = ['food', 'water', 'medicine', 'energy', 'wood'];
+
+// A real port-terminal's own bulk cargo bump to a city's `food`
+// supply (`config.portCargoImports`'s own header, above, has the real
+// USACE citation for why `food`/grain rather than an invented metals
+// stream). Flagged interpretive: no document gives a real ratio for
+// how much a river port raises a city's own food supply, so this is a
+// modest, bounded nudge, the same ±15% magnitude `landCoverPacks.js`'s
+// own real-signal nudges already use rather than an invented precise
+// figure.
+const PORT_CARGO_FOOD_SUPPLY_BOOST = 1.15;
 
 const SURNAMES = [
   'Vance', 'Okoro', 'Marchetti', 'Delgado', 'Hollis', 'Nakamura',
@@ -2687,6 +2722,50 @@ function generateWorld(options = {}) {
         }
       });
       landmarkProperty.staffed = true;
+    });
+  }
+
+  // ---- a real port-terminal's own bulk cargo, not a claim with nothing
+  // behind it --------------------------------------------------------
+  // **Opt-in (`config.portCargoImports`, default false — see that
+  // flag's own header on `DEFAULTS` for the real USACE citation and
+  // why `food` rather than an invented `metals` stream).** Runs after
+  // landmark placement above, because a city's own `food` resource row
+  // is generated earlier in the per-city loop, before this same city's
+  // hero landmarks — including whether it got a real `port-terminal`
+  // — are drawn. A city's resource rows don't move with population
+  // the way `w.properties` does, so this reads `w.resources` directly
+  // rather than re-deriving anything `economy.generateResource` above
+  // already computed.
+  //
+  // **`resource.portCargoBoosted` is a real idempotency marker, the
+  // identical shape `institutionStaffing`'s own `landmarkProperty
+  // .staffed` already uses, and it is not optional here.** This loop
+  // scans the WHOLE accumulated `w.resources`/`w.properties`, not just
+  // what THIS call added — `generateWorld()` is called repeatedly
+  // against one shared, growing world (this file's own `delta()`
+  // testing pattern depends on exactly that). Caught by mutation,
+  // not reasoned out in advance: a second `generateWorld()` call with
+  // this flag on re-found every earlier call's own already-boosted
+  // port city and multiplied its `food` supply a second time, the
+  // fifteenth standing rule's own "a delivery pass run twice on an
+  // unchanged world must leave the world unchanged" — a port city's
+  // real cargo bump is a ONE-TIME fact about that city, not a
+  // compounding multiplier applied again every time the world is
+  // asked to generate more of itself.
+  if (config.portCargoImports) {
+    const portCityIds = new Set(
+      (w.properties || [])
+        .filter((p) => p.landmark_category === 'port-terminal')
+        .map((p) => p.city_id),
+    );
+    (w.resources || []).forEach((resource) => {
+      if (resource.resource_type !== 'food') return;
+      if (!portCityIds.has(resource.city_id)) return;
+      if (resource.portCargoBoosted) return;
+      resource.supply = Math.round(resource.supply * PORT_CARGO_FOOD_SUPPLY_BOOST);
+      resource.portCargoBoosted = true;
+      summary.portCargoBoosted = (summary.portCargoBoosted ?? 0) + 1;
     });
   }
 
