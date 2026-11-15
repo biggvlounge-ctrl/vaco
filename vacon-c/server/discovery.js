@@ -127,6 +127,16 @@ const POOLS = {
   //: "closest fit, stated" posture as `casino` just above.
   'port-terminal': { itemCategories: ['materials', 'metals', 'textiles'] },
 
+  // Two more, same posture -- `mall`/`park` are named by direct
+  // instruction, not the discovery document, so the §26 category each
+  // maps to is this file's own closest-fitting choice.
+  mall: { itemCategories: ['clothing', 'luxury goods'] },
+  //: An ordinary park has no discovery pool, the same honest `null`
+  //: `stadium-arena`/`zoo-aquarium`/`notable-bridge` already hold --
+  //: unlike a cave system or a natural formation, an ordinary park is
+  //: landscaped civic ground, not a source of real natural resources.
+  park: null,
+
   // -- retail ---------------------------------------------------------
   //: COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md's merchandise pools, which
   //: are §26 categories almost word for word — "tools, construction

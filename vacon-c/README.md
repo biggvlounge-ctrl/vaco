@@ -1337,6 +1337,34 @@ requirement already computes, never a second, different headcount.
 unconditional warden-and-guard staffing rather than also getting the
 generic crew. All real gates mutation-verified.
 
+## Real landmark density: more than one of each, and two new categories
+See `CLAUDE.md`'s own hundred-and-third standing rule for the full
+reasoning. A direct question found a real structural limit: every
+hero-tier landmark is drawn WITHOUT REPLACEMENT per city, so no city,
+however large, could ever have a second hospital or a second school.
+`mall` and `park` also did not exist as categories at all.
+
+Both are closed now. `mall`/`park` join the Key the same way `school`
+did (THE_KEY_BUILDING_TYPES.md's own "any other genuinely distinctive
+feature not covered above"). `config.realLandmarkDensity` (opt-in,
+default `false`) generates the real EXPECTED count of eight
+repeatable categories -- `school`, `hospital`, `library`,
+`art-museum`, `university`, `church`, `park`, `mall` -- against each
+city's own real population, using real, cited national rates (NCES,
+AHA, IMLS, NRPA, Hartford Institute -- see `landmarks.
+REPEATABLE_DENSITY_PER_1K`'s own header for every citation) rather
+than an invented number. The expected count is drawn with a real
+probabilistic rounding, never floored to a guaranteed minimum and
+never capped at one -- a university's real rate means most small
+towns should genuinely get zero; a church's real rate means a modest
+town should genuinely get several. Categories with no clean real
+density figure found (skyscrapers, government buildings/city halls,
+mosque/synagogue/temple, and this session's own casino/fire-station/
+ems-station/ranger-station/port-terminal) are named rather than
+guessed, and stay at the original one-per-city cap. All real gates
+mutation-verified, including a near-miss where the first test used too
+small a population to actually exercise the real rate.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

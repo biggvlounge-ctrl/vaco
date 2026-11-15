@@ -131,6 +131,11 @@ const SOC_GROUP_BY_OCCUPATION = {
   // (Office and Administrative Support), the same group `clerk`
   // already sits in.
   dealer: '39', pitboss: '39', bookmaker: '39', cashier: '43',
+  // `surveillance` (SOC 33-9031 "Gambling Surveillance Officers and
+  // Gambling Investigators") is major group 33 (Protective Service),
+  // the same group `officer`/`enforcer`/`guard`/`warden`/`firefighter`
+  // already sit in.
+  surveillance: '33',
 };
 
 function groupFor(occupation) {

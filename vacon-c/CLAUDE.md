@@ -6529,6 +6529,103 @@ restaurant corporate retail, and the two real mega-employer categories
 worked example — each its own round, the same discipline every
 multi-part request in this file has followed.
 
+**A hundred-and-third, from a direct question that turned out to be
+right: "I thought we should have more than 24 locations that we try to
+duplicate... schools, malls, universities, hospitals, libraries,
+museums, parks... all the government buildings, city halls,
+skyscrapers. If I'm wrong, let me know."**
+
+**Checked, not guessed, and the answer was: not wrong, and it is two
+separate things.** First, `mall` and `park` did not exist as
+categories at all — `grep`, not assumed, against every project
+document and `landmarks.js` itself. Second, and the real structural
+finding: every hero-tier category is drawn WITHOUT REPLACEMENT per
+city (`worldgen.js`'s own comment: "a settlement does not get four
+airports"), so no city, however large, can ever have a second
+hospital or a second school — not a tunable setting, a hard cap.
+Measured directly: a generated city of ~800 people got exactly one of
+each of six hero categories, zero duplicates, at every
+`landmarksPerCity` value tried.
+
+**Asked how to scale a repeat count, the answer was explicit: "Use real
+data of real places don't make it up."** Eight real, cited national
+rates close the categories the question named — `landmarks.
+REPEATABLE_DENSITY_PER_1K`'s own header carries the full citation per
+entry: NCES (99,297 public K-12 schools, 2023-24), AHA (6,093
+hospitals, 2025 Fast Facts), IMLS (17,000+ library outlets; ~35,000
+active museums), NRPA (the 2026 Agency Performance Review's own
+directly-reported "2,437 residents per typical park"), Hartford
+Institute ("Fast Facts on American Religion," ~355,000 Christian
+congregations of its ~370,000 all-faiths estimate), and NCES again
+(3,542 degree-granting postsecondary institutions, academic year
+2021-22). `mall` is the one entry flagged for real uncertainty in the
+source itself — U.S. enclosed-mall counts range roughly 700-1,200 as
+of the mid-2020s across the sources found, and 900 is that range's own
+midpoint, stated as an estimate rather than presented as precise the
+way the others are.
+
+**Left OUT on purpose, named rather than silently guessed**:
+`skyscraper` (CTBUH counts ~900-940 U.S. buildings over 150m,
+concentrated in ~56 cities — a flat per-capita rate would misrepresent
+a distribution this skewed, and no real per-city-size-tier curve was
+found to key it on instead); `government-building`/"city hall" (the
+only figure found, ~19,500 incorporated municipalities, counts how
+many separate CITIES the country has, not how many government
+buildings exist within one — a different question, caught before it
+was used to answer the wrong one); `mosque`/`synagogue`/`temple`
+(Hartford's own combined "~15,000 other-faith congregations" has no
+further real breakdown by tradition at hand); and this session's own
+`casino`/`fire-station`/`ems-station`/`ranger-station`/`port-terminal`
+additions, left for their own future round rather than retrofitted
+with a number nobody checked.
+
+**The mechanism is opt-in (`config.realLandmarkDensity`, default
+false), the same posture every other behavior-changing flag in this
+file already holds**, and it is ADDITIVE to the existing
+one-per-city draw rather than a replacement of it: a repeatable
+category leaves the ordinary singleton pool entirely when the flag is
+on (so it is never drawn twice through two different mechanisms), and
+the real EXPECTED count for that category, against the city's own
+real, already-generated resident headcount, is drawn with a real
+probabilistic rounding — `Math.floor` plus one more with probability
+equal to the fractional remainder — never floored to a guaranteed
+minimum and never capped at one. **This was the deliberate design
+choice that makes the number honest at both ends**: a university's
+real rate (about one per 94,600 people) means most small towns should
+genuinely get zero, not one, and a church's real rate (about one per
+905) means a modest town should genuinely get several, not one. A
+flat `Math.round` would have forced a floor of either 0 or 1 onto
+every city regardless of size; the fractional draw is what lets a
+small city have a real chance at a university without guaranteeing
+one, and a large city reliably get several churches without an
+invented threshold deciding where "several" starts.
+
+**A genuine mutation-testing near-miss, caught by re-checking at the
+right population rather than trusting a green run.** The first
+version of the "defaults to false, byte-for-byte unaffected" test
+used the suite's usual small fixture (24 residents) — and deleting the
+entire `config.realLandmarkDensity &&` gate passed that test
+unchanged, because at 24 residents every real rate's own expected
+count is small enough that the mutated code's own probabilistic draw
+still almost always rounds to zero, with or without the gate. The
+twenty-fourth standing rule's shape again, this time about population
+size rather than a branch: **a test of a rate-driven mechanism has to
+run at a population large enough for the rate to actually produce a
+visible difference**, not just large enough to generate without
+error. Fixed by running that test at a real population (2,500) where
+`church`'s own expected count (~2.65) makes the mutation's effect
+impossible to miss — confirmed by re-running the mutation against the
+corrected test and watching it fail for real.
+
+Mall's own real crew (`salesperson`/`custodian`/`manager`) and `park`'s
+honest `staff: null` (an ordinary park is landscaped civic ground, not
+a workplace — a STAFFED park facility is the already-real
+`ranger-station`) both reuse real, already-existing occupations;
+neither needed a new one. `mall` is explicitly declared NOT to model
+the individual stores a real mall contains — a shopping-mall COMPLEX
+full of separately-salvageable shops is real, separate, future work,
+named here rather than silently implied.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

@@ -267,9 +267,116 @@ const KEY_BUILDING_TYPES = {
     significance: [55, 85], propertyType: 'commercial', staff: 'dockworker',
     discovery: 'cargo, trade goods',
   },
+
+  // **Two more, closing a real gap a direct question found: "schools,
+  // malls, universities, hospitals, libraries, museums, parks... city
+  // halls, skyscrapers" named two categories that did not exist at
+  // all.** Checked directly before adding either — neither
+  // `THE_KEY_BUILDING_TYPES.md` nor `COMPREHENSIVE_RETAIL_KEY_LOCATIONS
+  // .md` nor any other project document names a mall or a park, so
+  // these are the same "any other genuinely distinctive feature not
+  // covered above" extension `school`/`casino`/etc. already used.
+  mall: {
+    // A shopping-mall COMPLEX, not a second copy of any one
+    // `RETAIL_TYPES` store — significance alongside `department-store`/
+    // `stadium-arena`: a real anchor commercial landmark. **Explicitly
+    // NOT modelled**: the individual stores a real mall contains.
+    // Building "a mall full of real, separately-salvageable shops" is
+    // real, separate, future work, named here rather than silently
+    // implied by giving a mall a discovery pool that pretends to be
+    // every store inside it at once.
+    significance: [25, 55], propertyType: 'commercial', staff: 'manager',
+    discovery: 'clothing, luxury goods',
+  },
+  park: {
+    // Real, ordinary public green space — genuinely unstaffed in this
+    // engine's own model (a STAFFED park facility is `ranger-station`,
+    // already real; an ordinary park is the honest "nobody runs this,
+    // somebody watches it" shape `monument-memorial`/`cave-system`
+    // already hold). `propertyType: 'agricultural'`, the same real
+    // schema type those open-land categories already use.
+    significance: [15, 45], propertyType: 'agricultural', staff: null,
+    discovery: 'natural resources',
+  },
 };
 
 const KEY_BUILDING_CATEGORIES = Object.keys(KEY_BUILDING_TYPES);
+
+// ---------------------------------------------------------------------
+// Real density: some categories genuinely repeat per city, by direct
+// instruction and checked against real national counts rather than
+// guessed
+// ---------------------------------------------------------------------
+// A direct question found a real structural limit: every hero-tier
+// category above is drawn WITHOUT REPLACEMENT per city (see
+// `worldgen.js`'s own landmark-placement comment, "a settlement does
+// not get four airports") — so no city, however large, can ever have
+// a second hospital or a second school. That is a reasonable design
+// for a handful of categories (a city plausibly has one notable
+// airport), and simply wrong for the ones named directly: "schools,
+// malls, universities, hospitals, libraries, museums, parks."
+//
+// Each real rate below is national COUNT ÷ a ~335,000,000 U.S.
+// population estimate (U.S. Census Bureau), cited per entry rather
+// than asserted. **Checked and left OUT on purpose where no clean
+// real figure was found**, named here rather than silently guessed:
+// `skyscraper` (CTBUH counts ~900-940 total in the U.S., concentrated
+// in ~56 cities — a flat per-capita rate would misrepresent a real
+// distribution this skewed, and no real per-city-size-tier curve was
+// found to key it on instead); `government-building`/"city hall"
+// (the only national figure found, ~19,500 incorporated
+// municipalities, counts how many separate CITIES the country has,
+// not how many government buildings exist WITHIN one — a different
+// question); `mosque`/`synagogue`/`temple` (Hartford Institute's own
+// combined "~15,000 other-faith congregations" figure has no further
+// real breakdown by tradition at hand); and this session's own
+// `casino`/`fire-station`/`ems-station`/`ranger-station`/
+// `port-terminal` additions, left for their own future round rather
+// than retrofitted with an unresearched number.
+const REPEATABLE_DENSITY_PER_1K = {
+  // NCES, 2023-24 school year: 99,297 operating public K-12 schools.
+  school: 0.2964,
+  // AHA "Fast Facts on U.S. Hospitals," 2025 edition: 6,093 total
+  // hospitals.
+  hospital: 0.0182,
+  // IMLS Public Libraries Survey (reported Sept. 2025): over 17,000
+  // library outlets (central, branch, bookmobile).
+  library: 0.0507,
+  // IMLS: ~35,000 active museums (more than double the 1990s-era AAM
+  // estimate of 17,500).
+  'art-museum': 0.1045,
+  // NCES, academic year 2021-22: 3,542 degree-granting postsecondary
+  // institutions.
+  university: 0.0106,
+  // Hartford Institute "Fast Facts on American Religion": ~355,000
+  // Christian congregations (Protestant/other Christian + Catholic/
+  // Orthodox) of its ~370,000-congregation, all-faiths estimate —
+  // `church` covers all Christian denominations in this engine, the
+  // same single-grain posture `athlete`/`entertainer` already hold.
+  church: 1.0597,
+  // NRPA "2026 Agency Performance Review": the typical (median) park
+  // and recreation agency serves 2,437 residents per park — a real,
+  // directly-reported rate, not derived from a separate count/
+  // population division the way every other entry here is.
+  park: 0.4103,
+  // ICSC-sourced estimates of U.S. ENCLOSED malls range roughly
+  // 700-1,200 as of the mid-2020s (down from a mid-2000s peak near
+  // 1,500); 900 is this range's own midpoint, flagged for the real
+  // uncertainty rather than presented as a precise count the way the
+  // others above are.
+  mall: 0.0027,
+};
+
+const REPEATABLE_CATEGORIES = Object.keys(REPEATABLE_DENSITY_PER_1K);
+//: Everything else in the Key still draws at most once per city, the
+//: original behaviour, completely unaffected by any of the above.
+const SINGLETON_CATEGORIES = KEY_BUILDING_CATEGORIES.filter(
+  (category) => !REPEATABLE_CATEGORIES.includes(category),
+);
+
+function densityPer1kFor(category) {
+  return REPEATABLE_DENSITY_PER_1K[category] ?? null;
+}
 
 // ---------------------------------------------------------------------
 // COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md — ten types, verbatim
@@ -416,6 +523,12 @@ const CREWS = {
     { occupation: 'cashier', count: 6 },
     { occupation: 'bookmaker', count: 3 },
     { occupation: 'manager', count: 2 },
+    // Found while measuring this crew's own `control.maintenanceFor`
+    // composition: zero Combat-skilled posts reported `security: 0`
+    // for an undefended casino floor. Real casinos are notably not
+    // undefended -- `surveillance` (occupations.js's own real SOC
+    // 33-9031) closes it.
+    { occupation: 'surveillance', count: 4 },
   ],
   firehouse: [
     { occupation: 'firefighter', count: 10 },
@@ -451,6 +564,17 @@ const CREWS = {
     { occupation: 'teacher', count: 6 },
     { occupation: 'custodian', count: 2 },
     { occupation: 'manager', count: 1 },
+  ],
+  //: A mall's own real occupational shape: `salesperson` (SOC 41) for
+  //: the mall's own general-merchandise operations, `custodian` (SOC
+  //: 37) for common-area upkeep, `manager` running the property --
+  //: never a second copy of any individual store's own `RETAIL_TYPES`
+  //: crew, which this file's own `mall` comment above declares out of
+  //: scope.
+  mall: [
+    { occupation: 'salesperson', count: 8 },
+    { occupation: 'custodian', count: 3 },
+    { occupation: 'manager', count: 2 },
   ],
 };
 
@@ -490,6 +614,8 @@ const CREW_BY_CATEGORY = {
   'ems-station': 'ems',
   'ranger-station': 'ranger',
   'port-terminal': 'port',
+  mall: 'mall',
+  park: 'unmanned',
 };
 
 // Retail is one kind of place, so it is one entry rather than ten.
@@ -897,6 +1023,10 @@ function describeLandmarks(worldState) {
 module.exports = {
   KEY_BUILDING_TYPES,
   KEY_BUILDING_CATEGORIES,
+  REPEATABLE_DENSITY_PER_1K,
+  REPEATABLE_CATEGORIES,
+  SINGLETON_CATEGORIES,
+  densityPer1kFor,
   RETAIL_TYPES,
   RETAIL_CATEGORIES,
   ALL_CATEGORIES,

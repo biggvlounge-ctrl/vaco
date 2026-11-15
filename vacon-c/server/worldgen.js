@@ -289,6 +289,22 @@ const DEFAULTS = {
   // already asserts against -- no crew ever hired beyond what
   // `prisonStaffing`/`securityForces` already do, same as today.
   institutionStaffing: false,
+  // **Opt-in, same posture -- a direct question found a real structural
+  // limit: every hero-tier landmark category is drawn WITHOUT
+  // REPLACEMENT per city ("a settlement does not get four airports"),
+  // so no city, however large, can ever have a second school or a
+  // second hospital.** Right for a handful of categories; wrong for
+  // the ones asked about directly -- "schools, malls, universities,
+  // hospitals, libraries, museums, parks." `landmarks.
+  // REPEATABLE_DENSITY_PER_1K` gives each of those eight a real,
+  // cited national rate (NCES, AHA, IMLS, NRPA, Hartford Institute --
+  // see that table's own header), and this flag turns on generating
+  // the real EXPECTED count for each city's own real population,
+  // rather than one-of-each or zero. Off, every existing call to
+  // `generateWorld()` gets the exact unchanged world the whole suite
+  // already asserts against -- every repeatable category still draws
+  // at most once, same as today.
+  realLandmarkDensity: false,
   businessesPerCommunity: 2,
   factionsPerCity: 2,
   // Homes are generated to house everybody with a margin, which is
@@ -1822,13 +1838,23 @@ function generateWorld(options = {}) {
         return hero.length > 0 ? hero : null;
       })();
 
-      const heroPool = [...landmarks.KEY_BUILDING_CATEGORIES];
+      // **Repeatable categories leave the singleton pool entirely when
+      // `config.realLandmarkDensity` is on** (see that flag's own
+      // header on `DEFAULTS`) — they get their own real-density loop
+      // just below instead of the one-draw-per-city mechanism. Off
+      // (the default), or when a real landmark PACK is driving this
+      // city, the pool is the full, original list and nothing here
+      // changes from before.
+      const heroPool = (config.realLandmarkDensity && !packed)
+        ? [...landmarks.SINGLETON_CATEGORIES]
+        : [...landmarks.KEY_BUILDING_CATEGORIES];
       const heroCount = packed ? packed.length : config.landmarksPerCity;
-      for (let k = 0; k < heroCount && (packed || heroPool.length > 0); k += 1) {
-        const entry = packed ? packed[k] : null;
-        const pick = entry
-          ? entry.category
-          : heroPool.splice(random.int(heroPool.length, 'landmark', c, k), 1)[0];
+
+      // One real landmark property of a known category -- factored out
+      // so the ordinary singleton draw below and the real-density loop
+      // after it build an identical real property through one real
+      // path, never two slightly-different copies of the same logic.
+      const placeHeroLandmark = (pick, entry, seedKey) => {
         const definition = landmarks.KEY_BUILDING_TYPES[pick];
         // A pack names the area a place is really in; the generated
         // draw picks one. `named` is matched against the community's
@@ -1837,7 +1863,7 @@ function generateWorld(options = {}) {
           ? cityCommunityRows.find((cm) => cm.name === entry.area)
           : null;
         const home = named ?? cityCommunityRows[random.int(
-          Math.max(1, cityCommunityRows.length), 'landmark-where', c, k,
+          Math.max(1, cityCommunityRows.length), 'landmark-where', ...seedKey,
         )] ?? anchor;
         const row = property.generateProperty(w, {
           type: landmarks.propertyTypeFor(pick),
@@ -1846,20 +1872,20 @@ function generateWorld(options = {}) {
           // A landmark occupies real ground and a monument occupies
           // little of it — the spread is wide on purpose, because a
           // cave system and a masonic hall are both on this list.
-          landSize: Math.round(random.range(600, 12000, 'lland', c, k)),
-          value: Math.round(random.range(80000, 900000, 'lvalue', c, k)),
+          landSize: Math.round(random.range(600, 12000, 'lland', ...seedKey)),
+          value: Math.round(random.range(80000, 900000, 'lvalue', ...seedKey)),
           // These came through a collapse. `condition` is drawn low and
           // wide: some of them are ruins and some were built to last.
-          condition: Math.round(random.range(20, 90, 'lcond', c, k)),
+          condition: Math.round(random.range(20, 90, 'lcond', ...seedKey)),
           // From the category's own FORM, not one band for
           // everything: the first version drew 1-40 for every landmark
           // and produced a cave system with 23 floors.
           floors: (() => {
             const [lo, hi] = landmarks.floorsBandFor(pick);
-            return lo + random.int(hi - lo + 1, 'lfloors', c, k);
+            return lo + random.int(hi - lo + 1, 'lfloors', ...seedKey);
           })(),
           units: 1,
-          age: Math.round(random.range(20, 200, 'lage', c, k)),
+          age: Math.round(random.range(20, 200, 'lage', ...seedKey)),
           lifecycleStage: 'operation',
           createdTick: tick,
         });
@@ -1876,7 +1902,7 @@ function generateWorld(options = {}) {
           // importer. Where it gives none, the category's band, so an
           // imported place and a generated one are on one scale.
           significance: landmarkPacks.significanceFor(entry, Math.round(
-            random.range(definition.significance[0], definition.significance[1], 'lsig', c, k),
+            random.range(definition.significance[0], definition.significance[1], 'lsig', ...seedKey),
           )),
           tick,
           // **The real name, where there is one.** Everything else in
@@ -1886,6 +1912,44 @@ function generateWorld(options = {}) {
         });
         summary.properties += 1;
         summary.landmarks = (summary.landmarks ?? 0) + 1;
+      };
+
+      for (let k = 0; k < heroCount && (packed || heroPool.length > 0); k += 1) {
+        const entry = packed ? packed[k] : null;
+        const pick = entry
+          ? entry.category
+          : heroPool.splice(random.int(heroPool.length, 'landmark', c, k), 1)[0];
+        placeHeroLandmark(pick, entry, [c, k]);
+      }
+
+      // **Real per-capita density, opt-in** (`config.realLandmarkDensity`
+      // — see that flag's own header). For every category with a real
+      // cited national rate (`landmarks.REPEATABLE_CATEGORIES`), the
+      // real EXPECTED count for this city's own real, already-generated
+      // population is drawn probabilistically — `Math.floor` plus one
+      // more with probability equal to the fractional remainder — never
+      // floored to a guaranteed minimum (a university's real rate means
+      // most small towns should genuinely get zero, not one) and never
+      // capped at one (that is exactly the limit this round closes).
+      // Skipped entirely when a real landmark PACK is driving this
+      // city, for the identical reason the singleton draw already skips
+      // it: an imported region's real places are not a rate to draw
+      // from.
+      if (config.realLandmarkDensity && !packed) {
+        const cityResidentCount = (w.npcs || []).filter(
+          (n) => cityCommunityRows.some((cm) => cm.id === n.communityId),
+        ).length;
+        for (const category of landmarks.REPEATABLE_CATEGORIES) {
+          const rate = landmarks.densityPer1kFor(category);
+          const expected = (cityResidentCount * rate) / 1000;
+          const whole = Math.floor(expected);
+          const fraction = expected - whole;
+          const extra = random.unit('landmark-density-extra', c, category) < fraction ? 1 : 0;
+          const count = whole + extra;
+          for (let k = 0; k < count; k += 1) {
+            placeHeroLandmark(category, null, [c, 'density', category, k]);
+          }
+        }
       }
 
       // **Shops are per AREA, and hero landmarks are per city.** The

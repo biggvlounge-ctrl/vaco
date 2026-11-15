@@ -65,6 +65,10 @@ const KEY_CATEGORIES = [
   // `landmark-packs.test.js` for the assertion that keeps these two
   // copies identical.
   'casino', 'fire-station', 'ems-station', 'ranger-station', 'port-terminal',
+  // Two more, real per-capita density round -- see
+  // `vacon-c/server/landmarks.js`'s own comment on `REPEATABLE_
+  // DENSITY_PER_1K` for the real cited counts.
+  'mall', 'park',
 ];
 
 // UNESCO inscription is treated as maximal historical importance by

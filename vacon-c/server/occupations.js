@@ -425,7 +425,9 @@ const OCCUPATIONS = {
   // ---- outside §25 again, by direct request: "park rangers, the
   // forest rangers, fire departments, EMS workers... casino people,
   // all aspects of the casino working... all the dock workers" --------
-  //: Eight real occupations, each the closest-fitting real BLS/O*NET
+  //: Nine real occupations (the ninth, `surveillance`, found closing
+  //: the casino's own security gap further down), each the
+  //: closest-fitting real BLS/O*NET
   //: code found and cited rather than assumed, the same discipline the
   //: `guard`/`warden`/`nurse` block above already holds. None of these
   //: closes an empty major group (all 22 real SOC major groups already
@@ -532,6 +534,24 @@ const OCCUPATIONS = {
     // is a real, separate informal/criminal-economy mechanic, not an
     // occupation, named rather than silently invented.
     tier: 2, skill: 'Business', source: 'BLS SOC 39 (Personal Care and Service) -- 39-3012 Gambling and Sports Book Writers and Runners',
+    employers: ['business', 'corporation'],
+  },
+  // **Found while building the casino's own takeover composition: its
+  // real crew had zero Combat-skilled posts, so `control.maintenanceFor`
+  // reported `security: 0` for an undefended casino floor.** Real
+  // casinos are notably NOT undefended -- `surveillance` closes it
+  // with a real, cited code rather than reusing `guard`/`enforcer` and
+  // asserting a casino's security function is identical to a prison's
+  // or a street gang's.
+  surveillance: {
+    // Real SOC 33-9031 "Gambling Surveillance Officers and Gambling
+    // Investigators" (the BLS title as of the 2018 revision; "Gaming"
+    // was the pre-2019 wording) -- major group 33 (Protective
+    // Service), the same group `officer`/`enforcer`/`guard`/`warden`/
+    // `firefighter` already sit in. Tiered with `enforcer`/`guard`:
+    // BLS's own entry requirement is typically a high-school diploma,
+    // not a credentialed profession.
+    tier: 2, skill: 'Combat', source: 'BLS SOC 33 (Protective Service) -- 33-9031 Gambling Surveillance Officers and Gambling Investigators',
     employers: ['business', 'corporation'],
   },
 };

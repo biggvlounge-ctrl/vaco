@@ -77,9 +77,12 @@ test('THE KEY’s twenty-three categories are all here, plus the school and five
   // feature not covered above" extension `school` already used, this
   // time by direct instruction rather than a second document. See
   // `landmarks.js`'s own comment immediately above these five entries.
-  assert.equal(landmarks.KEY_BUILDING_CATEGORIES.length, 29);
+  //
+  // **Thirty-one, after `mall`/`park`** — a direct question found
+  // these two were missing entirely, closed the same way.
+  assert.equal(landmarks.KEY_BUILDING_CATEGORIES.length, 31);
   assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes('school'));
-  for (const category of ['casino', 'fire-station', 'ems-station', 'ranger-station', 'port-terminal']) {
+  for (const category of ['casino', 'fire-station', 'ems-station', 'ranger-station', 'port-terminal', 'mall', 'park']) {
     assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes(category), category);
   }
   for (const category of landmarks.KEY_BUILDING_CATEGORIES) {

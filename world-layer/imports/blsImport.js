@@ -125,6 +125,10 @@ const SOC_GROUP_BY_OCCUPATION = {
   // (39-3012) are major group 39, same as stylist; cashier (43-3041
   // "Gambling Cage Workers") is major group 43, same as clerk.
   dealer: '39', pitboss: '39', bookmaker: '39', cashier: '43',
+  // `surveillance` (SOC 33-9031 "Gambling Surveillance Officers and
+  // Gambling Investigators"), same major group 33 as officer/
+  // enforcer/guard/warden/firefighter.
+  surveillance: '33',
 };
 
 //: The SOC major groups this engine's occupations actually land in,

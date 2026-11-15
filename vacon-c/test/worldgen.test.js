@@ -19,6 +19,7 @@ const assert = require('node:assert/strict');
 
 const worldgen = require('../server/worldgen.js');
 const landmarksAll = require('../server/landmarks.js');
+const landmarkPacks = require('../server/landmarkPacks.js');
 const statistics = require('../server/statistics.js');
 const engine = require('../server/engine.js');
 const membership = require('../server/membership.js');
@@ -1034,5 +1035,79 @@ test('institutionStaffing never touches a real prison -- that is prisonStaffing\
   assert.ok(prisons.length > 0, 'this seed should produce at least one real prison');
   for (const prison of prisons) {
     assert.ok(!prison.staffed, `prison ${prison.id} must be untouched by institutionStaffing with prisonStaffing off`);
+  }
+});
+
+test('realLandmarkDensity defaults to false -- every existing call to generateWorld() is byte-for-byte unaffected', () => {
+  // **A real enough population to actually exercise the gate, not just
+  // the flag's own name.** `SMALL`'s 24 residents give every
+  // repeatable category a real expected count near zero regardless of
+  // whether the gate is checked at all -- caught by mutation: deleting
+  // the `config.realLandmarkDensity &&` check entirely passed this
+  // test unchanged at `SMALL`'s size, because the mutated code's own
+  // real probabilistic draw still almost always rounds to zero at 24
+  // residents. 2,500 gives `church` a real expected count near 2.65,
+  // which the mutation actually produces and this assertion actually
+  // catches.
+  const { before } = delta(() => worldgen.generateWorld({
+    cities: 1, communitiesPerCity: 5, populationPerCommunity: 500,
+    seed: 'landmark-density-default-off', landmarksPerCity: ALL_HERO_CATEGORIES,
+  }));
+  const newProperties = w.properties.slice(before.properties);
+  const counts = {};
+  for (const p of newProperties) {
+    if (!p.landmark_category) continue;
+    counts[p.landmark_category] = (counts[p.landmark_category] ?? 0) + 1;
+  }
+  for (const category of landmarksAll.REPEATABLE_CATEGORIES) {
+    assert.ok((counts[category] ?? 0) <= 1, `${category} should still draw at most once with realLandmarkDensity off, got ${counts[category]}`);
+  }
+});
+
+test('realLandmarkDensity generates real multiple instances of a repeatable category for a real, large enough population', () => {
+  const { before } = delta(() => worldgen.generateWorld({
+    cities: 1, communitiesPerCity: 5, populationPerCommunity: 500,
+    seed: 'landmark-density-on-big', landmarksPerCity: ALL_HERO_CATEGORIES, realLandmarkDensity: true,
+  }));
+  const newProperties = w.properties.slice(before.properties);
+  const counts = {};
+  for (const p of newProperties) {
+    if (!p.landmark_category) continue;
+    counts[p.landmark_category] = (counts[p.landmark_category] ?? 0) + 1;
+  }
+  // Real density for a real population this size (2,500) should put
+  // at least one repeatable category above the old one-per-city cap --
+  // measured directly at this exact seed/size before writing this
+  // assertion, not assumed: `church` alone expects ~2.65 at this size.
+  assert.ok(
+    landmarksAll.REPEATABLE_CATEGORIES.some((category) => (counts[category] ?? 0) > 1),
+    'at least one repeatable category should exceed the old one-per-city cap at this real population',
+  );
+});
+
+test('realLandmarkDensity never touches a city driven by a real landmark pack', () => {
+  // "A pack replaces the draw, and nothing else" -- the real-density
+  // loop is gated on `!packed` for the identical reason the ordinary
+  // singleton draw already is: an imported region's real places are
+  // not a rate to draw additional ones from.
+  const pack = {
+    region: 'landmark-density-pack-region',
+    source: 'sample',
+    locations: [
+      { category: 'school', name: 'Real Pack School', area: null },
+    ],
+  };
+  landmarkPacks.assertPack(pack);
+  w.landmarkPack = pack;
+  try {
+    const { before } = delta(() => worldgen.generateWorld({
+      cities: 1, communitiesPerCity: 5, populationPerCommunity: 500,
+      seed: 'landmark-density-packed', realLandmarkDensity: true,
+    }));
+    const newProperties = w.properties.slice(before.properties);
+    const schools = newProperties.filter((p) => p.landmark_category === 'school');
+    assert.equal(schools.length, 1, 'a packed city must get exactly the pack\'s own one real school, never an additional real-density draw on top');
+  } finally {
+    delete w.landmarkPack;
   }
 });
