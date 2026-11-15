@@ -435,8 +435,8 @@ test('describeDiscovery names the poolless categories rather than hiding them', 
   // port-terminal, CLAUDE.md's hundred-and-second standing rule) + 2
   // (mall/park, the real-landmark-density round) + 2
   // (distribution-center/industrial-plant) + 2 (discount-store/
-  // restaurant) + 1 (big-box-store) = 46.
-  assert.equal(report.categories, 46);
+  // restaurant) + 1 (big-box-store) + 2 (car-lot/car-wash) = 48.
+  assert.equal(report.categories, 48);
   assert.ok(report.poolless.includes('prison'));
   assert.ok(report.poolless.length < report.categories, 'nothing is searchable at all');
 });

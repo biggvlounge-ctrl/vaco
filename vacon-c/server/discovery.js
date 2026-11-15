@@ -182,6 +182,15 @@ const POOLS = {
   //: inventory, the same honest "closest real fit" posture
   //: `mall`/`distribution-center` already hold.
   'big-box-store': { itemCategories: ['clothing', 'tools', 'food'] },
+  //: `car-lot` draws from the real `transport` category
+  //: (car/motorcycle/scooter, `salvage.js`'s own real PRODUCTS) --
+  //: `auto-parts-store` already drew from this same category above,
+  //: and a lot full of real, intact vehicles is an honest source of
+  //: one too. `car-wash` has no real loot pool at all -- a wash bay
+  //: is a service, not an inventory, the same honest `null`
+  //: `stadium-arena`/`notable-bridge`/`park` already hold.
+  'car-lot': { itemCategories: ['repair', 'transport'] },
+  'car-wash': null,
 };
 
 //: How much a place holds, per point of historical significance.

@@ -488,6 +488,31 @@ const RETAIL_TYPES = {
     // precedent this whole table already holds.
     significance: [25, 55], discovery: 'clothing, tools, food',
   },
+
+  // **Two more, named directly ("inventory and car lots, car
+  // washes"), both reusing this engine's own real vehicle substrate
+  // (`vehicles.js`, `salvage.js`'s real `transport` TRADE_CATEGORY)
+  // rather than inventing a second one.**
+  'car-lot': {
+    // NADA's own 2025 annual profile: 16,990 franchised new-car
+    // dealerships nationally (used-only/independent lots are real and
+    // not counted in that figure, so the true total is higher — named
+    // rather than silently treated as complete). `discovery.js`'s own
+    // pool reads the real `transport` category (car/motorcycle/
+    // scooter) `salvage.js` already registers — a lot full of real
+    // vehicles is, if anything, a MORE honest source of one than
+    // `auto-parts-store`'s existing pool, which already draws from
+    // the same category.
+    significance: [18, 42], discovery: 'vehicles, vehicle parts',
+  },
+  'car-wash': {
+    // IBISWorld's own 2025 industry-business count: 16,576 (combines
+    // car washes with auto detailing, no cleaner national split
+    // found). Genuinely no real loot — a wash bay is a service, not
+    // an inventory — the same honest `null` `stadium-arena`/
+    // `notable-bridge` already hold.
+    significance: [10, 28], discovery: null,
+  },
 };
 
 const RETAIL_CATEGORIES = Object.keys(RETAIL_TYPES);

@@ -1429,6 +1429,32 @@ category.
 
 All real gates mutation-verified; full suite green before and after.
 
+## Car lots, car washes, and six more real logistics operators
+Two more `RETAIL_TYPES` entries ("inventory and car lots, car
+washes"): `car-lot` and `car-wash`. `car-lot`'s discovery pool is the
+real `transport` §26 category `auto-parts-store` already drew from --
+a lot full of real vehicles needed no new category, only a second
+reader of one that already existed; `car-wash` gets the honest `null`
+a service with no real inventory already holds elsewhere.
+
+A direct follow-up ("Amazon's all over the area... 3-4 Edwardsville...
+East St. Louis, Cahokia Heights area, Sauget area... don't forget the
+FedExes, UPSs") added six more real, individually-checked landmarks to
+`data/st-louis.landmarks.json` (now 39 locations, 18 areas): a second,
+distinct real Amazon building in Edwardsville (3931 Lakeview Corporate
+Dr., a different real address from the Gateway Commerce Center
+building already in this pack), a real Amazon mini-fulfillment center
+in Sauget, UPS's real Earth City hub and a real UPS delivery center in
+Belleville, IL (a new real area, adjacent to Sauget/East St. Louis),
+and FedEx Ground's own real Earth City hub (named in FedEx Ground's
+own published hub list, no current address confirmed so none is
+invented). Checked and genuinely not found: no confirmed real Amazon/
+UPS/FedEx facility address in East St. Louis or Cahokia Heights
+specifically -- stated as a gap in the pack's own `note` rather than
+silently dropped.
+
+All real gates mutation-verified; full suite green before and after.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

@@ -96,14 +96,15 @@ test('THE KEY’s twenty-three categories are all here, plus the school and five
   }
 });
 
-test('the retail list’s ten are here and are not hero-tier, plus three more by direct instruction', () => {
+test('the retail list’s ten are here and are not hero-tier, plus five more by direct instruction', () => {
   // Twelve, after `discount-store`/`restaurant` ("Family Dollars,
   // Dollar Generals... grocery stores, restaurants, hardware stores").
   // Thirteen, after `big-box-store` ("Walmart's, Targets, Sam's,
-  // Costco's").
-  assert.equal(landmarks.RETAIL_CATEGORIES.length, 13);
+  // Costco's"). Fifteen, after `car-lot`/`car-wash` ("inventory and
+  // car lots, car washes").
+  assert.equal(landmarks.RETAIL_CATEGORIES.length, 15);
   assert.ok(landmarks.RETAIL_CATEGORIES.includes('hardware-store'));
-  for (const category of ['discount-store', 'restaurant', 'big-box-store']) {
+  for (const category of ['discount-store', 'restaurant', 'big-box-store', 'car-lot', 'car-wash']) {
     assert.ok(landmarks.RETAIL_CATEGORIES.includes(category), category);
   }
   for (const category of landmarks.RETAIL_CATEGORIES) {

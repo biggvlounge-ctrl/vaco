@@ -6713,6 +6713,57 @@ industrial park was confirmed for any of them in this pass, and that
 gap is stated in the pack's own `note` field rather than silently left
 looking complete.
 
+**A hundred-and-fifth, closing "inventory and car lots, car washes"
+and a direct follow-up naming specific real logistics operators —
+and it is the clearest instance yet of this file's own "generic
+category, real density" precedent extending to a category that
+already existed for a different reason.**
+
+`car-lot`/`car-wash` are two more `RETAIL_TYPES` entries, following
+the exact shape `discount-store`/`restaurant`/`big-box-store` just
+set. The real find is in `discovery.js`: `car-lot`'s honest discovery
+pool is the same real `transport` §26 category (car/motorcycle/
+scooter, `salvage.js`'s own real PRODUCTS) that `auto-parts-store`
+already drew from — a lot full of real, intact vehicles is, if
+anything, a MORE literal source of one than a parts store, so this
+needed no new category invented, only a second, better-fitting reader
+of one that already existed. `car-wash` gets the honest `null` a
+service with no real inventory already holds elsewhere in this table
+(`stadium-arena`, `park`).
+
+**The follow-up ("Amazon's all over the area... 3-4 Edwardsville...
+East St. Louis, Cahokia Heights area, Sauget area... don't forget the
+FedExes, UPSs") is six more real, individually-checked landmarks —
+and one real, stated gap.** A second, genuinely distinct real Amazon
+building in Edwardsville (3931 Lakeview Corporate Dr., checked and
+confirmed a different real street address from the Gateway Commerce
+Center building already in this pack — third-party trackers disagree
+on this building's own facility code, so none is asserted, only the
+confirmed address); a real Amazon "mini-fulfillment center" in
+Sauget, IL (confirmed via a real news report, ~200 employees at
+opening); UPS's real Earth City hub (13818 Rider Trail Dr.) and a
+real, smaller UPS delivery center in Belleville, IL (8200 Excellence
+Place — a real Metro East city not named directly in the request but
+genuinely adjacent to Sauget/East St. Louis, added to `areas` for
+this one real facility, the same posture Maryland Heights already
+got for World Wide Technology's real HQ); and FedEx Ground's own real
+Earth City hub, named in FedEx Ground's own published hub-location
+list even though no current street address for it was confirmed (only
+a two-decade-old lease record), so the hub itself is asserted and no
+address is invented for it.
+
+**Checked and genuinely not found, stated as a gap rather than
+quietly dropped**: no confirmed real Amazon, UPS, or FedEx facility
+address turned up specifically in East St. Louis or Cahokia Heights —
+only unreliable job-aggregator pages that carry inconsistent figures
+and read as marketing rather than real facility records, and a real
+2021 St. Louis Business Journal report describing an Amazon Metro
+East lease that does not name its own municipality. Both of those
+were checked and neither is strong enough to hang a named landmark
+on, so neither did — the twenty-ninth standing rule's shape again: a
+request to look something up is not an instruction to find something
+regardless of whether it is really there.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and
