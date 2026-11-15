@@ -433,8 +433,10 @@ test('describeDiscovery names the poolless categories rather than hiding them', 
   const report = discovery.describeDiscovery(world());
   // 24 + 10 (prior) + 5 (casino/fire-station/ems-station/ranger-station/
   // port-terminal, CLAUDE.md's hundred-and-second standing rule) + 2
-  // (mall/park, the real-landmark-density round) = 41.
-  assert.equal(report.categories, 41);
+  // (mall/park, the real-landmark-density round) + 2
+  // (distribution-center/industrial-plant) + 2 (discount-store/
+  // restaurant) + 1 (big-box-store) = 46.
+  assert.equal(report.categories, 46);
   assert.ok(report.poolless.includes('prison'));
   assert.ok(report.poolless.length < report.categories, 'nothing is searchable at all');
 });

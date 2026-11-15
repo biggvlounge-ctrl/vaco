@@ -136,6 +136,14 @@ const SOC_GROUP_BY_OCCUPATION = {
   // the same group `officer`/`enforcer`/`guard`/`warden`/`firefighter`
   // already sit in.
   surveillance: '33',
+  // `trucker` (SOC 53-3032/53-3033) is major group 53 (Transportation
+  // and Material Moving), the same group `navigator`/`dockworker`
+  // already sit in. `dispatcher` (SOC 43-5032/43-5011) is major group
+  // 43 (Office and Administrative Support), the same group
+  // `clerk`/`cashier` already sit in. `assembler` (SOC 51-2092) is
+  // major group 51 (Production Occupations) — real BLS group,
+  // previously mapped to by nothing.
+  trucker: '53', dispatcher: '43', assembler: '51',
 };
 
 function groupFor(occupation) {

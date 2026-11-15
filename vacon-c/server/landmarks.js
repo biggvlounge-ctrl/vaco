@@ -298,6 +298,36 @@ const KEY_BUILDING_TYPES = {
     significance: [15, 45], propertyType: 'agricultural', staff: null,
     discovery: 'natural resources',
   },
+
+  // **Two more, by direct instruction: "the trucking market... large
+  // corporations, warehouses... St. Louis as an example" and "plants...
+  // car plants, food warehouses... chemical plants."** Checked rather
+  // than invented — real NAICS/BLS substance for both is in
+  // `REPEATABLE_DENSITY_PER_1K` and the `distribution`/`plant` crews
+  // below, and St. Louis's own real Gateway Commerce Center/Earth City
+  // Business Park/Hazelwood Logistics Center/Sauget Business Park are
+  // the worked example in `data/st-louis.landmarks.json`.
+  'distribution-center': {
+    // A warehouse/distribution-center mega-employer — the real, generic
+    // substrate for "UPS/FedEx/Amazon/Walmart-style" named directly,
+    // one category rather than four invented brand-specific ones, the
+    // same "one grain, real source, generic name" posture
+    // `casino`/`port-terminal` already hold. `staff: 'manager'`, the
+    // same "whoever runs the building" role `skyscraper`/`mall` use —
+    // the real occupational DEPTH is in the `distribution` crew below,
+    // not this one post.
+    significance: [40, 70], propertyType: 'commercial', staff: 'manager',
+    discovery: 'materials, tools, clothing',
+  },
+  'industrial-plant': {
+    // A manufacturing mega-employer — auto, food/beverage, chemical,
+    // the categories named directly, generalised to one real grain the
+    // same way `entertainer` generalises singers/actors/movie stars.
+    // `staff: 'manager'` for the same reason `distribution-center`
+    // takes it; the real production-floor depth is the `plant` crew.
+    significance: [45, 75], propertyType: 'commercial', staff: 'manager',
+    discovery: 'materials, metals, technology components',
+  },
 };
 
 const KEY_BUILDING_CATEGORIES = Object.keys(KEY_BUILDING_TYPES);
@@ -365,6 +395,26 @@ const REPEATABLE_DENSITY_PER_1K = {
   // uncertainty rather than presented as a precise count the way the
   // others above are.
   mall: 0.0027,
+  // Census County Business Patterns (NAICS 493110, "General
+  // Warehousing and Storage"), most recent (2023) file: secondary
+  // sources disagree on the exact national establishment count
+  // (16,753 vs. 18,983 found, a direct fetch of the Census CBP file
+  // itself was not reachable from this environment) — 17,868, this
+  // range's own midpoint, is used the same flagged-uncertain way
+  // `mall` above is.
+  'distribution-center': 0.0533,
+  // Census County Business Patterns (NAICS 31-33, "Manufacturing"),
+  // 2023 national file: a third-party calculation over the real CBP
+  // size-class breakdown found 3,384 establishments nationally with
+  // 500 or more employees (2,347 at 500-999, 1,037 at 1,000+) —
+  // employing 3.80 million people, out of ~285,500 manufacturing
+  // establishments of every size the Census Bureau itself confirms for
+  // 2022. This engine's `industrial-plant` models the MEGA-employer
+  // end of manufacturing specifically (the "car plants, food
+  // warehouses... chemical plants" named directly), not an ordinary
+  // small machine shop — the 500+-employee subset is the honest match
+  // for that, not the 285,500 total.
+  'industrial-plant': 0.0101,
 };
 
 const REPEATABLE_CATEGORIES = Object.keys(REPEATABLE_DENSITY_PER_1K);
@@ -408,6 +458,36 @@ const RETAIL_TYPES = {
   bookstore: { significance: [20, 45], discovery: 'additional book source' },
   'gun-store': { significance: [25, 50], discovery: null },
   'department-store': { significance: [20, 45], discovery: null },
+
+  // **Two more, by direct instruction: "Family Dollars, Dollar
+  // Generals... even if you don't use that exact name, just like a
+  // dollar store" and "grocery stores, restaurants, hardware stores."**
+  // `hardware-store`/`grocery-store` already existed above;
+  // `discount-store`/`restaurant` close the other two named directly.
+  // Generic category names over real brand names, the same precedent
+  // this whole table already holds.
+  'discount-store': {
+    // Generic stand-in for the real dollar-store format named
+    // directly, never the brand itself — this project's own standing
+    // "generic over brand" rule. Significance alongside
+    // `department-store`: a real retail anchor, smaller than one.
+    significance: [15, 38], discovery: 'clothing, tools, food',
+  },
+  restaurant: {
+    significance: [12, 32], discovery: 'food',
+  },
+  'big-box-store': {
+    // Generic stand-in for the large-format general-merchandise/
+    // warehouse-club cluster named directly, as one phrase, in the
+    // same breath: "Walmart's, Targets, Sam's, Costco's." Checked via
+    // WebSearch rather than assumed: roughly 4,593 Walmart + 1,995
+    // Target + ~600 Sam's Club + ~634 Costco US locations (2026,
+    // third-party trackers — ScrapeHero/Statista/OpenCapital, no
+    // single company filing gives all four at once) is ~7,822
+    // combined. Generic category name over any one brand, the same
+    // precedent this whole table already holds.
+    significance: [25, 55], discovery: 'clothing, tools, food',
+  },
 };
 
 const RETAIL_CATEGORIES = Object.keys(RETAIL_TYPES);
@@ -576,6 +656,30 @@ const CREWS = {
     { occupation: 'custodian', count: 3 },
     { occupation: 'manager', count: 2 },
   ],
+  //: A distribution center's real occupational shape: `dockworker`
+  //: (warehouse floor labour) as the bulk of it, `trucker` for the
+  //: real fleet a mega-employer the size of a UPS/FedEx/Amazon-style
+  //: facility runs, `dispatcher` coordinating loads, `logistician`
+  //: (already real, SOC major group 11, tier 5) for the real
+  //: supply-chain specialist a facility this size employs, and
+  //: `manager` running the building.
+  distribution: [
+    { occupation: 'dockworker', count: 20 },
+    { occupation: 'trucker', count: 12 },
+    { occupation: 'dispatcher', count: 3 },
+    { occupation: 'logistician', count: 2 },
+    { occupation: 'manager', count: 2 },
+  ],
+  //: A manufacturing plant's real occupational shape: `assembler`
+  //: (the production-floor bulk, SOC 51-2092) with `mechanic` (real
+  //: equipment upkeep) and `engineer` (real process/industrial
+  //: engineering a plant this size employs), `manager` running it.
+  plant: [
+    { occupation: 'assembler', count: 25 },
+    { occupation: 'mechanic', count: 4 },
+    { occupation: 'engineer', count: 3 },
+    { occupation: 'manager', count: 2 },
+  ],
 };
 
 const CREW_NAMES = Object.keys(CREWS);
@@ -616,6 +720,8 @@ const CREW_BY_CATEGORY = {
   'port-terminal': 'port',
   mall: 'mall',
   park: 'unmanned',
+  'distribution-center': 'distribution',
+  'industrial-plant': 'plant',
 };
 
 // Retail is one kind of place, so it is one entry rather than ten.

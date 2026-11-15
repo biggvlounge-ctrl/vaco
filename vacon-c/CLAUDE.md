@@ -6626,6 +6626,93 @@ the individual stores a real mall contains — a shopping-mall COMPLEX
 full of separately-salvageable shops is real, separate, future work,
 named here rather than silently implied.
 
+**A hundred-and-fourth, closing the trucking/warehousing/manufacturing/
+large-retail round, St. Louis as the worked example a second time —
+and it found a real, independent staleness bug one directory over from
+the one it was built to fix.**
+
+Three new occupations (`trucker`, `dispatcher`, `assembler`, every one
+a cited real BLS SOC code) and two new hero landmark categories
+(`distribution-center`, `industrial-plant`) follow the exact
+"any other genuinely distinctive feature not covered above" extension
+`school`/`casino`/`mall`/`park` already used, with real per-capita
+density the same shape `REPEATABLE_DENSITY_PER_1K` already holds:
+Census CBP NAICS 493110 for warehousing (a flagged real range — two
+secondary sources disagree, 16,753 vs. 18,983 establishments, and a
+direct fetch of the Census file itself was not reachable from this
+environment) and Census CBP's 500-or-more-employee manufacturing
+establishments specifically (3,384 nationally, 2023) for the mega-
+employer end of manufacturing the request actually named — "car
+plants, food warehouses... chemical plants" is not an ordinary small
+machine shop, and the 285,500-establishment all-sizes figure would
+have misrepresented it. Two new retail categories close the other two
+named directly: `discount-store` (generic over Dollar General/Family
+Dollar, ~27,900 combined US locations) and `restaurant` (~749,404 US
+locations per the figure third-party sites attribute to the National
+Restaurant Association's 2024 data — its own 2025 Pocket Guide
+separately headlines "1M+ locations," a different, unreconciled
+measure named rather than quietly preferred). A direct follow-up in
+the same round ("Walmart's, Targets, Sam's, Costco's") added a third,
+`big-box-store`, generic over all four real chains named together as
+one phrase, ~7,822 combined US locations.
+
+**The real find, independent of any of that:** the generic "hire the
+real crew" and "repeat per real density" mechanisms
+(`institutionStaffing`, `realLandmarkDensity`) needed zero changes to
+cover either new hero category — both already iterate every category
+with a crew and a density figure generically, confirmed by running the
+existing `worldgen.test.js` suite unchanged and watching it exercise
+the two new categories without a single new assertion. What was NOT
+generic, and did not show up until the directly-affected test files
+were run: `world-layer/test/exportRegion.test.js`'s own `KEY_CATEGORIES.
+length` assertion still said 24 — a number already stale BEFORE this
+round, since `server/landmarks.js`'s own list had already grown to 31
+across the casino/mall/park rounds with nothing catching it.
+**`world-layer`'s own test directory is not part of the
+`node --test test/*.test.js` full-suite run this project's own
+discipline runs from `vacon-c/`**, so a real drift between the two
+copies of the Key sat there for two full rounds, caught only because
+this round's own addition pushed the gap from "already wrong" to
+"freshly wrong in the same place." The twenty-second standing rule's
+shape, one directory over: a file this project's own full-suite
+command does not reach is as invisible to that discipline as a
+gitignored file is to `git status` — confirmed failing before this
+round's changes touched it, by stashing and re-running. `landmark-
+packs.test.js`'s own "world-layer's exported Key matches this engine's
+Key, exactly" is the real guard that keeps the two lists from drifting
+again; the fixed assertion's own count is not.
+
+**The real St. Louis worked example grew the honest way: checked
+individually, not generated.** Nine more real greater-St.-Louis
+warehouse/trucking/industrial districts named directly (Edwardsville,
+Granite City, Pontoon Beach, Sauget, South Broadway, Earth City,
+Hazelwood, the St. Charles/I-370 corridor, Hall Street/North Broadway)
+were added to `data/st-louis.landmarks.json`'s `areas`, crossing into
+Illinois the same way Cahokia Mounds/Confluence Point already do.
+Nine real, individually-checked named landmarks — never a generic
+placeholder forced into a real place's name, the exact mistake this
+pack's own `note` already corrects itself for once (Moolah Temple's
+real address) — fill four of those districts (Gateway Commerce Center,
+Earth City Business Park, Hazelwood Logistics Center, Sauget Business
+Park) and five more real, named corporate/industrial sites asked for
+by name a turn later (Nestlé Purina PetCare's real HQ at Checkerboard
+Square, the real Procter & Gamble plant at 169 E. Grand Ave., the real
+Solutia W.G. Krummrich chemical plant in Sauget — the real chemical
+plant this round asked for by category — World Wide Technology's real
+~176-acre industrial campus near Edwardsville, and a real, named
+Amazon sortation center in Hazelwood). **Checked and corrected before
+it shipped, the same way this file's own prior rounds already model**:
+World Wide Technology's real global HQ (1 World Wide Way, Maryland
+Heights) is a different real asset from its Edwardsville-area
+industrial campus — the HQ got no landmark row, since an office
+headquarters fits neither `distribution-center` nor `industrial-plant`
+honestly, and forcing it into one would have repeated the exact
+mistake this pack already corrects for Moolah Temple. Five of the nine
+named districts got no landmark row at all; no single real, named
+industrial park was confirmed for any of them in this pass, and that
+gap is stated in the pack's own `note` field rather than silently left
+looking complete.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

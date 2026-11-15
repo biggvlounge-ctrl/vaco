@@ -69,6 +69,11 @@ const KEY_CATEGORIES = [
   // `vacon-c/server/landmarks.js`'s own comment on `REPEATABLE_
   // DENSITY_PER_1K` for the real cited counts.
   'mall', 'park',
+  // Two more, by direct instruction ("the trucking market... large
+  // corporations, warehouses... plants") -- see
+  // `vacon-c/server/landmarks.js`'s own comment above these two
+  // entries for the real citations.
+  'distribution-center', 'industrial-plant',
 ];
 
 // UNESCO inscription is treated as maximal historical importance by

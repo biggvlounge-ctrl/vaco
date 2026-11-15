@@ -136,6 +136,15 @@ const POOLS = {
   //: unlike a cave system or a natural formation, an ordinary park is
   //: landscaped civic ground, not a source of real natural resources.
   park: null,
+  //: A distribution center holds a mixed consumer-goods inventory, not
+  //: one retail category -- same honest "closest real fit, stated"
+  //: posture `port-terminal`/`mall` already hold.
+  'distribution-center': { itemCategories: ['materials', 'tools', 'clothing'] },
+  //: A manufacturing plant holds raw/in-process materials and its own
+  //: technical know-how -- the same `books: ['manufacturing']` pool
+  //: `skyscraper` already draws from, plus the real §26 categories a
+  //: plant floor plausibly holds.
+  'industrial-plant': { itemCategories: ['materials', 'metals'], books: ['manufacturing'] },
 
   // -- retail ---------------------------------------------------------
   //: COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md's merchandise pools, which
@@ -162,6 +171,17 @@ const POOLS = {
   // share this category — see `search`'s own filter below.
   'gun-store': { itemCategories: ['protection'] },
   'department-store': null,
+  //: `discount-store`/`restaurant` are named directly ("dollar
+  //: store... grocery stores, restaurants"), not the discovery
+  //: document — same honest "closest real fit, stated" posture
+  //: `mall`/`park` already hold above.
+  'discount-store': { itemCategories: ['clothing', 'tools'] },
+  restaurant: { itemCategories: ['food'] },
+  //: `big-box-store` is the Walmart/Target/Sam's/Costco-style cluster
+  //: named directly, as one phrase -- a mixed general-merchandise
+  //: inventory, the same honest "closest real fit" posture
+  //: `mall`/`distribution-center` already hold.
+  'big-box-store': { itemCategories: ['clothing', 'tools', 'food'] },
 };
 
 //: How much a place holds, per point of historical significance.

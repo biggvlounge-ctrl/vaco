@@ -102,11 +102,25 @@ test('half a coordinate pair is dropped rather than exported', () => {
   assert.equal(pack.locations[0].lat, undefined);
 });
 
-test('the Key is the documents’ twenty-three, plus the school they disagree about', () => {
-  assert.equal(KEY_CATEGORIES.length, 24);
+test('the Key is the documents’ twenty-three, plus the school they disagree about, plus everything added by direct instruction since', () => {
+  // **Stale before this fix, independent of this round**: this
+  // assertion still said 24 after `vacon-c/server/landmarks.js`'s own
+  // KEY_BUILDING_CATEGORIES had already grown to 31 (casino/
+  // fire-station/ems-station/ranger-station/port-terminal, then
+  // mall/park) — world-layer's own test directory is not part of the
+  // `node --test test/*.test.js` full-suite run this project's own
+  // discipline runs from `vacon-c/`, so nothing caught the drift.
+  // Confirmed failing before this round's own distribution-center/
+  // industrial-plant additions touched it. 33 is the real, current
+  // count on both sides — `landmark-packs.test.js`'s own "world-layer's
+  // exported Key matches this engine's Key, exactly" is what actually
+  // keeps the two lists from silently diverging again.
+  assert.equal(KEY_CATEGORIES.length, 33);
   assert.ok(KEY_CATEGORIES.includes('school'));
   assert.ok(KEY_CATEGORIES.includes('masonic-building'));
   assert.ok(KEY_CATEGORIES.includes('other-distinctive-feature'));
+  assert.ok(KEY_CATEGORIES.includes('distribution-center'));
+  assert.ok(KEY_CATEGORIES.includes('industrial-plant'));
 });
 
 // ---------------------------------------------------------------------

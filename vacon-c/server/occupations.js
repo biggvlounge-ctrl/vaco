@@ -554,6 +554,51 @@ const OCCUPATIONS = {
     tier: 2, skill: 'Combat', source: 'BLS SOC 33 (Protective Service) -- 33-9031 Gambling Surveillance Officers and Gambling Investigators',
     employers: ['business', 'corporation'],
   },
+  // **Trucking and warehouse occupations, by direct instruction: "the
+  // trucking market... the trucking industry," folded into the same
+  // round as `distribution-center`/`industrial-plant` in `landmarks.js`
+  // below.** Real SOC codes, checked via WebSearch rather than assumed —
+  // BLS's own current OEWS release groups several of these codes
+  // together, named here rather than smoothed over.
+  trucker: {
+    // Real SOC 53-3032 "Heavy and Tractor-Trailer Truck Drivers" (BLS
+    // May 2025 OEWS: ~2.1 million employed nationally, mean annual wage
+    // $59,710) and its lighter sibling, 53-3033 "Light Truck Drivers"
+    // (May 2023 OEWS: 1,003,960 employed) — one occupation at this
+    // engine's own grain, the same "one real job, both codes" posture
+    // `paramedic` already holds for EMT/paramedic. Major group 53
+    // (Transportation and Material Moving), the same group
+    // `navigator`/`dockworker` already sit in. Tiered with
+    // `firefighter`: BLS's own entry requirement is a commercial
+    // driver's license and short-term training, not an apprenticeship.
+    tier: 2, skill: 'Construction', source: 'BLS SOC 53 (Transportation and Material Moving) -- 53-3032 Heavy and Tractor-Trailer Truck Drivers / 53-3033 Light Truck Drivers',
+    employers: ['business', 'corporation', 'government'],
+  },
+  dispatcher: {
+    // Real SOC 43-5032 "Dispatchers, Except Police, Fire, and
+    // Ambulance" (May 2022 OEWS: 206,370 employed; May 2023 OEWS:
+    // median annual wage $46,860) and 43-5011 "Cargo and Freight
+    // Agents" — the real office/coordination side of a trucking or
+    // warehouse operation, major group 43 (Office and Administrative
+    // Support), the same group `clerk`/`cashier` already sit in.
+    tier: 2, skill: 'Management', source: 'BLS SOC 43 (Office and Administrative Support) -- 43-5032 Dispatchers, Except Police, Fire, and Ambulance / 43-5011 Cargo and Freight Agents',
+    employers: ['business', 'corporation', 'government'],
+  },
+  assembler: {
+    // Real SOC 51-2092 "Team Assemblers" — the real production-floor
+    // role at a manufacturing plant (auto, food/beverage, chemical —
+    // the St. Louis-worked-example categories named directly). Major
+    // group 51 (Production Occupations), a real BLS group previously
+    // mapped to by nothing in this taxonomy. **Checked rather than
+    // assumed current**: BLS's own newer OEWS releases report this
+    // code combined with 51-2099 "Assemblers and Fabricators, All
+    // Other" (combined group, May 2019: 1,371,920 employed, median
+    // $32,350/yr) — the last STANDALONE Team Assemblers figure found
+    // dates to around the May 2011 survey (952,300 employed), named
+    // here rather than cited as current.
+    tier: 2, skill: 'Crafting', source: 'BLS SOC 51 (Production Occupations) -- 51-2092 Team Assemblers',
+    employers: ['business', 'corporation'],
+  },
 };
 
 const OCCUPATION_NAMES = Object.keys(OCCUPATIONS);

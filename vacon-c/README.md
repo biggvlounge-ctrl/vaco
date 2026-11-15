@@ -1365,6 +1365,70 @@ guessed, and stay at the original one-per-city cap. All real gates
 mutation-verified, including a near-miss where the first test used too
 small a population to actually exercise the real rate.
 
+## Trucking, warehousing, manufacturing, and large retail -- the
+## "trucking market... Family Dollars, Dollar Generals... Walmart's,
+## Targets, Sam's, Costco's... Ralston, Purina... Procter & Gamble,
+## chemical plants" round, St. Louis as the real worked example
+Three new occupations (`server/occupations.js`): `trucker` (BLS SOC
+53-3032/53-3033, Heavy/Tractor-Trailer and Light Truck Drivers),
+`dispatcher` (SOC 43-5032/43-5011, Dispatchers and Cargo/Freight
+Agents), `assembler` (SOC 51-2092, Team Assemblers). Two new hero
+landmark categories (`server/landmarks.js`): `distribution-center`
+(the real, generic substrate for "UPS/FedEx/Amazon/Walmart-style"
+warehouse mega-employers named directly) and `industrial-plant` (auto/
+food-beverage/chemical manufacturing mega-employers), each with real
+per-capita density -- `distribution-center` from Census CBP NAICS
+493110 (General Warehousing and Storage, 2023, ~17,868 establishments,
+a flagged real range), `industrial-plant` from Census CBP's 500+-
+employee manufacturing establishments nationally (2023, 3,384
+establishments, employing 3.80 million people) -- and real crews
+(`distribution`: dockworker/trucker/dispatcher/logistician/manager;
+`plant`: assembler/mechanic/engineer/manager).
+
+Three new retail categories (`landmarks.RETAIL_TYPES`): `discount-
+store` (the real dollar-store format, generic name over the brand,
+~27,900 combined Dollar General + Family Dollar US locations, rate
+0.0832/1000), `restaurant` (~749,000 US locations per the National
+Restaurant Association's own 2024-data figure, rate 2.238/1000 --
+its 2025 Pocket Guide's own "1M+" headline figure is a different,
+unreconciled measure and is named rather than silently preferred), and
+`big-box-store` (the Walmart/Target/Sam's Club/Costco cluster named
+together as one phrase, generic category over any one brand, ~7,822
+combined US locations, rate 0.0233/1000).
+
+`data/st-louis.landmarks.json` grows from 25 to 34 locations and from
+7 to 17 areas, with nine real greater-St.-Louis warehouse/trucking/
+industrial districts named directly added to `areas` (crossing into
+Illinois the same way Cahokia Mounds/Confluence Point already do:
+Earth City, Hazelwood, Edwardsville, Granite City, Pontoon Beach,
+Sauget, South Broadway, the St. Charles/I-370 corridor, Hall Street/
+North Broadway, plus Maryland Heights for World Wide Technology's real
+HQ). Nine real, individually-checked named landmarks fill them rather
+than a generic density count, since a pack-driven city is named real
+places, not counted ones: Gateway Commerce Center (Edwardsville, IL --
+TriStar's 2,300-acre bulk-distribution park), Earth City Business Park,
+Hazelwood Logistics Center, Sauget Business Park, Nestlé Purina
+PetCare's real North American HQ at Checkerboard Square, the real
+Procter & Gamble home-products plant at 169 E. Grand Ave. (Cascade/
+Mr. Clean/Swiffer/Febreze, ~100 years operating), the real Solutia
+W.G. Krummrich chemical plant in Sauget, IL (formerly Monsanto, ~100
+years operating -- the real chemical plant this round asked for by
+category), World Wide Technology's real ~176-acre industrial campus
+near Edwardsville, and a real, named Amazon sortation center in
+Hazelwood. Five of the nine named districts got no landmark row at
+all -- no single real, named industrial park was confirmed for any of
+them in this pass, stated as a gap in the pack's own `note` field
+rather than silently left looking complete, the same posture every
+other honest gap in this registry takes. Moolah Temple's address
+("Kings Highway near Delmar") was checked and corrected in the prior
+round; this round rechecked rather than assumed that WWT's downtown-
+style HQ building (Maryland Heights) is a different real asset from
+its Edwardsville-area industrial campus, and gave the campus the
+landmark row rather than forcing an office HQ into a warehouse
+category.
+
+All real gates mutation-verified; full suite green before and after.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

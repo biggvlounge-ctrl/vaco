@@ -80,9 +80,14 @@ test('THE KEY’s twenty-three categories are all here, plus the school and five
   //
   // **Thirty-one, after `mall`/`park`** — a direct question found
   // these two were missing entirely, closed the same way.
-  assert.equal(landmarks.KEY_BUILDING_CATEGORIES.length, 31);
+  //
+  // **Thirty-three, after `distribution-center`/`industrial-plant`** —
+  // by direct instruction ("the trucking market... plants"), the same
+  // "any other genuinely distinctive feature not covered above"
+  // extension used every time since `school`.
+  assert.equal(landmarks.KEY_BUILDING_CATEGORIES.length, 33);
   assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes('school'));
-  for (const category of ['casino', 'fire-station', 'ems-station', 'ranger-station', 'port-terminal', 'mall', 'park']) {
+  for (const category of ['casino', 'fire-station', 'ems-station', 'ranger-station', 'port-terminal', 'mall', 'park', 'distribution-center', 'industrial-plant']) {
     assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes(category), category);
   }
   for (const category of landmarks.KEY_BUILDING_CATEGORIES) {
@@ -91,9 +96,16 @@ test('THE KEY’s twenty-three categories are all here, plus the school and five
   }
 });
 
-test('the retail list’s ten are here and are not hero-tier', () => {
-  assert.equal(landmarks.RETAIL_CATEGORIES.length, 10);
+test('the retail list’s ten are here and are not hero-tier, plus three more by direct instruction', () => {
+  // Twelve, after `discount-store`/`restaurant` ("Family Dollars,
+  // Dollar Generals... grocery stores, restaurants, hardware stores").
+  // Thirteen, after `big-box-store` ("Walmart's, Targets, Sam's,
+  // Costco's").
+  assert.equal(landmarks.RETAIL_CATEGORIES.length, 13);
   assert.ok(landmarks.RETAIL_CATEGORIES.includes('hardware-store'));
+  for (const category of ['discount-store', 'restaurant', 'big-box-store']) {
+    assert.ok(landmarks.RETAIL_CATEGORIES.includes(category), category);
+  }
   for (const category of landmarks.RETAIL_CATEGORIES) {
     assert.equal(landmarks.isHeroTier(category), false, category);
     assert.equal(landmarks.propertyTypeFor(category), 'commercial');
