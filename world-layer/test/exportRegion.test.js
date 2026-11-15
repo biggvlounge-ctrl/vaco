@@ -115,12 +115,16 @@ test('the Key is the documents’ twenty-three, plus the school they disagree ab
   // count on both sides — `landmark-packs.test.js`'s own "world-layer's
   // exported Key matches this engine's Key, exactly" is what actually
   // keeps the two lists from silently diverging again.
-  assert.equal(KEY_CATEGORIES.length, 33);
+  assert.equal(KEY_CATEGORIES.length, 37);
   assert.ok(KEY_CATEGORIES.includes('school'));
   assert.ok(KEY_CATEGORIES.includes('masonic-building'));
   assert.ok(KEY_CATEGORIES.includes('other-distinctive-feature'));
   assert.ok(KEY_CATEGORIES.includes('distribution-center'));
   assert.ok(KEY_CATEGORIES.includes('industrial-plant'));
+  assert.ok(KEY_CATEGORIES.includes('military-base'));
+  assert.ok(KEY_CATEGORIES.includes('forest'));
+  assert.ok(KEY_CATEGORIES.includes('river'));
+  assert.ok(KEY_CATEGORIES.includes('lake'));
 });
 
 // ---------------------------------------------------------------------

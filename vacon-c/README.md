@@ -1510,6 +1510,30 @@ since nothing marked a resource as already handled. Fixed with
 Three new tests, one gate mutation-verified by deleting the marker's
 own check and confirming the exact failure reproduces.
 
+## Military bases, forests, rivers, lakes
+Four new hero landmark categories (`military-base`, `forest`, `river`,
+`lake`), closing a real gap this project's own spec names at §30
+("*Strategic:* ...military sites..."; "*Natural:* caves, forests,
+mountains, rivers, lakes...") and never built beyond caves.
+`military-base` reuses the existing "every government-type landmark
+gets the region's real government as operator" pass with zero new
+code, and a new `garrison` crew (officer/mechanic/engineer/
+logistician/physician/manager, all already-real occupations).
+`weapons.js`'s `machine_gun` gate now also allows a real military-base,
+mutation-verified. `forest`/`river`/`lake` are genuinely unstaffed, the
+same honest `staff: null` `park` already holds.
+
+Eight real landmarks: Scott Air Force Base (its own census-designated
+place, new area), Jefferson Barracks (active MO National Guard post,
+Lemay), Goodfellow Federal Center (real DoD tenants at 4300 Goodfellow
+Blvd. -- the real site behind "a military or National Guard site off
+of Goodfellow"), St. Louis Arsenal (active, Air Force-owned, houses
+the NGA), the Mississippi and Missouri Rivers (no `area` -- too large
+for one), Creve Coeur Lake, and Rockwoods Reservation. Verified in a
+real generated world: all four bases placed, staffed with real
+garrison occupations, and produced sensible finds; the four natural
+categories placed with no operator, exactly as designed.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

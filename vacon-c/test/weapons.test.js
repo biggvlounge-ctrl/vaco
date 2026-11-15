@@ -271,6 +271,19 @@ test('availableAt refuses the switch everywhere, and gates machine_gun on a gove
   assert.equal(weapons.availableAt(w, ordinary.id, 'pistol'), true, 'everything else answers true wherever its category pool already allows it');
 });
 
+test('availableAt also gates machine_gun on a real military-base, the same real tracked signal', () => {
+  // A real installation is, if anything, a MORE honest site for a
+  // crew-served automatic weapon than an ordinary government office —
+  // closing VACANCY_CONSOLIDATED_MASTER_SPEC.md's own "military sites"
+  // category, never built until this round.
+  const w = world();
+  const untrackedBase = placeWithChain(w, { landmarkCategory: 'military-base', countryKey: null });
+  assert.equal(weapons.availableAt(w, untrackedBase.id, 'machine_gun'), false, 'military-base but no tracked military signal');
+
+  const trackedBase = placeWithChain(w, { landmarkCategory: 'military-base', countryKey: 'russian' });
+  assert.equal(weapons.availableAt(w, trackedBase.id, 'machine_gun'), true);
+});
+
 // -- canManufactureAmmunition / manufactureAmmunition -----------------------
 
 test('canManufactureAmmunition refuses a non-ammunition item name', () => {

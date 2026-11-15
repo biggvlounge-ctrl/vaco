@@ -85,9 +85,15 @@ test('THE KEY’s twenty-three categories are all here, plus the school and five
   // by direct instruction ("the trucking market... plants"), the same
   // "any other genuinely distinctive feature not covered above"
   // extension used every time since `school`.
-  assert.equal(landmarks.KEY_BUILDING_CATEGORIES.length, 33);
+  //
+  // **Thirty-seven, after `military-base`/`forest`/`river`/`lake`** —
+  // closing a real gap VACANCY_CONSOLIDATED_MASTER_SPEC.md itself
+  // names at line 639/642 ("*Strategic:* ...military sites...";
+  // "*Natural:* caves, forests, mountains, rivers, lakes...") and
+  // never built beyond `cave-system`/`natural-formation`.
+  assert.equal(landmarks.KEY_BUILDING_CATEGORIES.length, 37);
   assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes('school'));
-  for (const category of ['casino', 'fire-station', 'ems-station', 'ranger-station', 'port-terminal', 'mall', 'park', 'distribution-center', 'industrial-plant']) {
+  for (const category of ['casino', 'fire-station', 'ems-station', 'ranger-station', 'port-terminal', 'mall', 'park', 'distribution-center', 'industrial-plant', 'military-base', 'forest', 'river', 'lake']) {
     assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes(category), category);
   }
   for (const category of landmarks.KEY_BUILDING_CATEGORIES) {

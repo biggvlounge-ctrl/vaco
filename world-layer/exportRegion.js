@@ -74,6 +74,12 @@ const KEY_CATEGORIES = [
   // `vacon-c/server/landmarks.js`'s own comment above these two
   // entries for the real citations.
   'distribution-center', 'industrial-plant',
+  // Four more, closing a real gap VACANCY_CONSOLIDATED_MASTER_SPEC.md
+  // itself has named since before this engine existed ("*Strategic:*
+  // ...military sites..."; "*Natural:* caves, forests, mountains,
+  // rivers, lakes...") -- see `vacon-c/server/landmarks.js`'s own
+  // comment above these four entries.
+  'military-base', 'forest', 'river', 'lake',
 ];
 
 // UNESCO inscription is treated as maximal historical importance by

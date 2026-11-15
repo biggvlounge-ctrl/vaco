@@ -6877,6 +6877,79 @@ Mutation-verified: removing the marker's own early-return reproduced
 the exact failure, confirming the test actually exercises the gate
 rather than passing by accident.
 
+**A hundred-and-eighth, closing a real gap this project's own spec has
+named since before this engine existed — "military bases all over the
+country... Scott Air Force Base... Jefferson Barracks... a military or
+National Guard site off of Goodfellow" and "all the forest
+information... all the river and lake information."**
+
+`VACANCY_CONSOLIDATED_MASTER_SPEC.md` §30 reads, verbatim: "*Strategic:*
+airports, ports, military sites, power plants, communication centers"
+and "*Natural:* caves, forests, mountains, rivers, lakes, underground
+areas." Only `cave-system` and the generic `natural-formation` catch-all
+were ever built from either line — `military-base`, `forest`, `river`,
+`lake` are the rest of it, the same "named in a real document, never
+built" shape `school`/`mall`/`park` already closed.
+
+`military-base` takes `propertyType: 'government'` on purpose, not a
+new organization archetype — the existing "every OTHER real hero
+landmark gets a real operator" pass in `worldgen.js` already assigns
+every `government`-type landmark the region's (or civilization's) real
+government as operator, with zero new code needed. Its real `garrison`
+crew (officer/mechanic/engineer/logistician/physician/manager) reuses
+five occupations already real and already `military`-/`government`-
+employable in this taxonomy — none invented. `weapons.js`'s own
+`availableAt` now gates `machine_gun` on a real `military-base` the
+identical way it already gated one on a `government-building` — a real
+installation is, if anything, a MORE honest site for a crew-served
+automatic weapon than an ordinary government office. Mutation-verified:
+removing `military-base` from the gate's own category list reproduced
+the exact failure in a new, dedicated test.
+
+**Verified, not just asserted, that sharing an operator does what it
+looks like it does.** All four real military-base landmarks placed in
+one generated world reported the identical aggregate payroll when
+queried by `employer_organization_id` — not a bug, the same shape
+`hospital`/`university`/`library`/`school`/`government-building`
+already have: every `propertyType: 'government'` landmark shares the
+ONE real region/civilization government as its employer, so a query by
+employer id alone returns that government's WHOLE payroll, not one
+building's. Confirmed by checking that each base's own real garrison
+occupations (officer, mechanic, engineer, logistician, physician) are
+genuinely present in non-zero, plausible counts, which they are.
+
+`forest`/`river`/`lake` take the same honest `staff: null` `park`/
+`cave-system` already hold — genuinely unstaffed, mapped to the
+`unmanned` crew for real takeover/control math only. No clean national
+per-capita density figure was found for any of the four new categories
+(checked, not skipped), so all four stay singleton draws, the same
+honest gap `skyscraper`/`government-building` already declare in
+`REPEATABLE_DENSITY_PER_1K`'s own header.
+
+Eight real, individually-checked landmarks close the St. Louis worked
+example: Scott Air Force Base (genuinely its own census-designated
+place in St. Clair County, IL — added as its own area rather than
+forced into the existing "Belleville" area, since Belleville is only
+one of several real neighboring towns named for it, never its own
+municipality); Jefferson Barracks (real, still an active Missouri
+National Guard post — the 70th Troop Command, the Guard's largest
+brigade — in Lemay, MO, a new area); Goodfellow Federal Center (4300
+Goodfellow Blvd., a new "Goodfellow / Natural Bridge" area matching
+the real corridor described — a WWII-era Army ammunition plant that
+today houses real DoD tenants, checked directly rather than assumed to
+be a Guard armory, since no real Guard armory at that exact corner was
+found); St. Louis Arsenal (290 Arsenal St., still active, Air
+Force-owned, houses the National Geospatial-Intelligence Agency — the
+other real "military spot" this pass found by checking rather than
+guessing); the Mississippi and Missouri Rivers (added with NO `area` —
+both real, named, major rivers spanning far more than any one
+neighborhood, the same honest treatment Meramec Caverns/the Ozarks
+already got for a real feature too large for one area to hold); Creve
+Coeur Lake (a real natural oxbow lake, the second-largest natural lake
+in Missouri per the park's own trail map); and Rockwoods Reservation
+(a real 1,843-1,880-acre Missouri Department of Conservation forest, a
+new "Eureka" area).
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

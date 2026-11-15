@@ -273,16 +273,22 @@ function regionHasTrackedMilitaryCapability(worldState, propertyId) {
 
 // `discovery.js`'s own question: can THIS item be found at THIS
 // property? `auto_sear_switch` never — see header. `machine_gun` only
-// from a `government-building` with a real tracked military signal.
-// Everything else this file names answers true wherever its §26
-// category pool already allows it.
+// from a `government-building` OR a real `military-base` (the real
+// landmark category this engine's own §30 "Strategic" list always
+// named and never built, closed by direct instruction — a real
+// installation is, if anything, a MORE honest site for a crew-served
+// automatic weapon than an ordinary government office), either way
+// gated on a real tracked military signal. Everything else this file
+// names answers true wherever its §26 category pool already allows it.
 const RESTRICTED_DISCOVERY_NAMES = ['machine_gun', SWITCH_ITEM];
+
+const MACHINE_GUN_CATEGORIES = ['government-building', 'military-base'];
 
 function availableAt(worldState, propertyId, itemName) {
   if (itemName === SWITCH_ITEM) return false;
   if (itemName === 'machine_gun') {
     const property = (worldState.properties || []).find((p) => p.id === propertyId);
-    return property?.landmark_category === 'government-building'
+    return MACHINE_GUN_CATEGORIES.includes(property?.landmark_category)
       && regionHasTrackedMilitaryCapability(worldState, propertyId);
   }
   return true;

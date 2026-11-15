@@ -328,6 +328,55 @@ const KEY_BUILDING_TYPES = {
     significance: [45, 75], propertyType: 'commercial', staff: 'manager',
     discovery: 'materials, metals, technology components',
   },
+
+  // **Four more, by direct instruction — and three of them close a real
+  // gap `VACANCY_CONSOLIDATED_MASTER_SPEC.md` itself has named since
+  // before this engine existed.** §30's own category list reads, in
+  // full: "*Strategic:* airports, ports, military sites, power plants,
+  // communication centers" and "*Natural:* caves, forests, mountains,
+  // rivers, lakes, underground areas." Only `cave-system` and the
+  // generic `natural-formation` catch-all were ever built from either
+  // line — `military-base`, `forest`, `river`, `lake` are the rest of
+  // it, the same "named in a real document, never built" shape
+  // `school`/`mall`/`park` already closed.
+  'military-base': {
+    // `propertyType: 'government'` on purpose, not a new org archetype
+    // — `worldgen.js`'s own "every OTHER real hero landmark gets a
+    // real operator" pass already assigns every `government`-type
+    // landmark the region's (or civilization's) real government as
+    // operator, with zero new code. `staff: 'officer'` (real SOC major
+    // group 33, already `military`/`government`-employable) is the
+    // defining post; the real occupational depth — mechanic, engineer,
+    // logistician, physician, all already real and already
+    // `military`-employable — is the `garrison` crew below.
+    significance: [50, 80], propertyType: 'government', staff: 'officer',
+    discovery: 'protection, tools, vehicles',
+  },
+  forest: {
+    // An ordinary generated wooded area — genuinely unstaffed, the
+    // same honest `staff: null` `park`/`cave-system` already hold; a
+    // forest with real on-site staff is a separate real thing
+    // (`ranger-station`, already built) rather than a property of
+    // every forest. No clean real national per-capita figure was
+    // found for this one (checked, not skipped — national forest
+    // acreage and count exist, but nothing ties either to a per-city
+    // rate the way NRPA's own park-agency figure does), so this stays
+    // a singleton draw, the same honest gap `skyscraper`/
+    // `government-building` already declare in `REPEATABLE_
+    // DENSITY_PER_1K`'s own header.
+    significance: [25, 55], propertyType: 'agricultural', staff: null,
+    discovery: 'natural resources',
+  },
+  river: {
+    form: 'site',
+    significance: [40, 70], propertyType: 'agricultural', staff: null,
+    discovery: 'natural resources',
+  },
+  lake: {
+    form: 'site',
+    significance: [35, 65], propertyType: 'agricultural', staff: null,
+    discovery: 'natural resources',
+  },
 };
 
 const KEY_BUILDING_CATEGORIES = Object.keys(KEY_BUILDING_TYPES);
@@ -705,6 +754,21 @@ const CREWS = {
     { occupation: 'engineer', count: 3 },
     { occupation: 'manager', count: 2 },
   ],
+  //: A military installation's real occupational shape: `officer`
+  //: (real SOC 55-xxxx/33, the actual garrisoned presence) as the
+  //: bulk of it, with `mechanic`/`engineer` for real vehicle/facility
+  //: upkeep, `logistician` for real supply, and `physician` for real
+  //: base medical — every one of these five already a real occupation
+  //: in this taxonomy, already `military`- or `government`-employable,
+  //: none invented for this crew.
+  garrison: [
+    { occupation: 'officer', count: 25 },
+    { occupation: 'mechanic', count: 5 },
+    { occupation: 'engineer', count: 3 },
+    { occupation: 'logistician', count: 2 },
+    { occupation: 'physician', count: 2 },
+    { occupation: 'manager', count: 1 },
+  ],
 };
 
 const CREW_NAMES = Object.keys(CREWS);
@@ -747,6 +811,10 @@ const CREW_BY_CATEGORY = {
   park: 'unmanned',
   'distribution-center': 'distribution',
   'industrial-plant': 'plant',
+  'military-base': 'garrison',
+  forest: 'unmanned',
+  river: 'unmanned',
+  lake: 'unmanned',
 };
 
 // Retail is one kind of place, so it is one entry rather than ten.

@@ -145,6 +145,20 @@ const POOLS = {
   //: `skyscraper` already draws from, plus the real §26 categories a
   //: plant floor plausibly holds.
   'industrial-plant': { itemCategories: ['materials', 'metals'], books: ['manufacturing'] },
+  //: `military-base` is the real §30 "Strategic" category closed by
+  //: direct instruction -- `protection` (its own real §26 category,
+  //: already backed by real items in `salvage.js`) is the honest pool
+  //: for an installation's own armament/equipment; `weapons.js`'s own
+  //: `availableAt` is the separate real gate on whether a `machine_gun`
+  //: specifically can be found here.
+  'military-base': { itemCategories: ['protection', 'tools', 'transport'] },
+  //: `forest`/`river`/`lake` close the real §30 "Natural" category --
+  //: the same honest `materials`/`metals` pool `cave-system`/
+  //: `natural-formation` already hold, never an invented `fish`/
+  //: `water` item category with no real items backing it.
+  forest: { itemCategories: ['materials'] },
+  river: { itemCategories: ['materials', 'metals'] },
+  lake: { itemCategories: ['materials', 'metals'] },
 
   // -- retail ---------------------------------------------------------
   //: COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md's merchandise pools, which
