@@ -100,6 +100,7 @@ const media = require('./media.js');
 const occupations = require('./occupations.js');
 const knowledge = require('./knowledge.js');
 const landmarks = require('./landmarks.js');
+const control = require('./control.js');
 const salvage = require('./salvage.js');
 const produce = require('./produce.js');
 const landmarkPacks = require('./landmarkPacks.js');
@@ -270,6 +271,24 @@ const DEFAULTS = {
   // every existing call to `generateWorld()` gets the exact unchanged
   // world the whole suite already asserts against.
   motorcycleOrganizations: false,
+  // **Opt-in, same posture -- by direct instruction: "make sure we
+  // have all the dock workers... park rangers, the forest rangers,
+  // fire departments, EMS workers, the hospitals, all their
+  // employees... libraries will be important. Just like we did the
+  // penitentiary."** `prisonStaffing` above hires exactly one real
+  // warden and one real guard per prison, always; this is the general
+  // form for every OTHER real hero-tier landmark that has a real
+  // CREW (`landmarks.crewFor`) -- hospital, university, library,
+  // school, casino, fire-station, ems-station, ranger-station,
+  // port-terminal -- hiring the FULL real crew `landmarks.staffingFor`
+  // already computes, scaled by the same real size/significance
+  // `control.maintenanceFor`'s takeover composition already uses for
+  // the identical building, rather than the single defining post each
+  // of these buildings has had until now. Off, every existing call to
+  // `generateWorld()` gets the exact unchanged world the whole suite
+  // already asserts against -- no crew ever hired beyond what
+  // `prisonStaffing`/`securityForces` already do, same as today.
+  institutionStaffing: false,
   businessesPerCommunity: 2,
   factionsPerCity: 2,
   // Homes are generated to house everybody with a margin, which is
@@ -2523,6 +2542,87 @@ function generateWorld(options = {}) {
       business.influence = Math.round(random.range(10, 70, 'landmark-biz-influence', i));
       landmarkProperty.operating_organization_id = business.id;
       summary.organizations += 1;
+    });
+  }
+
+  // ---- real multi-role crews for every other staffed hero landmark -------
+  // **Opt-in (`config.institutionStaffing`, default false — see that
+  // flag's own header on `DEFAULTS` for why).** `prisonStaffing` above
+  // hires exactly one real warden and one real guard, always, by
+  // design — a prison's real staffing roles ARE those two, named by
+  // direct instruction, not a crew ratio. Every OTHER real hero
+  // landmark with a real crew (`landmarks.crewFor`) has never had any
+  // of its real posts actually hired at all: `hospital`/`university`/
+  // `library`/`school` each had at most the single `CITY_INSTITUTIONS`
+  // post (a SEPARATE, smaller organization with no property link),
+  // and the hero-tier landmark property itself — the real building
+  // with a real size and significance — had nobody working in it.
+  //
+  // **Reuses the exact real composition `control.maintenanceFor`
+  // already computes for this same building's takeover requirement,
+  // run through `landmarks.staffingFor`'s own crew-ratio division** —
+  // rather than inventing a second, different headcount for "how many
+  // people actually work here" versus "how many it takes to hold it".
+  // A building's own real staff IS what a taker has to displace or
+  // co-opt, the same fact `control.js`'s own header already argues for
+  // every other target scale.
+  if (config.institutionStaffing) {
+    (w.properties || []).forEach((landmarkProperty) => {
+      const category = landmarkProperty.landmark_category;
+      if (!category || category === 'prison') return;
+      if (!landmarks.KEY_BUILDING_TYPES[category]) return;
+      if (landmarkProperty.operating_organization_id == null) return;
+      if (landmarkProperty.staffed) return;
+      if (landmarks.crewFor(category) === null) return;
+
+      // `control.maintenanceFor` already calls `landmarks.staffingFor`
+      // internally for a property-scale target with a real crew — this
+      // reuses that `crew` field directly rather than re-deriving it,
+      // so a hired headcount and a takeover's own requirement can never
+      // read two different numbers for the same real building.
+      const maintenance = control.maintenanceFor(w, { scale: 'property', locationId: landmarkProperty.id, tick });
+      const realCrew = maintenance?.crew ?? null;
+      if (!realCrew) return;
+
+      const cityCommunities = (w.communities || []).filter((cm) => cm.city_id === landmarkProperty.city_id);
+      const cityResidents = (w.npcs || []).filter(
+        (n) => cityCommunities.some((cm) => cm.id === n.communityId),
+      );
+
+      // No separate "already picked this pass" set is needed: `economy
+      // .hireEntity` writes an ACTIVE employment record synchronously,
+      // and `economy.getEmployment` reads that same live array on every
+      // call -- so the person just hired for the previous seat already
+      // fails `!economy.getEmployment(w, n.id)` the next time `.find`
+      // runs, for the identical real reason `prisonStaffing`'s own
+      // `['warden','guard']` loop above never double-hires either. A
+      // second guard here would be the twelfth standing rule's "dead
+      // code that looks live" -- confirmed by mutation: removing a
+      // first draft's redundant `alreadyPicked` Set changed no test
+      // result at all.
+      realCrew.forEach((post, postIndex) => {
+        for (let seat = 0; seat < post.count; seat += 1) {
+          const candidate = cityResidents.find(
+            (n) => !economy.getEmployment(w, n.id)
+              && (tick - n.createdTick) / 365 >= 16
+              && occupations.tierReachable(n, occupations.tierOf(post.occupation)),
+          );
+          if (!candidate) break;
+          economy.hireEntity(w, {
+            entityId: candidate.id,
+            employerOrganizationId: landmarkProperty.operating_organization_id,
+            wage: Math.round(random.range(40, 140, 'institution-staff-wage', landmarkProperty.id, postIndex, seat)),
+            position: post.occupation,
+            tick,
+          });
+          membership.joinOrganization(w, {
+            entityId: candidate.id, organizationId: landmarkProperty.operating_organization_id, role: 'employee', tick,
+          });
+          summary.employed += 1;
+          summary.institutionStaff = (summary.institutionStaff ?? 0) + 1;
+        }
+      });
+      landmarkProperty.staffed = true;
     });
   }
 

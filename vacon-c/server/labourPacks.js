@@ -106,6 +106,31 @@ const SOC_GROUP_BY_OCCUPATION = {
   mechanic: '49',
   tailor: '51', preserver: '51',
   navigator: '53',
+  // `ranger` is SOC 19-1031.03 "Park Naturalists" (alt. title "Park
+  // Ranger"), the same major group 19 `scientist`/`researcher`/
+  // `polymath`/`agronomist`/`linguist` already sit in.
+  ranger: '19',
+  // `firefighter` (SOC 33-2011) is major group 33 (Protective
+  // Service), the same group `officer`/`enforcer`/`guard`/`warden`
+  // already sit in.
+  firefighter: '33',
+  // `paramedic` (SOC 29-2043, or 29-2042 for the EMT-level sibling) is
+  // major group 29 (Healthcare Practitioners), the same group
+  // `physician`/`nurse` already sit in.
+  paramedic: '29',
+  // `dockworker` (SOC 53-7062, alt. title "Dock Worker") is major
+  // group 53 (Transportation and Material Moving), the same group
+  // `navigator` already sits in.
+  dockworker: '53',
+  // Casino occupations, all real BLS/O*NET codes -- `dealer` (39-3011
+  // "Gambling Dealers"), `pitboss` (39-1013 "First-Line Supervisors of
+  // Gambling Services Workers") and `bookmaker` (39-3012 "Gambling and
+  // Sports Book Writers and Runners") are major group 39 (Personal
+  // Care and Service), the same group `stylist` already sits in;
+  // `cashier` (43-3041 "Gambling Cage Workers") is major group 43
+  // (Office and Administrative Support), the same group `clerk`
+  // already sits in.
+  dealer: '39', pitboss: '39', bookmaker: '39', cashier: '43',
 };
 
 function groupFor(occupation) {

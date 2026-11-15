@@ -62,7 +62,7 @@ const actions = require('../server/actions.js');
 // The vocabularies are the documents'
 // ---------------------------------------------------------------------
 
-test('THE KEY’s twenty-three categories are all here, plus the school', () => {
+test('THE KEY’s twenty-three categories are all here, plus the school and five more by direct instruction', () => {
   // **Twenty-four, and the twenty-fourth comes from a disagreement
   // between two documents this repo HAS.** `THE_KEY_BUILDING_TYPES.md`
   // lists twenty-three and no school;
@@ -71,8 +71,17 @@ test('THE KEY’s twenty-three categories are all here, plus the school', () => 
   // hospitals, caves)" and "Schools/Libraries → knowledge books across
   // every category". Both are present and both are the owner's. See
   // `landmarks.js` for why the tie breaks toward including it.
-  assert.equal(landmarks.KEY_BUILDING_CATEGORIES.length, 24);
+  //
+  // **Twenty-nine, after casino/fire-station/ems-station/ranger-station/
+  // port-terminal** — the same "any other genuinely distinctive
+  // feature not covered above" extension `school` already used, this
+  // time by direct instruction rather than a second document. See
+  // `landmarks.js`'s own comment immediately above these five entries.
+  assert.equal(landmarks.KEY_BUILDING_CATEGORIES.length, 29);
   assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes('school'));
+  for (const category of ['casino', 'fire-station', 'ems-station', 'ranger-station', 'port-terminal']) {
+    assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes(category), category);
+  }
   for (const category of landmarks.KEY_BUILDING_CATEGORIES) {
     // `alwaysHeroTier: true` for every one, per the document.
     assert.equal(landmarks.isHeroTier(category), true, category);

@@ -421,6 +421,119 @@ const OCCUPATIONS = {
     tier: 4, skill: 'Medicine', source: 'BLS SOC 29 (Healthcare Practitioners)',
     employers: ['government', 'hospital'],
   },
+
+  // ---- outside §25 again, by direct request: "park rangers, the
+  // forest rangers, fire departments, EMS workers... casino people,
+  // all aspects of the casino working... all the dock workers" --------
+  //: Eight real occupations, each the closest-fitting real BLS/O*NET
+  //: code found and cited rather than assumed, the same discipline the
+  //: `guard`/`warden`/`nurse` block above already holds. None of these
+  //: closes an empty major group (all 22 real SOC major groups already
+  //: have at least one occupation mapped, since the `programmer`/
+  //: `lawyer`/`custodian`/`stylist`/`salesperson`/`clerk` round) — they
+  //: are new, distinct real job titles sitting ALONGSIDE an occupation
+  //: already in that group, the same relationship `guard`/`warden`
+  //: already have with `officer`/`enforcer` in group 33.
+  ranger: {
+    // Real O*NET-SOC 19-1031.03 "Park Naturalists" — the official
+    // alternate-title list for this code includes "Park Ranger"
+    // directly, under parent SOC 19-1031 "Conservation Scientists",
+    // major group 19 (Life, Physical and Social Science) — the same
+    // group `scientist`/`researcher`/`agronomist`/`linguist`/`polymath`
+    // already sit in. A park/forest ranger in this engine is a real
+    // government employee, not a second kind of `officer`.
+    tier: 4, skill: 'Science', source: 'BLS SOC 19 (Life, Physical and Social Science)',
+    employers: ['government'],
+  },
+  firefighter: {
+    // Real SOC 33-2011 "Firefighters", major group 33 (Protective
+    // Service), the same group `officer`/`enforcer`/`guard`/`warden`
+    // already sit in. Tiered with `enforcer`/`guard`: BLS's own entry
+    // requirement is typically a high-school diploma plus fire-academy
+    // training, not a credentialed profession the way `officer` is.
+    // `Athletics` rather than `Combat` on purpose — the real work is
+    // physical rescue and structural firefighting, not armed conflict,
+    // and reusing `Combat` here would conflate the two the way
+    // `guard`'s own header already warned against for `officer`.
+    tier: 2, skill: 'Athletics', source: 'BLS SOC 33 (Protective Service)',
+    employers: ['government'],
+  },
+  paramedic: {
+    // Real SOC 29-2043 "Paramedics" — major group 29 (Healthcare
+    // Practitioners and Technical), the same group `physician`/`nurse`
+    // already sit in. The real, lower-credentialed sibling code,
+    // 29-2042 "Emergency Medical Technicians", is the same real role at
+    // this engine's own grain (one occupation per real job, the
+    // `athlete`/`entertainer` precedent) — EMT is the entry point,
+    // paramedic the advanced credential, both covered by this one
+    // occupation. US EMS is overwhelmingly municipal/government-run or
+    // hospital-based, so both real employers are named, the same shape
+    // `nurse`'s own entry already takes.
+    tier: 3, skill: 'Medicine', source: 'BLS SOC 29 (Healthcare Practitioners) -- 29-2043 Paramedics / 29-2042 EMTs',
+    employers: ['government', 'hospital'],
+  },
+  dockworker: {
+    // Real SOC 53-7062 "Laborers and Freight, Stock, and Material
+    // Movers, Hand" — its own official O*NET alternate-title list
+    // includes "Dock Worker" and "Loader" directly. Major group 53
+    // (Transportation and Material Moving), the same group `navigator`
+    // already sits in. Tier 1, same as `labourer`: BLS's own entry
+    // requirement for this code is no formal credential.
+    tier: 1, skill: 'Construction', source: 'BLS SOC 53 (Transportation and Material Moving)',
+    employers: ['business', 'corporation', 'government'],
+  },
+  // **Casino occupations, by direct instruction and an explicit
+  // override of this project's own standing gambling/casino compliance
+  // gate (CLAUDE.md's "Explicitly deferred" list) — see this file's own
+  // header rule for the override and `orgArchetypes.js`/`landmarks.js`
+  // for the rest of the casino build.** Four real, distinct BLS/O*NET
+  // codes, all under SOC major group 39 (Personal Care and Service) or
+  // its neighbour 43 (Office/Administrative Support) — never a second,
+  // informal "dealer"/"bookie" occupation invented for the LEGAL,
+  // licensed casino floor. `drugTrade.js`'s own "dealer" is a different,
+  // illegal-economy word for a different thing; this is the real,
+  // licensed casino job title, SOC-coded like everything else here.
+  dealer: {
+    // Real SOC 39-3011, renamed "Gambling Dealers" in the 2019 title
+    // update (was "Gaming Dealers" before). Major group 39 (Personal
+    // Care and Service), the same group `stylist` already sits in.
+    tier: 2, skill: 'Business', source: 'BLS SOC 39 (Personal Care and Service) -- 39-3011 Gambling Dealers',
+    employers: ['business', 'corporation'],
+  },
+  pitboss: {
+    // Real SOC 39-1013 "First-Line Supervisors of Gambling Services
+    // Workers" — the industry's own common term for this real
+    // supervisory role is "pit boss". Tiered one above `dealer`, the
+    // same relationship `warden` has over `guard`.
+    tier: 3, skill: 'Management', source: 'BLS SOC 39 (Personal Care and Service) -- 39-1013 First-Line Supervisors of Gambling Services Workers',
+    employers: ['business', 'corporation'],
+  },
+  cashier: {
+    // Real SOC 43-3041, renamed "Gambling Cage Workers" in the 2019
+    // title update (was "Gaming Cage Workers" before) -- the real
+    // cash/chip-handling role at a casino cage. Major group 43
+    // (Office and Administrative Support), the same group `clerk`
+    // already sits in. Named generically rather than
+    // `casinoCage`/`cageWorker` because this real code's own duties
+    // (handling currency and recording transactions) generalise
+    // cleanly to any cash-handling post this engine adds later, the
+    // same "one name, reusable across employers" posture `clerk`
+    // already holds for office/administrative work broadly.
+    tier: 2, skill: 'Business', source: 'BLS SOC 43 (Office and Administrative Support) -- 43-3041 Gambling Cage Workers',
+    employers: ['business', 'corporation', 'government'],
+  },
+  bookmaker: {
+    // Real SOC 39-3012, renamed "Gambling and Sports Book Writers and
+    // Runners" in the 2019 title update -- the real, LEGAL, licensed
+    // casino sportsbook role, and the honest answer to "bookies" inside
+    // a real casino. An illegal street-level bookie or loan shark
+    // outside a licensed casino has no real BLS code (illegal activity
+    // is not surveyed) and is deliberately NOT given one here -- that
+    // is a real, separate informal/criminal-economy mechanic, not an
+    // occupation, named rather than silently invented.
+    tier: 2, skill: 'Business', source: 'BLS SOC 39 (Personal Care and Service) -- 39-3012 Gambling and Sports Book Writers and Runners',
+    employers: ['business', 'corporation'],
+  },
 };
 
 const OCCUPATION_NAMES = Object.keys(OCCUPATIONS);

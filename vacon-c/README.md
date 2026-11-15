@@ -1308,6 +1308,35 @@ posture `establish-camp`/`begin-journey` already have. All real gates
 mutation-verified, including the theft-targeting bug's own regression
 test and the travel.js fuel-stall/wear-application integration points.
 
+## Real occupations and landmarks: casino, dock, ranger, fire/EMS, and real multi-role institution staffing
+See `CLAUDE.md`'s own hundred-and-second standing rule for the full
+reasoning. By direct instruction ("add it... casinos... dock
+workers... park rangers... fire departments, EMS workers... all their
+employees"), Round 1 of a larger backlog: eight new real occupations
+(`ranger`, `firefighter`, `paramedic`, `dockworker`, and four real
+licensed casino roles -- `dealer`, `pitboss`, `cashier`, `bookmaker`,
+every one a real, cited BLS/O*NET code), five new real hero-tier
+landmark categories (`casino`, `fire-station`, `ems-station`,
+`ranger-station`, `port-terminal` -- the same "any other genuinely
+distinctive feature not covered above" extension `school` already
+used), and a real, long-missing gap closed along the way: `school`
+itself had never been given a real staffing crew.
+
+**Casino is a real, explicit override of this project's own standing
+gambling/casino compliance gate** -- recorded on the record, the same
+posture Leader mode's own reopening already holds.
+
+**`config.institutionStaffing`** (opt-in, default `false`) is the
+general form `prisonStaffing`'s own header had already named and left
+undone: every real hero-tier landmark with a real crew
+(`landmarks.crewFor`) -- hospital, university, library, school, and
+the five new categories -- gets its FULL real crew hired, reusing the
+exact `control.maintenanceFor` composition its own takeover
+requirement already computes, never a second, different headcount.
+`prison` is explicitly excluded; it keeps `prisonStaffing`'s own
+unconditional warden-and-guard staffing rather than also getting the
+generic crew. All real gates mutation-verified.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

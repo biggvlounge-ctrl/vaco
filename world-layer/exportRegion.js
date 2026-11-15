@@ -59,6 +59,12 @@ const KEY_CATEGORIES = [
   // `landmark-packs.test.js` for the assertion that keeps these two
   // copies identical.
   'school',
+  // **Five more, by direct instruction** rather than a second document
+  // disagreeing with this one — see `vacon-c/server/landmarks.js`'s own
+  // comment above these five entries, and that repo's
+  // `landmark-packs.test.js` for the assertion that keeps these two
+  // copies identical.
+  'casino', 'fire-station', 'ems-station', 'ranger-station', 'port-terminal',
 ];
 
 // UNESCO inscription is treated as maximal historical importance by

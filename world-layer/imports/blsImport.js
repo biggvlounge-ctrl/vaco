@@ -108,6 +108,23 @@ const SOC_GROUP_BY_OCCUPATION = {
   tailor: '51', preserver: '51',
   // 53-0000 Transportation and material moving
   navigator: '53',
+  // `ranger` is SOC 19-1031.03 "Park Naturalists" (alt. title "Park
+  // Ranger"), same major group 19 as scientist/researcher/polymath/
+  // agronomist/linguist.
+  ranger: '19',
+  // `firefighter` (SOC 33-2011), same major group 33 as officer/
+  // enforcer/guard/warden.
+  firefighter: '33',
+  // `paramedic` (SOC 29-2043, EMT sibling 29-2042), same major group
+  // 29 as physician/nurse.
+  paramedic: '29',
+  // `dockworker` (SOC 53-7062, alt. title "Dock Worker"), same major
+  // group 53 as navigator.
+  dockworker: '53',
+  // Casino occupations: dealer (39-3011), pitboss (39-1013), bookmaker
+  // (39-3012) are major group 39, same as stylist; cashier (43-3041
+  // "Gambling Cage Workers") is major group 43, same as clerk.
+  dealer: '39', pitboss: '39', bookmaker: '39', cashier: '43',
 };
 
 //: The SOC major groups this engine's occupations actually land in,

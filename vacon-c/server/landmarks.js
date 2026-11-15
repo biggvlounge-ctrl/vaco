@@ -227,6 +227,46 @@ const KEY_BUILDING_TYPES = {
     significance: [30, 60], propertyType: 'historical_site', staff: null,
     discovery: null,
   },
+
+  // **Five more, the same way `school` became the 24th real category:
+  // this document's own list ends "any other genuinely distinctive
+  // feature not covered above", explicitly open, and these five are
+  // named by direct instruction rather than by a second document
+  // disagreeing with this one.** `port-terminal` also has real textual
+  // support of its own — `VACANCY_CONSOLIDATED_MASTER_SPEC.md`'s §49
+  // CITY DNA names "port" among its nine city identities, and no
+  // landmark had ever existed for a port city to actually have.
+  casino: {
+    // By direct instruction, overriding this project's own standing
+    // gambling/casino compliance gate — see CLAUDE.md's "Explicitly
+    // deferred" list and its own standing-rule entry recording the
+    // override. Significance alongside `stadium-arena`/`art-museum`:
+    // a real casino resort is a major commercial landmark, not a
+    // corner shop. `dealer` as the defining post, the same "most
+    // numerous, most visible real role" reasoning `physician`/
+    // `teacher`/`librarian` already use for their own buildings.
+    significance: [50, 80], propertyType: 'commercial', staff: 'dealer',
+    discovery: 'cash, gaming chips, gaming equipment',
+  },
+  'fire-station': {
+    significance: [35, 60], propertyType: 'government', staff: 'firefighter',
+    discovery: 'firefighting equipment, rescue vehicles, medical supplies',
+  },
+  'ems-station': {
+    significance: [35, 60], propertyType: 'government', staff: 'paramedic',
+    discovery: 'medical supplies, ambulances',
+  },
+  'ranger-station': {
+    significance: [35, 60], propertyType: 'government', staff: 'ranger',
+    discovery: 'natural resources, firefighting/rescue equipment',
+  },
+  'port-terminal': {
+    // Significance alongside `airport`/`train-station`: major transit
+    // infrastructure, the real place cargo this engine's own
+    // `trade.js`/`barter.js` already model actually arrives through.
+    significance: [55, 85], propertyType: 'commercial', staff: 'dockworker',
+    discovery: 'cargo, trade goods',
+  },
 };
 
 const KEY_BUILDING_CATEGORIES = Object.keys(KEY_BUILDING_TYPES);
@@ -362,6 +402,56 @@ const CREWS = {
   unmanned: [
     { occupation: 'officer', count: 1 },
   ],
+  //: The casino's real occupational shape: the gaming floor (`dealer`)
+  //: is overwhelmingly the largest category at any real casino, with
+  //: `pitboss` supervising it, `cashier` at the cage, `bookmaker` at
+  //: the sportsbook, and `manager` running the property — flagged
+  //: interpretive the same way every other ratio in this table is;
+  //: the ABSOLUTE count still comes from `control.maintenanceFor`'s
+  //: own measured size and significance, this only says how it
+  //: divides.
+  casino: [
+    { occupation: 'dealer', count: 20 },
+    { occupation: 'pitboss', count: 4 },
+    { occupation: 'cashier', count: 6 },
+    { occupation: 'bookmaker', count: 3 },
+    { occupation: 'manager', count: 2 },
+  ],
+  firehouse: [
+    { occupation: 'firefighter', count: 10 },
+    { occupation: 'manager', count: 1 },
+  ],
+  ems: [
+    { occupation: 'paramedic', count: 8 },
+    { occupation: 'manager', count: 1 },
+  ],
+  ranger: [
+    { occupation: 'ranger', count: 6 },
+    { occupation: 'manager', count: 1 },
+  ],
+  //: Real dock labour (`dockworker`) as the bulk of the crew, with
+  //: `officer` for port security/customs (the same role `transit`'s
+  //: own crew already uses for airport/train-station security) and
+  //: `manager` running the terminal.
+  port: [
+    { occupation: 'dockworker', count: 15 },
+    { occupation: 'officer', count: 3 },
+    { occupation: 'manager', count: 2 },
+  ],
+  //: `school` (the 24th category, added when `KEY_LOCATION_DISCOVERY_
+  //: WORD_OF_MOUTH_SYSTEM.md` named it) had never been given a crew at
+  //: all — `crewFor('school')` returned null since the day the
+  //: category existed, the eleventh standing rule's own shape, found
+  //: while wiring real multi-role institution staffing. `teacher` as
+  //: the bulk of it, `custodian` (real SOC 37, already in this
+  //: taxonomy) for upkeep, `manager` running the building — the same
+  //: "manager as whoever runs the place" shape `care`/`learning`/
+  //: `tower` already hold.
+  schoolhouse: [
+    { occupation: 'teacher', count: 6 },
+    { occupation: 'custodian', count: 2 },
+    { occupation: 'manager', count: 1 },
+  ],
 };
 
 const CREW_NAMES = Object.keys(CREWS);
@@ -387,6 +477,7 @@ const CREW_BY_CATEGORY = {
   hospital: 'care',
   'stadium-arena': 'venue',
   library: 'learning',
+  school: 'schoolhouse',
   'theater-concert-hall': 'venue',
   'notable-bridge': 'unmanned',
   'monument-memorial': 'unmanned',
@@ -394,6 +485,11 @@ const CREW_BY_CATEGORY = {
   'cave-system': 'unmanned',
   'natural-formation': 'unmanned',
   'other-distinctive-feature': 'unmanned',
+  casino: 'casino',
+  'fire-station': 'firehouse',
+  'ems-station': 'ems',
+  'ranger-station': 'ranger',
+  'port-terminal': 'port',
 };
 
 // Retail is one kind of place, so it is one entry rather than ten.

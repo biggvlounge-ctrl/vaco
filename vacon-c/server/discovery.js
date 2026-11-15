@@ -107,6 +107,26 @@ const POOLS = {
   'natural-formation': { itemCategories: ['materials', 'metals'] },
   'other-distinctive-feature': null,
 
+  // Five more, by direct instruction (`landmarks.js`'s own comment
+  // above these five KEY_BUILDING_TYPES entries) rather than the
+  // discovery document naming them -- so the §26 category each maps to
+  // is this file's own closest-fitting choice, stated rather than
+  // left implicit.
+  //: There is no "cash"/"chips" item category anywhere in §26's real
+  //: twenty -- this engine is barter-based and has no currency item at
+  //: all. `luxury goods` is the closest real fit for a gaming chip's
+  //: actual economic role (a high-value token), not a literal claim
+  //: that chips and luxury goods are the same real-world thing.
+  casino: { itemCategories: ['luxury goods'] },
+  'fire-station': { itemCategories: ['tools', 'protection'] },
+  'ems-station': { itemCategories: ['medicine'] },
+  'ranger-station': { itemCategories: ['materials', 'tools'] },
+  //: A port moves bulk trade goods of every kind, not one retail
+  //: category -- `materials`/`metals`/`textiles` are the real §26
+  //: categories a bulk-cargo terminal plausibly holds, same honest
+  //: "closest fit, stated" posture as `casino` just above.
+  'port-terminal': { itemCategories: ['materials', 'metals', 'textiles'] },
+
   // -- retail ---------------------------------------------------------
   //: COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md's merchandise pools, which
   //: are §26 categories almost word for word — "tools, construction

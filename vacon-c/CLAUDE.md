@@ -6397,6 +6397,138 @@ and `travel.js`'s own fuel-stall and wear-application integration
 points (neither had any test coverage before this pass — added and
 confirmed to fail when each is removed).
 
+**A hundred-and-second, the first round of "add it... casinos... dock
+workers... park rangers, the forest rangers, fire departments, EMS
+workers, the hospitals, all their employees... libraries" — eight new
+real occupations, five new real hero-tier landmark categories, and the
+generalized real multi-role institution staffing `prisonStaffing`'s own
+header had already left as "the broader... gap... closed now rather
+than left for someone to rediscover" and then did not actually close.**
+
+**Eight real occupations, every one the closest-fitting real BLS/O*NET
+code found and cited, never an invented title.** `ranger` (O*NET
+19-1031.03 "Park Naturalists," alt. title "Park Ranger," closing major
+group 19's own first NEW occupation since the thirty-somethingth
+round's audit saturated all 22 real SOC major groups at least once —
+this is a second, DIFFERENT occupation in an already-covered group, the
+identical relationship `guard`/`warden` already have with `officer` in
+group 33), `firefighter` (33-2011), `paramedic` (29-2043, with the
+real, lower-credentialed sibling 29-2042 "EMTs" named as the same role
+at this engine's own one-occupation-per-real-job grain), `dockworker`
+(53-7062, alt. title "Dock Worker"), and four real, LICENSED casino
+occupations — `dealer` (39-3011 "Gambling Dealers"), `pitboss`
+(39-1013), `cashier` (43-3041 "Gambling Cage Workers"), `bookmaker`
+(39-3012 "Gambling and Sports Book Writers and Runners" — the real,
+legal answer to "bookies" inside a casino; an illegal street-level
+bookie or loan shark has no real BLS code at all, since illegal
+activity is not surveyed, and is deliberately left as a real, separate,
+future informal-economy mechanic rather than given a fabricated one).
+
+**Casino is a real override of this project's own standing compliance
+gate, not a silent bypass of it.** This file's own "Locked Day 1 /
+Phase 1 scope" section has named gambling/casino systems closed
+"pending compliance review... a legal gate rather than a scope
+decision" since the project began. Asked directly how to handle that
+gate given the request, the explicit choice was to override it and
+build the casino system now — recorded here the same way Leader mode's
+own reopening is, as a real decision made on the record rather than
+either silently honoring the old gate or silently building through it
+unremarked.
+
+**Five new real hero-tier landmark categories, added the same way
+`school` became the twenty-fourth** — `THE_KEY_BUILDING_TYPES.md`'s own
+list ends "any other genuinely distinctive feature not covered above,"
+explicitly open, and `casino`/`fire-station`/`ems-station`/
+`ranger-station`/`port-terminal` are named by direct instruction rather
+than a second document disagreeing with this one. `port-terminal` has
+real textual support of its own too: `VACANCY_CONSOLIDATED_MASTER_SPEC
+.md`'s §49 CITY DNA names "port" among nine city identities, and no
+landmark had ever existed for a port city to actually have. Both
+`world-layer/exportRegion.js`'s own duplicated `KEY_CATEGORIES` list
+and `landmarks.js`'s discovery-pool comment keep this honest: a §26
+item category is picked for each (`luxury goods` for casino chips, the
+closest real fit to a high-value token when this engine has no
+currency item at all; `materials`/`metals`/`textiles` for a port's
+bulk cargo) and stated as this file's own closest-fit choice rather
+than claimed as the document's.
+
+**A real, pre-existing gap found while wiring this: `school` — the
+24th category, added by the SAME "any other… not covered above"
+extension two rounds ago — had never been given a crew at all.**
+`crewFor('school')` returned null since the day the category existed;
+`schoolhouse` (teacher 6, custodian 2, manager 1) closes it, the
+eleventh standing rule's own shape one category later.
+
+**The generalized staffing pass is the part `prisonStaffing`'s own
+header had already named and left undone.** That header's own words:
+"every OTHER hero landmark category (museum, library, cathedral, and
+the rest) still has exactly the same missing operator link" — and the
+round that followed closed the OPERATOR link for every hero landmark,
+but never the STAFF. `hospital`/`university`/`library`/`school` each
+had at most one real post through the small, separate
+`CITY_INSTITUTIONS` organization (no property link at all); the actual
+hero-tier BUILDING — the one with a real size and significance,
+real enough to be a takeover target — had nobody working in it, for
+every category except `prison`.
+
+`config.institutionStaffing` (opt-in, default false, the identical
+posture `securityForces`/`prisonStaffing` already hold) hires the real,
+FULL crew `landmarks.staffingFor` has been computing since the crew
+table was written, scaled by the exact `control.maintenanceFor` number
+that target's own takeover composition already uses — **reusing that
+field directly (`maintenanceFor(...).crew`) rather than re-deriving a
+second number for "how many actually work here" versus "how many it
+takes to hold it."** A building's own real staff IS what a taker has
+to displace or co-opt.
+
+**`prison` is explicitly excluded, and the exclusion is real rather
+than redundant with something else.** `prison` has its own real crew
+(`state`: cook/officer/engineer/manager) the same as every other
+government landmark — without the exclusion, `institutionStaffing`
+would hire a SECOND, different crew into a building `prisonStaffing`
+already staffs with exactly one warden and one guard, by design. The
+first test written for this checked the wrong thing and passed by
+accident: with BOTH flags on, `prisonStaffing`'s own `staffed` flag
+(set first, since its block runs earlier) already makes
+`institutionStaffing`'s own idempotency check skip the prison, so the
+exclusion LOOKED redundant and a mutation that deleted it changed
+nothing. Isolating the test with `prisonStaffing` left OFF — nothing
+else protects the prison in that configuration — is what actually
+exercises the real exclusion, and is the twenty-fourth standing rule's
+own lesson again: a test has to isolate the SPECIFIC mechanism it
+claims to check, not a configuration where something else already
+guarantees the outcome.
+
+**A second, genuine "dead code that looks live" instance (the twelfth
+standing rule), found by mutation rather than assumed.** The first
+draft kept a per-pass `alreadyPicked` `Set` to stop the same real
+candidate being hired into two posts at once. Deleting it changed no
+test result: `economy.hireEntity` writes an ACTIVE employment record
+synchronously, and `economy.getEmployment`'s own live read already
+excludes the just-hired candidate from the very next `.find()` call —
+the identical real guarantee `prisonStaffing`'s own `['warden',
+'guard']` loop has always relied on without a second Set. Removed
+rather than kept "for safety," because a guard that cannot fail is
+decoration, the twentieth standing rule's own lesson about what a
+check has to risk to be worth writing.
+
+All real gates mutation-verified: the opt-in flag itself, the prison
+exclusion (correctly isolated the second time), and the double-hire
+guarantee (confirmed to hold through `economy.js`'s own synchronous
+write rather than through dead local bookkeeping).
+
+Still open from this same request, named rather than silently folded
+in here: the casino ORGANIZATION/takeover/post-collapse-money/
+inside-job mechanics, loan sharks and bookies as a real informal-economy
+mechanic, real cargo tied to the new port-terminal landmark, university
+students as a real population, school-type depth (grade/middle/high/
+private/religious/performing-arts) and a penitentiary-style inventory
+for colleges, car lots/car washes, generalized dollar-store/grocery/
+restaurant corporate retail, and the two real mega-employer categories
+(logistics warehouses, industrial plants) with St. Louis as the named
+worked example — each its own round, the same discipline every
+multi-part request in this file has followed.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

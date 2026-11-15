@@ -18,6 +18,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const worldgen = require('../server/worldgen.js');
+const landmarksAll = require('../server/landmarks.js');
 const statistics = require('../server/statistics.js');
 const engine = require('../server/engine.js');
 const membership = require('../server/membership.js');
@@ -28,6 +29,15 @@ const occupations = require('../server/occupations.js');
 const behavior = require('../server/behavior.js');
 
 const w = engine.WorldState;
+
+// `landmarksPerCity` set to every real hero category's own count
+// guarantees each one is placed exactly once (`worldgen.js`'s own
+// draw-without-replacement loop) -- a fixed `24` was the real count
+// before casino/fire-station/ems-station/ranger-station/port-terminal
+// (CLAUDE.md's hundred-and-second standing rule) raised it to 29;
+// derived here so a future category addition cannot silently break
+// this guarantee a third time.
+const ALL_HERO_CATEGORIES = landmarksAll.KEY_BUILDING_CATEGORIES.length;
 
 // **Every test here builds into `engine.WorldState`, and that is not an
 // accident of convenience** — `generateNPC`, `generateOrganization` and
@@ -521,11 +531,11 @@ test('extended family generation never recurses -- a generated aunt/uncle or cou
 
 test('every real prison this engine generates gets a real government operator, not left null', () => {
   const { before } = delta(() => worldgen.generateWorld({
-    ...SMALL, seed: 'prison-operator', landmarksPerCity: 24,
+    ...SMALL, seed: 'prison-operator', landmarksPerCity: ALL_HERO_CATEGORIES,
   }));
   const newProperties = w.properties.slice(before.properties);
   const prisons = newProperties.filter((p) => p.landmark_category === 'prison');
-  assert.ok(prisons.length > 0, 'landmarksPerCity: 24 should guarantee at least one generated prison');
+  assert.ok(prisons.length > 0, 'landmarksPerCity: ALL_HERO_CATEGORIES should guarantee at least one generated prison');
   for (const prison of prisons) {
     assert.ok(prison.operating_organization_id != null, `prison ${prison.id} has no operating_organization_id`);
     const operator = w.organizations.find((o) => o.id === prison.operating_organization_id);
@@ -536,13 +546,13 @@ test('every real prison this engine generates gets a real government operator, n
 
 test('a real guard can actually be hired into the government that operates a real prison', () => {
   const { before, summary } = delta(() => worldgen.generateWorld({
-    ...SMALL, seed: 'prison-guard-hire', landmarksPerCity: 24,
+    ...SMALL, seed: 'prison-guard-hire', landmarksPerCity: ALL_HERO_CATEGORIES,
   }));
   const government = w.organizations.find((o) => o.id === summary.governmentId);
   assert.ok(government, 'generateWorld should always found a civilization government');
   const newProperties = w.properties.slice(before.properties);
   const prison = newProperties.find((p) => p.landmark_category === 'prison');
-  assert.ok(prison, 'this seed should produce a real prison at landmarksPerCity: 24');
+  assert.ok(prison, 'this seed should produce a real prison at landmarksPerCity: ALL_HERO_CATEGORIES');
   assert.equal(
     prison.operating_organization_id, government.id,
     'with no scoped region government in this config, the prison should be operated by the civilization government',
@@ -600,7 +610,7 @@ test('guard, warden and nurse are real, drawable occupations at a government emp
 test('every government-type hero landmark gets a real government operator, not just prisons', () => {
   const landmarks = require('../server/landmarks.js');
   const { before, summary } = delta(() => worldgen.generateWorld({
-    ...SMALL, seed: 'landmark-operator-government', landmarksPerCity: 24,
+    ...SMALL, seed: 'landmark-operator-government', landmarksPerCity: ALL_HERO_CATEGORIES,
   }));
   const newProperties = w.properties.slice(before.properties);
   const governmentCategories = Object.keys(landmarks.KEY_BUILDING_TYPES)
@@ -621,7 +631,7 @@ test('every government-type hero landmark gets a real government operator, not j
 
 test('every real religious landmark is operated by its own community\'s religious order, with a real title matching the building', () => {
   const { before } = delta(() => worldgen.generateWorld({
-    ...SMALL, seed: 'landmark-operator-religious', landmarksPerCity: 24, religiousOrdersPerCommunity: true,
+    ...SMALL, seed: 'landmark-operator-religious', landmarksPerCity: ALL_HERO_CATEGORIES, religiousOrdersPerCommunity: true,
   }));
   const newProperties = w.properties.slice(before.properties);
   const titleByCategory = {
@@ -678,7 +688,7 @@ test('a commercial-type hero landmark always gets a real operator -- a fresh bus
   // does not fight with.
   const landmarks = require('../server/landmarks.js');
   const { before } = delta(() => worldgen.generateWorld({
-    ...SMALL, seed: 'landmark-operator-business', landmarksPerCity: 24,
+    ...SMALL, seed: 'landmark-operator-business', landmarksPerCity: ALL_HERO_CATEGORIES,
   }));
   const newProperties = w.properties.slice(before.properties);
   const commercialStaffed = Object.keys(landmarks.KEY_BUILDING_TYPES).filter((cat) => {
@@ -709,7 +719,7 @@ test('a commercial-type hero landmark always gets a real operator -- a fresh bus
 
 test('a hero landmark with no real staff slot gets no operator at all -- nobody works there, so there is nothing to wire', () => {
   const { before } = delta(() => worldgen.generateWorld({
-    ...SMALL, seed: 'landmark-operator-no-staff', landmarksPerCity: 24,
+    ...SMALL, seed: 'landmark-operator-no-staff', landmarksPerCity: ALL_HERO_CATEGORIES,
   }));
   const newProperties = w.properties.slice(before.properties);
   const noStaffCategories = ['monument-memorial', 'notable-bridge', 'historic-site', 'other-distinctive-feature', 'masonic-building', 'cave-system', 'natural-formation'];
@@ -744,7 +754,7 @@ test('foundingLeaders defaults to false -- every existing call to generateWorld(
 
 test('a gang holding real territory gets a real founding leader from the communities it actually holds', () => {
   const { before } = delta(() => worldgen.generateWorld({
-    ...SMALL, communitiesPerCity: 6, seed: 'founding-leaders-gang', landmarksPerCity: 24, foundingLeaders: true,
+    ...SMALL, communitiesPerCity: 6, seed: 'founding-leaders-gang', landmarksPerCity: ALL_HERO_CATEGORIES, foundingLeaders: true,
   }));
   const newOrgs = w.organizations.slice(before.organizations);
   const gangs = newOrgs.filter((o) => o.type === 'gang');
@@ -772,7 +782,7 @@ test('a gang holding real territory gets a real founding leader from the communi
 
 test('a business operating a real property gets a real founding leader from that property\'s own community', () => {
   const { before } = delta(() => worldgen.generateWorld({
-    ...SMALL, seed: 'founding-leaders-business', landmarksPerCity: 24, foundingLeaders: true,
+    ...SMALL, seed: 'founding-leaders-business', landmarksPerCity: ALL_HERO_CATEGORIES, foundingLeaders: true,
   }));
   const newOrgs = w.organizations.slice(before.organizations);
   const businesses = newOrgs.filter((o) => o.type === 'business');
@@ -794,7 +804,7 @@ test('a business operating a real property gets a real founding leader from that
 
 test('governments get a real founding leader, correctly scoped to civilization, region, or city', () => {
   const { before } = delta(() => worldgen.generateWorld({
-    ...SMALL, seed: 'founding-leaders-government', landmarksPerCity: 24,
+    ...SMALL, seed: 'founding-leaders-government', landmarksPerCity: ALL_HERO_CATEGORIES,
     scopedGovernments: true, foundingLeaders: true,
   }));
   const newOrgs = w.organizations.slice(before.organizations);
@@ -824,7 +834,7 @@ test('a city government\'s real leader comes from its own real city, never a dif
   // picked from anyway.
   const { before } = delta(() => worldgen.generateWorld({
     communitiesPerCity: 2, populationPerCommunity: 12, cities: 2,
-    seed: 'founding-leaders-two-cities', landmarksPerCity: 24,
+    seed: 'founding-leaders-two-cities', landmarksPerCity: ALL_HERO_CATEGORIES,
     scopedGovernments: true, foundingLeaders: true,
   }));
   const newCities = w.cities.slice(before.cities);
@@ -898,7 +908,7 @@ test('securityForces hires one real officer per real city a government\'s own sc
 
 test('prisonStaffing defaults to false -- every existing call to generateWorld() is byte-for-byte unaffected', () => {
   const { before } = delta(() => worldgen.generateWorld({
-    ...SMALL, seed: 'prison-staffing-default-off', landmarksPerCity: 24,
+    ...SMALL, seed: 'prison-staffing-default-off', landmarksPerCity: ALL_HERO_CATEGORIES,
   }));
   const staff = (w.employmentRecords || []).slice(before.employment)
     .filter((r) => ['guard', 'warden'].includes(r.position));
@@ -907,7 +917,7 @@ test('prisonStaffing defaults to false -- every existing call to generateWorld()
 
 test('prisonStaffing hires a real warden and a real guard for every real prison, employed by its own real operator', () => {
   const { before } = delta(() => worldgen.generateWorld({
-    ...SMALL, seed: 'prison-staffing-on', landmarksPerCity: 24, prisonStaffing: true,
+    ...SMALL, seed: 'prison-staffing-on', landmarksPerCity: ALL_HERO_CATEGORIES, prisonStaffing: true,
   }));
   const newProperties = w.properties.slice(before.properties);
   const prisons = newProperties.filter((p) => p.landmark_category === 'prison');
@@ -929,5 +939,100 @@ test('prisonStaffing hires a real warden and a real guard for every real prison,
     );
     assert.ok(staffHere.some((r) => r.position === 'warden'), `prison ${prison.id}'s real operator must employ a real warden`);
     assert.ok(staffHere.some((r) => r.position === 'guard'), `prison ${prison.id}'s real operator must employ a real guard`);
+  }
+});
+
+test('institutionStaffing defaults to false -- every existing call to generateWorld() is byte-for-byte unaffected', () => {
+  const { before } = delta(() => worldgen.generateWorld({
+    ...SMALL, seed: 'institution-staffing-default-off', landmarksPerCity: ALL_HERO_CATEGORIES,
+  }));
+  const newProperties = w.properties.slice(before.properties);
+  assert.ok(newProperties.every((p) => !p.staffed || p.landmark_category === 'prison'),
+    'no non-prison property should be marked staffed with institutionStaffing left off');
+});
+
+test('institutionStaffing hires a real multi-role crew for every other staffed hero landmark, employed by its own real operator', () => {
+  const { before } = delta(() => worldgen.generateWorld({
+    ...SMALL, seed: 'institution-staffing-on', landmarksPerCity: ALL_HERO_CATEGORIES, institutionStaffing: true,
+  }));
+  const newProperties = w.properties.slice(before.properties);
+  // Only properties the implementation itself would actually process:
+  // a real crew AND a real operator already assigned (checked directly
+  // on the generated property, not inferred from `staff != null` --
+  // a religious landmark can have a real staff post and STILL have no
+  // real operator, when no real religious order exists for that
+  // community) AND not a prison (owned by `prisonStaffing` above).
+  // `cave-system`/`historic-site`/etc. have a real `unmanned` crew (a
+  // single `officer`) but no real staff post at all, so they are never
+  // assigned an operator and are correctly skipped -- asserting
+  // `staffed` on them would be the twenty-fourth standing rule's own
+  // mistake, encoding a stronger claim than the implementation makes.
+  const staffedLandmarks = newProperties.filter(
+    (p) => p.landmark_category && p.landmark_category !== 'prison'
+      && landmarksAll.crewFor(p.landmark_category) !== null
+      && p.operating_organization_id != null,
+  );
+  assert.ok(staffedLandmarks.length > 0, 'this seed should produce at least one real crewed, staffed-post landmark');
+
+  // Not every seat is guaranteed filled at this small a population --
+  // `prisonStaffing`'s own identical idempotency marker already means
+  // "attempted", not "succeeded" (it sets `staffed = true` outside its
+  // own hire loop too), so the aggregate claim -- at least SOME real
+  // hire happened across every real crewed landmark this seed
+  // produced -- is the honest one, not a per-landmark guarantee.
+  let totalHired = 0;
+  for (const landmarkProperty of staffedLandmarks) {
+    assert.equal(landmarkProperty.staffed, true, `${landmarkProperty.landmark_category} ${landmarkProperty.id} must be marked staffed`);
+    const crew = landmarksAll.crewFor(landmarkProperty.landmark_category);
+    const realPositions = crew.map((post) => post.occupation);
+    const staffHere = (w.employmentRecords || []).filter(
+      (r) => r.status === 'active' && r.employer_organization_id === landmarkProperty.operating_organization_id
+        && realPositions.includes(r.position),
+    );
+    totalHired += staffHere.length;
+    for (const record of staffHere) {
+      assert.ok(crew.some((post) => post.occupation === record.position));
+    }
+  }
+  assert.ok(totalHired > 0, 'at least one real crew member should have been hired somewhere across these landmarks');
+});
+
+test('institutionStaffing never hires the same real entity into two posts at once', () => {
+  const { before } = delta(() => worldgen.generateWorld({
+    ...SMALL, seed: 'institution-staffing-no-double-hire', landmarksPerCity: ALL_HERO_CATEGORIES, institutionStaffing: true,
+  }));
+  const newRecords = (w.employmentRecords || []).slice(before.employment).filter((r) => r.status === 'active');
+  const seen = new Set();
+  for (const record of newRecords) {
+    assert.ok(!seen.has(record.entity_id), `entity ${record.entity_id} was hired twice in the same institutionStaffing pass`);
+    seen.add(record.entity_id);
+  }
+});
+
+test('institutionStaffing never touches a real prison -- that is prisonStaffing\'s own, unconditional scope', () => {
+  // `prison` has a real `staff` post (`officer`) and a real crew
+  // (`state`: cook/officer/engineer/manager) the same as every other
+  // government landmark, so this needs its own explicit exclusion
+  // rather than relying on being redundant with something else.
+  //
+  // **Isolated with `prisonStaffing` left OFF, deliberately** —
+  // `prisonStaffing`'s own `staffed` flag would otherwise make this
+  // exclusion look redundant (its block runs first and already marks
+  // the prison staffed, so `institutionStaffing`'s own `if
+  // (landmarkProperty.staffed) return;` would skip it anyway). With
+  // `prisonStaffing` off, nothing else protects a real prison from
+  // `institutionStaffing` hiring its generic `state` crew into it --
+  // only this category check does, which is exactly what this test
+  // needs to actually exercise.
+  const { before } = delta(() => worldgen.generateWorld({
+    cities: 1, communitiesPerCity: 3, populationPerCommunity: 80,
+    seed: 'institution-staffing-prison-exclusion', landmarksPerCity: ALL_HERO_CATEGORIES,
+    institutionStaffing: true,
+  }));
+  const newProperties = w.properties.slice(before.properties);
+  const prisons = newProperties.filter((p) => p.landmark_category === 'prison');
+  assert.ok(prisons.length > 0, 'this seed should produce at least one real prison');
+  for (const prison of prisons) {
+    assert.ok(!prison.staffed, `prison ${prison.id} must be untouched by institutionStaffing with prisonStaffing off`);
   }
 });
