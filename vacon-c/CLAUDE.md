@@ -6764,6 +6764,72 @@ on, so neither did — the twenty-ninth standing rule's shape again: a
 request to look something up is not an instruction to find something
 regardless of whether it is really there.
 
+**A hundred-and-sixth, closing "business areas... Clayton... Westport...
+U City, which is like our Chinatown... Indians... St. Ann, Northwest
+County... Mexicans... our Bosnian population on the south side...
+Black American North County... North Side... South Side" — and it
+caught a real, uncorrected version of exactly the mistake the
+hundred-and-fifth round's own Purina correction had just fixed.**
+
+Five more real areas (Clayton, Westport, University City, St. Ann,
+Overland) and four more real landmarks: the real St. Louis County
+Government Center in Clayton (the real county seat/business district,
+~70 Fortune 500 HQ/branch offices); Westport Plaza, a real 42-acre
+mixed-use district in Maryland Heights (kept as its own named area
+even though it is genuinely the same immediate place as "Maryland
+Heights" above, since the request named it separately); and Jeffrey
+Plaza (8635 Olive Blvd) in University City, the real, specific
+commercial anchor of the Olive Boulevard corridor St. Louis Public
+Radio's own reporting ("Curious Louis: the future of St. Louis'
+unofficial Chinatown") documents as the city's real, current,
+informally-recognized Chinese-American district — the honest match
+for "U City, which is like our Chinatown."
+
+**Checked and corrected before shipping, not after, this time.**
+St. Louis's actual HISTORIC Chinatown was Hop Alley, downtown
+(roughly 7th/8th and Walnut/Market/Chestnut), real and documented from
+1869 until its 1966 demolition for Busch Memorial Stadium's
+redevelopment area. It is named in the pack's own `note` as
+historical context rather than given a landmark row, because the
+hundred-and-fifth standing rule's own lesson applies directly here: a
+demolished site is not a standing landmark, and giving one a row would
+misrepresent a historical fact as a current one, the same shape as the
+Purina correction one round earlier — checked and NOT asserted this
+time, instead of checked, asserted, and corrected after the fact.
+
+**Checked and genuinely not found, the same posture**: no real source
+ties a specific Indian-American business corridor to Olive Boulevard —
+that corridor's own documented community is Chinese, not Indian. A
+real 2020 analysis (stlmosaicproject.org) does confirm Indian
+immigrants are a real, significant, even the largest, foreign-born
+group in the broader St. Louis area, but names no specific
+neighborhood for it, so none is asserted here either. St. Ann/Overland
+(real, confirmed growing Hispanic populations, ~12.9%/~15.3%
+respectively) and Bevo Mill (the real windmill-style building, 4749
+Gravois Ave., built 1916, a City of St. Louis Landmark since 1971,
+the actual historic anchor of the neighborhood that gives St. Louis's
+Bosnian community its nickname "Little Bosnia" — the metro is real and
+documented as tied with Chicago for the largest Bosnian-American
+population in the U.S.) round out the real, checked facts this
+request asked for. North St. Louis city/county's real, extensively
+documented majority-Black-American population is named as context in
+the pack's own `note`, the same "a region is a region, not an invented
+monument standing in for one" treatment the Ozarks already got —
+no landmark is forced onto a broad demographic fact about an area.
+
+**Stated explicitly, because this round is the furthest this registry
+has gone naming a real neighborhood's real ethnic/cultural character —
+none of this demographic color is wired into any mechanic.** This
+engine's real per-NPC ethnicity system (`ancestryPacks.js`,
+`africanEthnicGroupPacks.js`) already assigns real Census ancestry
+data by TRACT POSITION (§88), never by matching a neighborhood's NAME
+to an ethnicity, and `test/ethnicity.test.js`'s own forbidden-file scan
+(the §9 firewall) still holds completely unchanged. Every fact in this
+round is real, cited, geographic CONTEXT for the landmark pack's own
+`note` field — the same posture `countryPacks.js`/
+`regionalTemperamentPacks.js` already hold for a real fact reported
+and never wired to decide an outcome — not a new per-NPC rule.
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

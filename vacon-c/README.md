@@ -1455,6 +1455,39 @@ silently dropped.
 
 All real gates mutation-verified; full suite green before and after.
 
+## Clayton, Westport, University City, St. Ann/Overland, Bevo Mill
+Five more real areas and four more real landmarks in
+`data/st-louis.landmarks.json` (now 43 locations, 23 areas), by direct
+instruction ("business areas, Clayton... Westport... U City, which is
+like our Chinatown... Indians... St. Ann, Northwest County...
+Mexicans... our Bosnian population on the south side"): the real St.
+Louis County Government Center in Clayton; Westport Plaza, a real
+42-acre district in Maryland Heights; Jeffrey Plaza in University
+City, the real commercial anchor of the Olive Boulevard corridor St.
+Louis Public Radio's own reporting documents as the city's current,
+informally-recognized Chinese-American district; and Bevo Mill, the
+real windmill-style City Landmark (4749 Gravois Ave., built 1916) that
+gives St. Louis's Bosnian community -- real and documented as tied
+with Chicago for the largest Bosnian-American population in the U.S.
+-- its "Little Bosnia" nickname.
+
+Checked and corrected BEFORE shipping this time: St. Louis's actual
+historic Chinatown was Hop Alley, downtown, demolished in 1966 -- real
+and documented, but named only as historical context in the pack's
+own `note`, never given a landmark row, since a demolished site is
+not a standing landmark (the prior round's Purina lesson, applied
+before the mistake instead of after). Checked and genuinely not
+found: no real source ties a specific Indian-American business
+corridor to Olive Boulevard -- that corridor's documented community is
+Chinese, not Indian, named as a correction rather than asserted.
+North St. Louis city/county's real, documented majority-Black-American
+population is named as context only, the same treatment the Ozarks
+already got, with no landmark forced onto a demographic fact about an
+area. **None of this is wired into any mechanic** -- this engine's
+real per-NPC ethnicity system already assigns real Census data by
+tract position, never by neighborhood name, and the §9 firewall is
+unchanged.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a
