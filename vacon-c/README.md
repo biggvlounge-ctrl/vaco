@@ -1601,6 +1601,26 @@ exists), and a finer per-nationality Asian-population breakdown for
 West County specifically (city-level totals for Chesterfield/Ballwin
 were added; the finer ACS tables were not pulled this round).
 
+## Duplicating the St. Louis method, and real workforce-nativity data
+Asked to confirm the St. Louis approach can be duplicated across the
+country, and the answer needed no new code: `landmarkPacks.js`'s join
+is already region-agnostic (proved with a synthetic Chicago pack, not
+just inferred), so a second real city needs a new, real, cited
+`data/<city>.landmarks.json` -- the same research method this file's
+own St. Louis sections already document -- not an engine change.
+
+Also closed: real national foreign-born shares for `physician`/`nurse`
+(26%/16%, Migration Policy Institute's 2021 ACS tabulation) and
+`teacher` (~8%, Brookings/IIR), with real top origin countries for
+each, reported as a derived estimate over a real community's own real
+occupation headcount -- never a per-NPC field, so it stays on the
+right side of the fortieth standing rule's own "occupation tied to
+ethnicity" decline. And the "people out of place after chaos" framing
+already has most of its pieces built: `migration.js`'s real relocation
+mechanics, `fugitives.js`'s pursuit mechanism, and `countryPacks.js`/
+`migrationPathwayPacks.js`'s real country-of-origin context -- pointed
+out rather than rebuilt.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

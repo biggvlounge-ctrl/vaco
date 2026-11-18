@@ -7133,3 +7133,75 @@ Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and
 route inventory. Both are kept current — if either disagrees with the
 code, the code is right and the document is a bug.
+
+**A hundred-and-eleventh, and it is a methodology question answered by
+checking rather than building, plus a real data gap closed the same
+report-only way every other demographic fact in this registry
+already is.**
+
+By direct instruction: "make sure the way we're examining St. Louis
+will be duplicated across the country... St. Louis has this [military
+bases/forests/rivers/casinos/etc.]... let me check [that]... this is
+what those things are for," plus "the nationalities of the schools...
+and the hospital workers... because this will affect after the chaos
+hits — a lot of these people will be out of place."
+
+**The "duplicate across the country" half needed no new code at
+all, checked directly rather than assumed.** `server/landmarkPacks.js`
+and `world-layer/exportRegion.js`'s join was already written to be
+region-agnostic — nothing in either file names "St. Louis," and
+`data/st-louis.landmarks.json` is explicitly the worked EXAMPLE the
+import documents point at, not a hardcoded special case. Proved rather
+than inferred: a minimal synthetic pack for a different real city
+(`{ region: 'Chicago, Illinois', ..., locations: [{ name: 'Willis
+Tower', category: 'skyscraper', ... }] }`) placed correctly in a real
+generated world through the exact same `config.landmarkPack` path, no
+code changed. **The real, repeatable METHOD this project has actually
+been running, worth stating as a method rather than leaving implicit
+across forty-plus St. Louis-specific standing-rule entries**: for any
+new region, check military installations, hospitals, universities,
+rivers/lakes/forests, demographic context, and unusual/historic
+buildings — in roughly that order, each one researched and cited
+before being written down — then assemble a pack the identical shape
+`data/st-louis.landmarks.json` already is. Building a SECOND real
+city's pack this way is real, substantial, future work (a new
+`data/<city>.landmarks.json` plus its own research pass); it is not
+a code change, and nothing here pretends it already happened.
+
+**The "nationalities of the schools and the hospital workers" half is
+real, and real care was needed to keep it from becoming the one thing
+this project's own fortieth standing rule already declined: occupation
+tied to ethnicity, in either direction.** `server/workforceNativityPacks.js`
+is the closed version — real, cited, NATIONAL figures only
+(`physician`/`nurse`: Migration Policy Institute's 2021 Census ACS
+tabulation, 26%/16% foreign-born; `teacher`: Brookings/IIR's analysis
+of Furuya et al. 2019, ~8%; real top origin countries for each, cited
+in the module's own header) — reported through two new `statistics.js`
+entries (`estimated_foreign_born_physicians`/`_teachers`) as a derived
+ESTIMATE over a real community's own real, already-generated
+occupation headcount (`occupations.holdersOf`). No NPC anywhere is
+marked foreign-born; no hiring, behavior or outcome reads this module
+— `test/workforce-nativity-packs.test.js`'s own scan confirms
+`statistics.js` is the only real reader in `server/`. A genuine
+per-NPC nativity/birthplace field, closing this the same way
+`racePacks.js`/`disabilityPacks.js`/`veteranPacks.js` once closed their
+own deferred Census tables, is separate, future work — this round
+answers "what does the real national data say," not "which NPC was
+born where."
+
+**"After the chaos hits, a lot of these people will be out of place
+and not in their own country or city" is a real framing this engine
+already has most of the pieces for, pointed out rather than rebuilt.**
+`migration.js`'s own real relocation mechanics (`vacanciesByCommunity`,
+`relocate`) already move a real NPC to a different real community,
+including `migration type: 'forced'` for exactly this kind of
+displacement; `fugitives.js`'s real pursuit mechanism already tracks
+someone who has left their home community/city, with `countryPacks.js`
+and `migrationPathwayPacks.js` layering real country-of-origin and
+real-migration-pathway context onto an NPC's own ancestry group.
+Nothing new needed building for this round; the connection between
+"people displaced after collapse" and "the real mechanisms that
+already model displacement" is the deliverable, and a genuinely new
+mass-displacement-at-scale mechanic (as opposed to the individual
+relocations these modules already handle) is real, separate, future
+work if ever asked for directly.

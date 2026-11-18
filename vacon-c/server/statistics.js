@@ -105,6 +105,7 @@ const infrastructure = require('./infrastructure.js');
 const mortality = require('./mortality.js');
 const policing = require('./policing.js');
 const property = require('./property.js');
+const workforceNativityPacks = require('./workforceNativityPacks.js');
 const statecraft = require('./statecraft.js');
 const tierTraits = require('./tierTraits.js');
 const media = require('./media.js');
@@ -540,6 +541,23 @@ const CATALOGUE = [
       ).length;
       return share(recorded, ctx.population);
     },
+  },
+  // **Real, national workforce-nativity context, by direct
+  // instruction ("the nationalities of the schools... and the
+  // hospital workers"). A derived ESTIMATE over this community's own
+  // real, already-generated occupation headcount — never a per-NPC
+  // field, never a claim about any one person's own origin.** See
+  // `workforceNativityPacks.js`'s own header for the real sources and
+  // the §9 posture this stays inside.
+  {
+    key: 'estimated_foreign_born_physicians', category: 'demographic', unit: 'count', scope: 'community',
+    compute: (ctx) => workforceNativityPacks
+      .estimatedForeignBornWorkers(ctx.worldState, ctx.communityId, 'physician')?.estimatedForeignBorn ?? null,
+  },
+  {
+    key: 'estimated_foreign_born_teachers', category: 'demographic', unit: 'count', scope: 'community',
+    compute: (ctx) => workforceNativityPacks
+      .estimatedForeignBornWorkers(ctx.worldState, ctx.communityId, 'teacher')?.estimatedForeignBorn ?? null,
   },
   {
     // **Declared deliberately absent, and now built — because the
