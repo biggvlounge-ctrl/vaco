@@ -1621,6 +1621,19 @@ mechanics, `fugitives.js`'s pursuit mechanism, and `countryPacks.js`/
 `migrationPathwayPacks.js`'s real country-of-origin context -- pointed
 out rather than rebuilt.
 
+## Comprehensive global country coverage (income level)
+`server/globalIncomeClassification.js` extends `countryPacks.js`'s 36
+countries with 122 more real ones, scoped honestly to income level
+only (World Bank FY2027 bands already in use elsewhere in this
+project) rather than attempting full depth for all ~190 countries in
+one pass. Each entry is confidence-flagged -- `bracket-estimate` for
+well-established economies, `checked` for four directly-verified
+borderline cases (Romania, Moldova, Tunisia, Sri Lanka), and
+`null`/`no-reliable-figure-found` for North Korea rather than a
+guessed level. `globalIncomeLevelFor` always defers to
+`countryPacks.COUNTRIES` first, so the two tables never disagree about
+a country both happen to cover.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

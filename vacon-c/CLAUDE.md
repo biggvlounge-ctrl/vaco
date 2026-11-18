@@ -7205,3 +7205,29 @@ already model displacement" is the deliverable, and a genuinely new
 mass-displacement-at-scale mechanic (as opposed to the individual
 relocations these modules already handle) is real, separate, future
 work if ever asked for directly.
+
+**A hundred-and-twelfth, picking the long-pending task tracker back
+up: "comprehensive global country coverage."** The thirty-ninth
+standing rule already named the real gap when `countryPacks.js` was
+built — 36 countries, keyed on `ancestryPacks.GROUPS`, "not all
+190-odd countries on Earth." Closing that to literal completeness at
+the SAME depth (regime score, military expenditure, incarceration,
+immigration flows, individually researched per country) is not one
+round's work. `server/globalIncomeClassification.js` closes the
+single most load-bearing field instead, honestly scoped: 122 more
+real countries with a real World Bank income level (the same FY2027
+thresholds `countryPacks.INCOME_THRESHOLDS_USD` already carries), no
+conflict level/government type/military data for any of them. Every
+entry is confidence-flagged — `bracket-estimate` for the brackets
+checked against well-established, stable classifications rather than
+individually re-verified this round, `checked` for four genuinely
+borderline economies (Romania, Moldova, Tunisia, Sri Lanka) that were
+directly verified. `countryPacks.COUNTRIES` is checked first and
+always wins where both tables cover the same country — the deeper,
+individually-researched figure is always the more authoritative one.
+A handful of countries (North Korea, most microstates) are left out
+entirely rather than guessed, the same "no reliable figure found"
+honesty `oilProducer` already holds for most of the deep table. Full
+global coverage AT THE DEEP TABLE'S OWN STANDARD remains a real,
+stated, much larger gap — this closes the income-level slice of it,
+not the whole thing.
