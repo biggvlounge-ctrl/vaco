@@ -7037,6 +7037,97 @@ eligible for the real "every hero-tier institution gets real staff"
 pass the same way Barnes-Jewish and Washington University already
 are.
 
+**A hundred-and-tenth, and it is the twenty-first standing rule's own
+shape found a second time inside a single category this round added —
+a brand-new real category can collide with an old, silent assumption
+that "this `type` always means an ordinary home," and the suite only
+sees it where a fixture happens to reach the collision.**
+
+By direct instruction — Piasa Bird/Alton-Grafton docks, breweries,
+haunted/historic sites, Grant's Farm/Botanical Garden/Tower Grove
+Park/a second zoo, casinos, stadiums, and big apartment
+complexes/public housing, all in one round — the new `apartment-complex`
+hero category (`propertyType: 'residential'`, closing the real "big
+apartment complexes... Cochran... Peabodys... Streets of St.
+Charles... Windham Chase" request, three of which turned out to be
+real St. Louis Housing Authority PUBLIC HOUSING developments rather
+than market-rate complexes, which is why this also closes the separate
+"access to public housing... Section 8" request: individual
+voucher-holder addresses are not public data, and HUD's own real,
+project-level Public Housing Developments dataset is the honest
+substitute, the same shape this file already declined individual
+ICE/immigration records with) is the first HERO category ever given
+`propertyType: 'residential'` — every other one is government/
+commercial/historical_site/agricultural. Two real call sites elsewhere
+in this engine had silently assumed `type === 'residential'` means
+"an ordinary home from the home-generation path," and a landmark
+sharing that type broke both the moment it was actually drawn:
+
+- **`test/building-packs.test.js`/`test/income-packs.test.js`**, both
+  filtering newly-created properties by `type === 'residential'` to
+  find "the homes this call built" — caught immediately by the full
+  suite, because `apartment-complex` is also in the default (no-pack)
+  singleton `heroPool`, so an ordinary `generateWorld()` call with no
+  landmark pack at all can draw it, same as drawing a skyscraper.
+- **`migration.vacanciesByCommunity`**, filtering `type === 'residential'`
+  for a real relocating NPC's destination — an apartment-complex
+  landmark is NEVER assigned as anyone's `home_property_id` by the
+  ordinary home-generation path, so it would read as permanently
+  vacant and a single migrating person could be moved into a named,
+  real, hundreds-of-unit public-housing building as if it were one
+  ordinary single-family home — a modeling inaccuracy this engine has
+  no per-unit mechanic for yet (the Overture-building-pack's own
+  declared "height is read by nothing" gap, one category over).
+- **`statistics.vacancy_rate`**, for the identical reason: a landmark
+  never populated by the home-assignment mechanism would read every
+  one as permanently vacant regardless of whether it is, silently
+  inflating a real, reported statistic.
+
+All three are fixed the same precise way: `!p.landmark_category`
+alongside `type === 'residential'`, so "an ordinary home" means
+exactly that again. `statistics.residential_share` is deliberately
+LEFT UNCHANGED — a named apartment building genuinely is residential
+housing stock, and excluding it there would be the wrong fix for a
+different question. Mutation-verified by reproducing each failure
+first (a direct `node -e` check showing the drawn landmark's inflated
+value/footprint inside the "homes" filter, and a direct check showing
+it would have been picked up as `vacant`) before applying the fix,
+rather than guessing the shape of the bug from the assertion message
+alone.
+
+A second, smaller finding from the same round: the first version of
+this pass added two real St. Louis craft breweries (Schlafly Tap
+Room, Urban Chestnut) as `restaurant` — a RETAIL category — and
+`landmark-packs.test.js`'s own real invariant ("a real register holds
+no hardware stores, and the pack says so") caught it the same way the
+tests above did: this hand-typed pack is deliberately restricted to
+hero-tier heritage places, and ordinary commerce is generated per-area
+rather than named individually, the same reason Dierbergs/Schnucks
+never got a row either. Removed rather than recategorized into a
+hero category that would not honestly describe either business, and
+named here as a real, citable gap.
+
+Real, cited corrections rather than additions, in the same round:
+"the Rams Stadium" is now The Dome at America's Center (the Rams left
+for Los Angeles after the 2015 season; the real building today hosts
+the UFL's Battlehawks); "Wyndham Chase" is really spelled Windham
+Chase; "the zoo off of Riverview" has no real zoo under that exact
+name, and the closest real candidate is the St. Louis Zoo's own
+under-construction second campus, WildCare Park, in the same general
+north-county corridor, stated as an uncertain match rather than
+asserted as confirmed. Real, cited and deliberately NOT built: a
+river-adjacent property-value/home-dock mechanic (needs its own
+scoping round on what "touches a river" structurally means before any
+code is written); open national farmland-for-sale data (checked and
+declined — no open, structured, current dataset exists; USDA's own
+resale file is foreclosure-only and stale since 2018, and the real
+commercial listing platforms are not open data); and a finer
+Chinese/Indian/Korean/Vietnamese breakdown specific to West County
+municipalities (the city-level Asian population totals for Chesterfield
+and Ballwin were found and added as real geographic context; the
+finer per-nationality ACS tables for those two places specifically
+were not pulled this round).
+
 ## Active work
 Phase 2. `dev-docs/` holds a folder per completed phase; `VACANCY_SEED.md`
 is the live working document and `VACANCY_INVENTORY.md` is the file and

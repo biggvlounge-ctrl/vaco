@@ -377,6 +377,26 @@ const KEY_BUILDING_TYPES = {
     significance: [35, 65], propertyType: 'agricultural', staff: null,
     discovery: 'natural resources',
   },
+
+  // **A thirty-eighth, by direct instruction ("big apartment
+  // complexes... Cochran... O'Fallon Place... Peabodys... Streets of
+  // St. Charles... Windham Chase"): a real, named multi-family housing
+  // development is a genuinely distinctive feature not covered
+  // above, the same "any other" extension `school`/`mall`/`park`
+  // already used.** `propertyType: 'residential'` is new among hero
+  // categories — every other one is government/commercial/
+  // historical_site/agricultural — because this is the one hero
+  // category that is actually occupied housing rather than an
+  // institution or a monument. `staff: 'manager'` is the real,
+  // smallest-honest defining post (a large residential development
+  // has an on-site property manager; it does not have a curator or a
+  // dealer). `discovery: null` is the same honest gap `car-wash`/
+  // `gun-store` already hold — this is occupied housing, not an
+  // institution with an inventory to find.
+  'apartment-complex': {
+    significance: [15, 40], propertyType: 'residential', staff: 'manager',
+    discovery: null,
+  },
 };
 
 const KEY_BUILDING_CATEGORIES = Object.keys(KEY_BUILDING_TYPES);
@@ -562,6 +582,43 @@ const RETAIL_TYPES = {
     // `notable-bridge` already hold.
     significance: [10, 28], discovery: null,
   },
+
+  // **Four more, by direct instruction ("franchise banks... gas
+  // stations... QuikTrip, BP, Shell, Exxon, Amoco... liquor stores...
+  // elderly homes, nursing homes") — generic category over real
+  // brand name, the same precedent this whole table already holds
+  // for `discount-store`/`big-box-store`/`car-lot`.**
+  bank: {
+    // No real §26 trade category backs currency or vault contents —
+    // this engine is barter-based with no cash item at all (the same
+    // real gap `casino`'s own header names for chips). Genuinely no
+    // clean fit, so `discovery: null`, the honest gap rather than
+    // stretching `protection`/`luxury goods` a second time.
+    significance: [20, 45], discovery: null,
+  },
+  'gas-station': {
+    // `fuel` is a real registered item (`items.RESOURCE_TYPES`,
+    // `vehicles.FUEL_ITEM_NAME`) but is NOT a §26 trade category —
+    // two separate vocabularies, and `discovery.js`'s pools draw only
+    // from the latter. `repair`/`transport` are the closest real fit,
+    // the same ones `auto-parts-store`/`car-lot` already draw from.
+    significance: [12, 30], discovery: 'vehicle repair components, fuel',
+  },
+  'liquor-store': {
+    // No §26 category for alcohol specifically exists; `food` is the
+    // closest real backed category, same "closest real fit, stated"
+    // posture `mall`/`distribution-center` already hold.
+    significance: [15, 35], discovery: 'food',
+  },
+  'nursing-home': {
+    // CMS Nursing Home Compare (data.cms.gov): roughly 15,000
+    // Medicare/Medicaid-certified facilities nationally — real and
+    // structured, though not wired as a per-capita density figure
+    // this round (see `landmarkPacks.js`'s own note on this pass).
+    // `medicine` is the real, directly-backed category a nursing
+    // home plausibly holds, same as `pharmacy`.
+    significance: [25, 50], discovery: 'medicine, medical supplies',
+  },
 };
 
 const RETAIL_CATEGORIES = Object.keys(RETAIL_TYPES);
@@ -662,6 +719,12 @@ const CREWS = {
   //: still not free, and that is the point.
   unmanned: [
     { occupation: 'officer', count: 1 },
+  ],
+  //: The real, smallest-honest shape of a large residential
+  //: development's on-site staff -- a property manager, not an
+  //: institution's full crew.
+  'apartment-manager': [
+    { occupation: 'manager', count: 1 },
   ],
   //: The casino's real occupational shape: the gaming floor (`dealer`)
   //: is overwhelmingly the largest category at any real casino, with
@@ -815,6 +878,7 @@ const CREW_BY_CATEGORY = {
   forest: 'unmanned',
   river: 'unmanned',
   lake: 'unmanned',
+  'apartment-complex': 'apartment-manager',
 };
 
 // Retail is one kind of place, so it is one entry rather than ten.

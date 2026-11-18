@@ -91,9 +91,11 @@ test('THE KEY’s twenty-three categories are all here, plus the school and five
   // names at line 639/642 ("*Strategic:* ...military sites...";
   // "*Natural:* caves, forests, mountains, rivers, lakes...") and
   // never built beyond `cave-system`/`natural-formation`.
-  assert.equal(landmarks.KEY_BUILDING_CATEGORIES.length, 37);
+  // **Thirty-eight, after `apartment-complex`** — a real, named
+  // multi-family housing development, by direct instruction.
+  assert.equal(landmarks.KEY_BUILDING_CATEGORIES.length, 38);
   assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes('school'));
-  for (const category of ['casino', 'fire-station', 'ems-station', 'ranger-station', 'port-terminal', 'mall', 'park', 'distribution-center', 'industrial-plant', 'military-base', 'forest', 'river', 'lake']) {
+  for (const category of ['casino', 'fire-station', 'ems-station', 'ranger-station', 'port-terminal', 'mall', 'park', 'distribution-center', 'industrial-plant', 'military-base', 'forest', 'river', 'lake', 'apartment-complex']) {
     assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes(category), category);
   }
   for (const category of landmarks.KEY_BUILDING_CATEGORIES) {
@@ -107,10 +109,12 @@ test('the retail list’s ten are here and are not hero-tier, plus five more by 
   // Dollar Generals... grocery stores, restaurants, hardware stores").
   // Thirteen, after `big-box-store` ("Walmart's, Targets, Sam's,
   // Costco's"). Fifteen, after `car-lot`/`car-wash` ("inventory and
-  // car lots, car washes").
-  assert.equal(landmarks.RETAIL_CATEGORIES.length, 15);
+  // car lots, car washes"). Nineteen, after `bank`/`gas-station`/
+  // `liquor-store`/`nursing-home` ("franchise banks... gas
+  // stations... liquor stores... nursing homes").
+  assert.equal(landmarks.RETAIL_CATEGORIES.length, 19);
   assert.ok(landmarks.RETAIL_CATEGORIES.includes('hardware-store'));
-  for (const category of ['discount-store', 'restaurant', 'big-box-store', 'car-lot', 'car-wash']) {
+  for (const category of ['discount-store', 'restaurant', 'big-box-store', 'car-lot', 'car-wash', 'bank', 'gas-station', 'liquor-store', 'nursing-home']) {
     assert.ok(landmarks.RETAIL_CATEGORIES.includes(category), category);
   }
   for (const category of landmarks.RETAIL_CATEGORIES) {

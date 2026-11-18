@@ -138,7 +138,11 @@ test('a world built with a real building pack draws land size and floors from th
       communitiesPerCity: 1,
       populationPerCommunity: 5,
     });
-    const made = w.properties.slice(before).filter((p) => p.type === 'residential');
+    // `landmark_category` excludes the real `apartment-complex` hero
+    // category -- also `type: 'residential'`, also drawable from the
+    // default (no-pack) singleton heroPool -- which is not a home this
+    // pass built from the building pack at all.
+    const made = w.properties.slice(before).filter((p) => p.type === 'residential' && !p.landmark_category);
     assert.ok(made.length > 0);
     assert.ok(made.every((h) => h.land_size === 250), 'every home should draw the real footprint');
     assert.ok(made.every((h) => h.floors === 4), 'every home should draw the real floor count');

@@ -1566,6 +1566,41 @@ holding a real find -- built earlier for a different direct
 instruction, and this round found it already covers the Civil Courts
 Building and every hospital/university added here too.
 
+## Piasa Bird, breweries, haunted sites, casinos, stadiums, apartment complexes
+Twenty-one more real landmarks and two real bug fixes, by direct
+instruction. The Piasa Bird and Grafton Harbor Marina close the
+"anywhere that touches the Missouri/Mississippi River has value"
+river-dock request; Anheuser-Busch Brewery closes the brewery
+request (two craft breweries were researched and then REMOVED after
+`landmark-packs.test.js` caught them as a retail category this
+hand-typed pack isn't allowed to carry); Lemp Mansion and the former
+St. Alexius Hospital/Northwest High School close the haunted/abandoned
+request; Grant's Farm, Missouri Botanical Garden, Tower Grove Park,
+and WildCare Park (the real but uncertain match for "the zoo off of
+Riverview") close the parks/zoos request; four real casinos and two
+real stadiums (The Dome at America's Center, correcting "the Rams
+Stadium" -- the team left in 2016 -- and Francis Olympic Field, the
+real 1904 Olympics stadium) close those two; and five real apartment
+complexes close both "big apartment complexes" and "Section 8/public
+housing locations" at once, because three of the five turned out to
+be real St. Louis Housing Authority developments rather than
+market-rate buildings.
+
+**Two real pre-existing bugs, found because this round's new
+`apartment-complex` category is the first hero category ever given
+`propertyType: 'residential'`.** `migration.vacanciesByCommunity` and
+`statistics.vacancy_rate` both filtered on `type === 'residential'`
+alone to mean "an ordinary home," which a residential-type landmark
+(never populated by the ordinary home-assignment path) breaks --
+fixed by excluding `landmark_category` from both, mutation-verified
+by reproducing each failure directly before fixing it.
+
+Declared gaps, not builds: a river-adjacent property-value mechanic,
+open national farmland-for-sale data (checked -- no open dataset
+exists), and a finer per-nationality Asian-population breakdown for
+West County specifically (city-level totals for Chesterfield/Ballwin
+were added; the finer ACS tables were not pulled this round).
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

@@ -159,6 +159,10 @@ const POOLS = {
   forest: { itemCategories: ['materials'] },
   river: { itemCategories: ['materials', 'metals'] },
   lake: { itemCategories: ['materials', 'metals'] },
+  //: Occupied housing, not an institution with an inventory -- the
+  //: same honest `null` `stadium-arena`/`notable-bridge`/`park`
+  //: already hold.
+  'apartment-complex': null,
 
   // -- retail ---------------------------------------------------------
   //: COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md's merchandise pools, which
@@ -205,6 +209,13 @@ const POOLS = {
   //: `stadium-arena`/`notable-bridge`/`park` already hold.
   'car-lot': { itemCategories: ['repair', 'transport'] },
   'car-wash': null,
+  //: Four more, by direct instruction -- `bank`/`gas-station`/
+  //: `liquor-store`/`nursing-home` closest-real-fit pools, same
+  //: posture `landmarks.js`'s own new RETAIL_TYPES entries state.
+  bank: null,
+  'gas-station': { itemCategories: ['repair', 'transport'] },
+  'liquor-store': { itemCategories: ['food'] },
+  'nursing-home': { itemCategories: ['medicine'] },
 };
 
 //: How much a place holds, per point of historical significance.

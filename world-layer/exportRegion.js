@@ -80,6 +80,9 @@ const KEY_CATEGORIES = [
   // rivers, lakes...") -- see `vacon-c/server/landmarks.js`'s own
   // comment above these four entries.
   'military-base', 'forest', 'river', 'lake',
+  // One more, by direct instruction ("big apartment complexes") --
+  // see `vacon-c/server/landmarks.js`'s own comment above this entry.
+  'apartment-complex',
 ];
 
 // UNESCO inscription is treated as maximal historical importance by

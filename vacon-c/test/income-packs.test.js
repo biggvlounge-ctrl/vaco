@@ -131,7 +131,11 @@ test('a world with no income pack still builds homes in the invented range', () 
   const w = engine.WorldState;
   const before = w.properties.length;
   worldgen.generateWorld({ seed: 'no-income-pack', communitiesPerCity: 1, populationPerCommunity: 5 });
-  const made = w.properties.slice(before).filter((p) => p.type === 'residential');
+  // `landmark_category` excludes the real `apartment-complex` hero
+  // category -- also `type: 'residential'`, also drawable from the
+  // default (no-pack) singleton heroPool -- whose value comes from the
+  // landmark placement path, not the home-value range this asserts.
+  const made = w.properties.slice(before).filter((p) => p.type === 'residential' && !p.landmark_category);
   const [investedLow, investedHigh] = incomePacks.INVENTED_VALUE_RANGE;
   assert.ok(made.every((h) => h.value >= investedLow && h.value <= investedHigh));
   cleanup();

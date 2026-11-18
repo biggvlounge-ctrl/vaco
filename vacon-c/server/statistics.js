@@ -976,9 +976,13 @@ const CATALOGUE = [
       // A standing home nobody lives in. `properties.lifecycle_stage`
       // has no 'abandoned' value, so vacancy is read from occupancy —
       // a residential property in `operation` that no living resident
-      // calls home.
+      // calls home. `!p.landmark_category` excludes the real
+      // `apartment-complex` hero category — also `type: 'residential'`
+      // — which this engine's ordinary home-assignment mechanism never
+      // populates, so counting it here would read every one as
+      // permanently vacant regardless of whether it is.
       const standing = propertiesIn(ctx).filter(
-        (p) => p.lifecycle_stage === 'operation' && p.type === 'residential',
+        (p) => p.lifecycle_stage === 'operation' && p.type === 'residential' && !p.landmark_category,
       );
       if (standing.length === 0) return null;
       const lived = new Set(ctx.worldState.npcs

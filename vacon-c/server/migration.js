@@ -405,6 +405,16 @@ function vacanciesByCommunity(worldState) {
   const vacant = new Map();
   for (const property of worldState.properties || []) {
     if (property.type !== 'residential') continue;
+    // The real `apartment-complex` hero category is also `type:
+    // 'residential'` and is never assigned as anyone's
+    // `home_property_id` by the ordinary home-generation path, so it
+    // would otherwise always read as "vacant" here — moving a single
+    // migrating NPC into a named, real, hundreds-of-unit public
+    // housing building the same way as an ordinary single-family home
+    // is a modeling inaccuracy this engine does not have a per-unit
+    // mechanic for yet (see `landmarks.js`'s own comment above this
+    // category), so it is excluded rather than silently misused.
+    if (property.landmark_category) continue;
     if (taken.has(property.id)) continue;
     const list = vacant.get(property.community_id) ?? [];
     list.push(property.id);
