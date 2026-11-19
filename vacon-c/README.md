@@ -1732,6 +1732,36 @@ land on the witness either way. No ninth `crime.CRIME_CATEGORIES` entry
 was added; this acts on an existing knowledge row, not a new offence
 type. See CLAUDE.md's hundred-and-eighteenth standing rule.
 
+## Group combat (gang wars)
+By direct instruction, with explicit design goals: realistic, not mass
+death; people are not trying to die; a fight can be "called in" and
+stopped; losing is better answered by a hospital than by total defeat.
+Violence in this engine hurt nobody at all before this -- confirmed by
+grep, `mortality.DEATH_CAUSES`'s own `'violence'` entry had zero real
+writers. `server/groupFights.js#resolveGroupFight` reuses
+`contest.rateEntity`'s own real combat rating (never a second,
+invented formula) averaged per SIDE, plus a real bounded size-ratio
+edge. Severity per losing-side member is dead/injured/unharmed,
+weighted so injury is the expected loss and death stays the measured
+rare tail (a first version's separate death/injury "caps" turned out
+to be unreachable by the real formula and were removed as decorative).
+"Called in and stopped" reuses `authority.writOf` directly -- a real
+governed area has a real, measured chance nobody gets hurt.
+Hospitalization mirrors `justice.imprison`'s own status+release-tick
+shape (quick recovery, wired into `tick.js`'s Security phase); death
+is `mortality.killEntity`, permanent. `continueFight` is the one new,
+opt-IN player verb -- fighting on at a real rating handicap rather
+than the safe hospitalized default, which needs no verb at all.
+Recovery does not have to be a literal hospital, by direct
+instruction: `recoveryPlanFor` checks the patient's own real
+organization AND family members (`householdOf`) for a real,
+currently-employed `nurse`/`physician` first -- faster recovery
+(`IN_HOUSE_RECOVERY_TICKS`) when one is kept in-house, the same
+unstaffed `HOSPITAL_RECOVERY_TICKS` default otherwise even when a
+real referral elsewhere is found, since travelling to a specialist
+buys real expertise but not real speed. See CLAUDE.md's
+hundred-and-nineteenth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

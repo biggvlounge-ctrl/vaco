@@ -82,6 +82,7 @@ const roguePolice = require('./roguePolice.js');
 const fraud = require('./fraud.js');
 const dominance = require('./dominance.js');
 const drugTrade = require('./drugTrade.js');
+const groupFights = require('./groupFights.js');
 const tribeMissions = require('./tribeMissions.js');
 const migration = require('./migration.js');
 const environment = require('./environment.js');
@@ -1280,6 +1281,23 @@ function runSecurityPhase(worldState) {
       affected_entity_ids: [incident.perpetrator_entity_id, incident.victim_entity_id]
         .filter((id) => id !== null),
       global_effects: { crimeIncidentId: incident.id, crimeCategory: incident.category },
+    });
+  }
+
+  // **Hospital recovery, the same real shape `justice.js`'s own
+  // sentence release already holds.** A group fight (server/
+  // groupFights.js) can leave a loser hospitalized rather than dead;
+  // this is the pass that returns them once their real recovery tick
+  // passes, the identical "a status flag plus a tick this phase
+  // checks" shape every other timed unavailability in this engine
+  // already uses.
+  for (const entityId of groupFights.advanceHospitalStays(worldState, worldState.tick)) {
+    events.push({
+      type: 'hospital_release', severity: 'low',
+      note: `Entity ${entityId} was released from the hospital.`,
+      tick: worldState.tick,
+      affected_entity_ids: [entityId],
+      global_effects: {},
     });
   }
 

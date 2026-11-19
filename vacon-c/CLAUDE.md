@@ -7466,3 +7466,109 @@ unwritten decision this file exists to catch.
 Mutation-verified twice: zeroing `STAKEOUT_DETECTION_REDUCTION`'s effect
 in `attemptHeist` is caught by 2 of `test/stakeout-intimidation.test.js`'s
 own tests; zeroing `INTIMIDATION_SUPPRESSION` is caught by 2 more.
+
+**A hundred-and-nineteenth, and it is a new real mechanic by direct
+instruction rather than the next pending task: group combat ("a gang
+war... 5 on 10"), with explicit design goals stated outright —
+realistic, not mass death; people are not trying to die; a fight can
+be "called in" and stopped before it goes that far; losing is better
+answered by a hospital than by "total defeat."**
+
+**Checked before any of it was designed: violence in this engine
+currently hurts nobody at all.** `keys.resolveAggression` and
+`crime.recordEscalation` raise `conflict`/stress and file a real
+incident — `grep -n "recordDeath\|killEntity" server/keys.js
+server/crime.js server/tick.js` returned nothing. A violent offence
+has been consequence-free, physically, since the day either file was
+written; `mortality.DEATH_CAUSES` has carried a real `'violence'`
+entry with zero writers the whole time — the eleventh standing rule's
+own shape, one more column over.
+
+**The team rating is reused, not invented.** `contest.js`'s own
+header already found this exact gap once for one-on-one bouts —
+`combat` traits generated on every NPC, read by nothing — and built
+`rateEntity`/`winProbability` to close it, with its own explicit,
+correct reasoning for leaving `Bloodlust` out of the rating ("appetite
+for violence, not skill at it"). `server/groupFights.js#teamRatingOf`
+is the mean of that identical real rating across a SIDE rather than a
+second, disagreeing formula for groups. Side size is a real, bounded
+RATIO term on top of it (`sizeEdgeFor`, the nineteenth standing rule's
+own "composition as a ratio" lesson one level over), capped so a
+numbers advantage is real without being an automatic massacre.
+
+**Severity is weighted so injury is the expected loss and death is
+the measured rare tail — checked directly rather than asserted.** A
+first version gave death and injury each a separate numeric "cap"
+(0.25, 0.85) alongside their real weighted formula, and a direct test
+at the worst input this model can produce (margin 1, Bloodlust 100)
+found NEITHER cap ever reachable — the weighted terms themselves only
+ever sum to 0.165 for death and 0.75 for injury. A clamp that can
+never bind is decorative, the twentieth standing rule's own shape one
+file over, so both were removed; the real ceiling is just the
+formula's own weighted sum, worked out and asserted directly rather
+than copied into a second constant that could silently drift from it.
+
+**"Called in and stopped" reuses `authority.writOf` directly.** Its
+own `.writ` is already a real `[0,1]` measure of how far real
+authority reaches an area — the same number `regimeFor` thresholds
+into governed/contested/lawless — so a real draw against it, checked
+BEFORE severity is ever rolled, is the realistic version of someone
+calling it in: a governed area has a real, measured chance nobody
+gets hurt; a lawless one does not. No second notion of "how much
+authority is here" was invented beside the one this engine already
+had.
+
+**Hospitalization mirrors `justice.imprison`'s own real shape on
+purpose — a status flag plus a real release tick, with a release pass
+in the same tick-pipeline slot as every other timed unavailability.**
+`advanceHospitalStays` is wired into `tick.js`'s Security phase next
+to the drug-trade and fraud passes it already runs beside. Death is
+`mortality.killEntity` — permanent, the real cost the explicit design
+asked for by saying a hospital stay should be quicker to return from
+than death, which only means something if death does not return at
+all.
+
+**The one real player choice is opt-IN, because the safe outcome is
+already the default.** An injured loser is hospitalized without
+anyone having to ask for it; `continueFight` is the one new function,
+pulling a hospitalized survivor back out to fight on at a real,
+bounded rating penalty for fighting hurt
+(`CONTINUE_FIGHT_RATING_PENALTY`). That is the whole mechanism for
+"it's better to go to the hospital than to go all the way to your
+defeat" — the safer path needs no verb, and the riskier one does.
+
+Mutation-verified five times: disabling the intervention gate,
+zeroing the size edge, forcing `severityFor` to always return
+`'unharmed'`, removing `continueFight`'s handicap, and disabling
+`advanceHospitalStays`'s own release-tick check are each caught by a
+real test in `test/group-fights.test.js`.
+
+**Extended the same day, by direct instruction: recovery does not have
+to be a literal hospital, and a real in-house medic should matter.**
+"You go to a house and somebody could assist you... this also helps
+by having this in-house... it helps things speed up the process"; a
+tribe's own nurse or physician may also refer a case elsewhere —
+"maybe in a different tribe or a hospital or a different town."
+
+`recoveryPlanFor` reads the patient's own real household first
+(`householdOf` — every living member of any real organization AND any
+real family they actually belong to, via `membership.organizationsOf`/
+`membersOf` and `familyMemberships`, never an invented "medical
+roster") for a real, currently-active employment record whose
+`position` is `nurse` or `physician` — `occupations.js`'s own real
+occupations, the identical ones task #14's prison-staff round and
+task #69's hospital-staffing round already made real and hireable.
+Found in-house, recovery is faster (`IN_HOUSE_RECOVERY_TICKS`, flagged
+interpretive, strictly less than `HOSPITAL_RECOVERY_TICKS`). Not
+found, `recoveryPlanFor` looks for a real referral anywhere else in
+the world — found or not, the duration stays at the unstaffed
+default, because travelling to a real specialist is real expertise,
+not real speed. Keeping a nurse or physician in the family or the
+organization is the one concrete reward; a referral is honest, not a
+shortcut.
+
+Mutation-verified three more times: removing the in-house speed bonus,
+widening `medicAmong` to ignore the household it was scoped to, and
+widening `MEDICAL_POSITIONS` to count a real `orderly` (SOC 31-1133,
+a real, different, lower-skill occupation `nurse`'s own header already
+distinguishes itself from) are each caught by a real test.
