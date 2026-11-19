@@ -1681,6 +1681,21 @@ already uses -- not a second, invented "distant witness" discount.
 that raises clearance chance whenever a real bystander account exists.
 See CLAUDE.md's hundred-and-fifteenth standing rule.
 
+## Disguise / notoriety-reduction mechanic
+`policing.js#evasionOf`'s real Stealth/Deception/Black Market Ties/Heat
+Tolerance average is explicitly "who this person IS" -- skill, not
+choice. A mask or wig is the opposite: a choice made for one offence,
+which helps an unskilled person exactly as much as a skilled one.
+`server/disguise.js` is a small new module (a named item list, the same
+shape `weapons.FIREARM_NAMES` already takes, and `isDisguised`, equipped-
+only) wired into exactly one function -- `evasionOf` -- so every real
+consumer of that number (crime.js's victim/witness confidence, task #35;
+policing's own clearance chance) inherits the real bonus for free, with
+no second confidence model. `mask`/`wig` are real, craftable
+`salvage.js` PRODUCTS, the same `zip_gun`-style split between "how to
+build one" and "what it means." See CLAUDE.md's hundred-and-sixteenth
+standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

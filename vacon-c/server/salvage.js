@@ -145,6 +145,13 @@ const PRODUCTS = {
   smoked_fish: { category: 'food', origin: 'producible' },
   preserved_vegetables: { category: 'food', origin: 'producible' },
   woven_garment: { category: 'clothing', origin: 'producible' },
+  // Real disguise items — by direct instruction: "disguise /
+  // notoriety-reduction mechanic (masks, wigs, clothing change)".
+  // `disguise.js` knows their names as a real disguise; this file
+  // knows how to build one, the same split `zip_gun` already has
+  // between this file and `weapons.js`.
+  mask: { category: 'clothing', origin: 'producible' },
+  wig: { category: 'clothing', origin: 'producible' },
   sewing_kit: { category: 'repair', origin: 'producible' },
   repair_kit: { category: 'repair', origin: 'producible' },
   // By direct instruction: "somebody has excess of cereal... might
@@ -277,6 +284,18 @@ const RECIPES = {
     skill: 'Crafting',
     tier: 2,
     note: 'tailor, Tier 2 — occupations.js',
+  },
+  mask: {
+    from: [{ cloth: 2 }, { plastic: 1 }],
+    skill: 'Crafting',
+    tier: 1,
+    note: 'disguise.js reads this item by name',
+  },
+  wig: {
+    from: [{ raw_fiber: 4 }],
+    skill: 'Crafting',
+    tier: 2,
+    note: 'disguise.js reads this item by name',
   },
   sewing_kit: {
     from: [{ cloth: 1, wire: 1 }, { raw_fiber: 2, wire: 1 }],

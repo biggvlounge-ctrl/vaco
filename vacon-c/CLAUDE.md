@@ -7334,3 +7334,35 @@ scaled by a raw headcount with no measured basis behind it. Mutation-
 verified twice: disabling the bystander block in `recordCrime` is
 caught by 4 of `test/weapon-witnesses.test.js`'s eight tests; zeroing
 `WITNESS_BONUS` is caught by 2 more.
+
+**A hundred-and-sixteenth, closing the next pending task: a disguise
+is the situational half `policing.evasionOf`'s own header had never
+had.** That function's real Stealth/Deception/Black Market Ties/Heat
+Tolerance average is explicitly "who this person IS" — skill, not
+choice. A mask or a wig is the opposite: a choice made for one offence,
+which reaches an unskilled person exactly as much as a skilled one.
+
+`server/disguise.js` is the new, small module — a named item list
+(`DISGUISE_ITEM_NAMES = ['mask', 'wig']`, the same shape
+`weapons.FIREARM_NAMES` already takes, rather than a bare
+`inventory.hasEquippedCategory(..., 'clothing')`, which would also
+catch `salvage.js`'s own ordinary `woven_garment`) and `isDisguised`,
+equipped-only, the same real distinction `weapons.equippedFirearm`
+already draws for a gun in a bag. `mask`/`wig` are real, craftable
+`salvage.js` PRODUCTS (Tier 1/Tier 2 Crafting, real materials —
+cloth/plastic for a mask, raw_fiber for a wig) — the same split
+`zip_gun` already has between `salvage.js` (how to build one) and the
+consuming file (what it means), so this is a real item with a real
+acquisition path, not a flag nothing can ever set.
+
+**Wired into exactly one real function — `policing.evasionOf` — and
+every real consumer of that number inherits it for free.**
+`crime.recordCrime`'s own victim- and bystander-witness confidence
+(task #35) and `policing.clearanceChance`'s evasion factor both
+already read `evasionOf`; a disguise bonus added there (`
+DISGUISE_EVASION_BONUS = 0.2`, flagged interpretive, the same magnitude
+as `VICTIM_BONUS` in the opposite direction) reaches both without a
+second confidence model or a second clearance check. Bounded to 1, the
+same clamp the function's own base skill average already carries.
+Mutation-verified: zeroing the bonus in `evasionOf` is caught by 4 of
+`test/disguise.test.js`'s seven tests.

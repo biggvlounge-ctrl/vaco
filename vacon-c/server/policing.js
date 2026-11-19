@@ -60,6 +60,7 @@
 
 const beliefs = require('./beliefs.js');
 const crime = require('./crime.js');
+const disguise = require('./disguise.js');
 const infrastructure = require('./infrastructure.js');
 const { seededDraw } = require('./seeded.js');
 const { getLiveEntity } = require('./entityTraits.js');
@@ -260,7 +261,14 @@ function evasionOf(worldState, entityId) {
   const skill = (
     trait('Stealth') + trait('Deception') + trait('Black Market Ties') + trait('Heat Tolerance')
   ) / 4;
-  return Math.max(0, Math.min(1, skill / 100));
+  const base = skill / 100;
+  // **The situational half `disguise.js`'s own header names**: a mask
+  // or a wig is not a skill, it is a choice made for this one offence,
+  // and it reaches an unskilled person exactly as much as a skilled
+  // one — unlike the four traits above, which are who this person IS.
+  const disguised = disguise.isDisguised(worldState, entityId);
+  const bonus = disguised ? disguise.DISGUISE_EVASION_BONUS : 0;
+  return Math.max(0, Math.min(1, base + bonus));
 }
 
 // A real bystander account of THIS perpetrator, held by anyone other
