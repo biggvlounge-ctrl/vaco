@@ -212,6 +212,15 @@ const GUN_SEVERITY_RATIO = SEVERITY.gun / SEVERITY.violent;
 // what a community would still be talking about.
 const HISTORY_SIGNIFICANCE_FLOOR = 60;
 
+// **Flagged interpretive, same honesty `policing.BASE_CLEARANCE`/
+// `VICTIM_BONUS` already carry — no document gives a witness-fright
+// number.** Placed between `engine.SHOWDOWN_STRESS_WIN` (5, winning a
+// real contest) and `SHOWDOWN_STRESS_LOSS` (15, losing one): seeing a
+// real gun used nearby is scarier than winning a fight and you are not
+// the one who lost or was hurt, so it sits in between rather than
+// matching either.
+const WITNESS_STRESS = 8;
+
 // ---------------------------------------------------------------------
 // Friction — and the deadlock that made violent crime impossible
 // ---------------------------------------------------------------------
@@ -476,6 +485,56 @@ function recordCrime(worldState, options = {}) {
       emotionLevel: -Math.round(severity / 2),
       relatedEntityIds: victimId === null ? [] : [victimId],
     });
+  }
+
+  // **A bystander is a real witness this engine did not yet have.**
+  // `policing.js`'s own `VICTIM_BONUS` comment already says the victim
+  // "is a witness this engine actually has" — true, and incomplete:
+  // `recordCrime`'s own knowledge-write above is the VICTIM's direct,
+  // immediate perception of the event. Everyone else in the community
+  // had no such thing; their only path to this fact was
+  // `media.runWordOfMouth`'s slow spread from the victim outward,
+  // identical to someone who was never there. Scoped to `gun` — the
+  // one category this file already treats as the more specific,
+  // visibly armed fact (see `recordEscalation`'s own header) — because
+  // an ordinary theft or a quiet domestic dispute does not alarm a
+  // whole neighbourhood the way a gun being fired does.
+  if (category === 'gun' && perpetratorId !== null && communityId !== null) {
+    // eslint-disable-next-line global-require
+    const behavior = require('./behavior.js');
+    // eslint-disable-next-line global-require
+    const policing = require('./policing.js');
+    // eslint-disable-next-line global-require
+    const perception = require('./perception.js');
+
+    const identifiable = 1 - policing.evasionOf(worldState, perpetratorId);
+    const bystanders = worldState.npcs.filter(
+      (n) => n.status === 'active' && n.communityId === communityId
+        && n.id !== perpetratorId && n.id !== victimId,
+    );
+    for (const bystander of bystanders) {
+      behavior.applyStress(worldState, bystander.id, WITNESS_STRESS);
+
+      // Each bystander's OWN perception sets their own confidence —
+      // the same real, already-entity-specific mechanism the victim's
+      // own knowledge row uses above, not a second, invented "distant
+      // witness" discount with no measurement behind it.
+      const confidence = perception.receivedConfidence(worldState, bystander.id, identifiable);
+      worldStore.addKnowledge(worldState, {
+        entityId: bystander.id,
+        subjectEntityId: perpetratorId,
+        factType: confidence >= 0.5 ? 'known' : 'assumption',
+        factContent: `entity ${perpetratorId} committed ${category}`,
+        confidenceLevel: confidence,
+        sourceEntityId: perpetratorId,
+        // Direct, present-at-the-scene perception, not hearsay — the
+        // same real distinction `recordCrime`'s own victim block
+        // already draws, carried to a second real holder of it.
+        spreadRate: 0.08,
+        distortionLevel: 1 - confidence,
+        tick,
+      });
+    }
   }
 
   return incident;

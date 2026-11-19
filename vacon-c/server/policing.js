@@ -82,6 +82,18 @@ const BASE_CLEARANCE = 0.35;
 const CAPACITY_PER_RESIDENT_AT_FULL = 0.02;   // 1 unit of capacity per 50 residents
 const VICTIM_BONUS = 0.2;
 
+//: Flagged interpretive, same honesty as `VICTIM_BONUS` right above it
+//: — no document gives a bystander's own clearance weight. Smaller
+//: than `VICTIM_BONUS` on purpose and by direct comparison: a victim
+//: has personal stake and (per `recordCrime`'s own header) the
+//: strongest real claim to attention; a bystander is corroborating,
+//: not primary, evidence. Boolean-gated the same shape `victimBonus`
+//: already is, not scaled by how many bystanders there were — a crime
+//: either has a second real account of it or it does not, and scaling
+//: by a raw headcount with no measured basis would be a second guess
+//: stacked on the first.
+const WITNESS_BONUS = 0.1;
+
 //: How far one case moves an area's trust. Small on purpose: trust is
 //: the accumulation of many outcomes, and a single cleared burglary
 //: should not swing a neighbourhood.
@@ -251,11 +263,25 @@ function evasionOf(worldState, entityId) {
   return Math.max(0, Math.min(1, skill / 100));
 }
 
+// A real bystander account of THIS perpetrator, held by anyone other
+// than the victim (whose own account is already `victimBonus` above) —
+// `crime.recordCrime`'s own bystander-witness block (task #35) is the
+// one writer of this shape today, scoped to `gun` incidents.
+function hasRealWitness(worldState, incident) {
+  if (incident.perpetrator_entity_id === null) return false;
+  return (worldState.entityKnowledge || []).some(
+    (k) => k.subject_entity_id === incident.perpetrator_entity_id
+      && k.entity_id !== incident.victim_entity_id
+      && k.acquired_tick === incident.tick,
+  );
+}
+
 // The chance one case is cleared, before the seeded draw.
 function clearanceChance(worldState, incident, { capacity }) {
   if (capacity === null) return 0;
   const victimBonus = incident.victim_entity_id === null ? 0 : VICTIM_BONUS;
-  const base = BASE_CLEARANCE * capacity + victimBonus * capacity;
+  const witnessBonus = hasRealWitness(worldState, incident) ? WITNESS_BONUS : 0;
+  const base = BASE_CLEARANCE * capacity + (victimBonus + witnessBonus) * capacity;
   const evasion = evasionOf(worldState, incident.perpetrator_entity_id);
   const factor = Math.max(0, 1 - (evasion - 0.5) * 2 * EVASION_WEIGHT);
   return Math.max(0, Math.min(1, base * factor));
@@ -437,6 +463,8 @@ module.exports = {
   BASE_CLEARANCE,
   CAPACITY_PER_RESIDENT_AT_FULL,
   VICTIM_BONUS,
+  WITNESS_BONUS,
+  hasRealWitness,
   EVASION_WEIGHT,
   evasionOf,
   TRUST_PER_CLEARED,

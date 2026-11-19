@@ -1665,6 +1665,22 @@ the searcher over capacity still costs the location a real find but is
 reported `carried: false` rather than added to inventory. See CLAUDE.md's
 hundred-and-fourteenth standing rule.
 
+## Weapon-visibility NPC reaction + memory/witness system
+`policing.js`'s own comment already says a victim "is a witness this
+engine actually has" -- true, and incomplete. `crime.js#recordCrime`'s
+knowledge-write was the victim's own direct, immediate perception of an
+incident; everyone else in the community had no such thing, only
+word-of-mouth's slow spread from the victim outward days later, same as
+someone who was never there. Scoped to `gun` (the one category this
+engine already treats as visibly, specifically armed): every other
+resident of the same community now gets a real, immediate stress load
+and a real, direct `entity_knowledge` fact about the perpetrator, using
+the exact same confidence mechanism the victim's own knowledge-write
+already uses -- not a second, invented "distant witness" discount.
+`policing.js` gained a real `WITNESS_BONUS` (half of `VICTIM_BONUS`)
+that raises clearance chance whenever a real bystander account exists.
+See CLAUDE.md's hundred-and-fifteenth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

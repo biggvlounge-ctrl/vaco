@@ -7297,3 +7297,40 @@ deliberately NOT gated this round, named here as real, separate,
 future work rather than silently implied. Mutation-verified: removing
 the capacity check from `discovery.search`'s book-kind branch is
 caught by exactly one of `test/carry-capacity.test.js`'s eight tests.
+
+**A hundred-and-fifteenth, closing the next pending task: a bystander
+is a real witness this engine did not yet have.** `policing.js`'s own
+`VICTIM_BONUS` comment already says the victim "is a witness this
+engine actually has" — true, and incomplete. `crime.js#recordCrime`'s
+own knowledge-write is the victim's direct, immediate perception of an
+incident; everyone else in the community had no such thing, only
+`media.runWordOfMouth`'s slow spread from the victim outward, identical
+to someone who was never there.
+
+Scoped to `gun` — the one category this file already treats as the
+more specific, visibly armed fact (`recordEscalation`'s own header) —
+because an ordinary theft does not alarm a whole neighbourhood the way
+a gun being fired does. Every other living resident of the same
+community (never the perpetrator or victim, who are already covered by
+their own existing write-backs) gets two real things, immediately, at
+the incident's own tick: a real stress load (`behavior.applyStress`,
+`WITNESS_STRESS = 8`, flagged interpretive and placed between
+`engine.SHOWDOWN_STRESS_WIN` (5) and `SHOWDOWN_STRESS_LOSS` (15) — a
+witnessed shooting is scarier than winning a fight, and you are not
+the one who was hurt), and a real, direct `entity_knowledge` fact about
+the perpetrator. **The confidence is not a second, invented "distant
+witness" discount** — it reuses the exact same mechanism the victim's
+own knowledge-write already uses (`perception.receivedConfidence`
+against the perpetrator's own real evasion skill), so each bystander's
+own real perception sets their own real confidence, the same way it
+already does for the victim.
+
+`policing.js` gained a real `WITNESS_BONUS` (0.1, half of
+`VICTIM_BONUS`'s 0.2 — a bystander is corroborating evidence, not the
+primary account) and `hasRealWitness`, which checks whether anyone
+other than the victim holds a real, same-tick fact about the specific
+perpetrator. Boolean-gated the same shape `victimBonus` already is, not
+scaled by a raw headcount with no measured basis behind it. Mutation-
+verified twice: disabling the bystander block in `recordCrime` is
+caught by 4 of `test/weapon-witnesses.test.js`'s eight tests; zeroing
+`WITNESS_BONUS` is caught by 2 more.
