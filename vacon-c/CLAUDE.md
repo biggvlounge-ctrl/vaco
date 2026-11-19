@@ -7401,3 +7401,68 @@ prices in the real risk of moving stolen goods. Mutation-verified
 twice: disabling the stolen-goods gate is caught by 2 of
 `test/fencing.test.js`'s eight tests; removing `priceMultiplier` from
 `agreedPrice`'s own computation is caught by 1 more.
+
+**A hundred-and-eighteenth, closing the next pending task: stakeouts
+and witness intimidation, built as two separate real mechanics rather
+than one, because they answer two different questions.** A stakeout is
+about REDUCING RISK on a planned crime; intimidation is about SUPPRESSING
+WHAT A WITNESS ALREADY KNOWS after one has already happened. Conflating
+them would have meant one mechanic quietly doing two jobs, the same
+mistake this file's own header warns against when a computed field gets
+written over.
+
+**Stakeouts live in `server/heists.js`, next to the mechanic they
+narrow, rather than a new file.** `stakeOut(worldState, entityId,
+targetOrganizationId, options)` records a real, retrievable intel entry
+— who watched, which real target, when, and that target's own
+already-computed `targetDefenseOf` — and `hasRecentStakeout` is what
+`attemptHeist` now checks before computing `detectionChance`.
+`STAKEOUT_DETECTION_REDUCTION` (0.1, flagged interpretive, the same
+honesty every other hand-fitted band in this file carries) subtracts
+straight off `detectionChanceFor`'s own result, clamped at 0 — real
+intel lowers the chance of being IDENTIFIED, never the chance of
+getting the loot, because `successChanceFor` already has its own real
+skill/crew terms and a stakeout is planning, not skill.
+`STAKEOUT_RECENCY_TICKS` (14, two real weeks at this engine's "a tick is
+a day" convention) is how long that intel stays good before the
+target's own guard pattern could plausibly have changed under it.
+
+**Intimidation is `server/intimidation.js`, a new module, because it
+reads a different pair of real traits nothing else in this engine
+reads together.** `reputation.Fear Factor` and `reputation.Notoriety`
+are two more entries in the eleventh standing rule's own list — real,
+generated on every NPC, read by zero consumers anywhere, confirmed
+directly by grep before writing a line of this. `emotional.Resilience`
+is the real counter-term, already read elsewhere
+(`behavior.js#loadMultiplier`) as how hard somebody is to rattle — the
+witness's resistance to the intimidator's own fear/notoriety, not a
+second property of the intimidator. `intimidationChanceFor` is weighted
+(Fear 0.5, Notoriety 0.3, Resilience 0.4) and centred on 50 vs. 50 the
+same way the twelfth standing rule's own case study insists on: an
+ordinary intimidator against an ordinary witness is exactly a coin
+flip, confirmed by a direct test rather than assumed from the formula.
+
+**A successful intimidation suppresses the witness's existing
+`entity_knowledge` confidence by a real, bounded fraction
+(`INTIMIDATION_SUPPRESSION = 0.7`) — it does not erase the row.** A
+frightened witness is less willing to assert what they know, not
+suddenly ignorant of it, and this project's own knowledge rows are a
+point-in-time record (see the fourteenth standing rule's sibling
+reasoning on never deleting a historical fact). `distortion_level`
+moves with it, the identical `1 - confidence` relationship
+`crime.js#recordCrime`'s own witness rows (task #35) already hold.
+Real stress (`behavior.applyStress`) and a real memory
+(`worldStore.addMemory`) land on the witness either way — being
+confronted is itself the event, whether or not it changes what they are
+willing to say.
+
+**No ninth `crime.CRIME_CATEGORIES` entry was added for this, on
+purpose.** The master spec's category vocabulary is closed and already
+covers eight real categories; intimidation is an action on an existing
+witness-knowledge row, not a new offence type, and extending that list
+without checking the spec first would have been exactly the kind of
+unwritten decision this file exists to catch.
+
+Mutation-verified twice: zeroing `STAKEOUT_DETECTION_REDUCTION`'s effect
+in `attemptHeist` is caught by 2 of `test/stakeout-intimidation.test.js`'s
+own tests; zeroing `INTIMIDATION_SUPPRESSION` is caught by 2 more.

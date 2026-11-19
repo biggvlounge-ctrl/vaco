@@ -1712,6 +1712,26 @@ not vehicle-specific), and a real fence pays a real discount
 every existing call stays byte-for-byte unaffected. See CLAUDE.md's
 hundred-and-seventeenth standing rule.
 
+## Stakeouts and witness intimidation
+Two separate real mechanics, because they answer two different
+questions. A stakeout (`heists.stakeOut`/`hasRecentStakeout`) is real,
+retrievable intel on a specific target that narrows a planned heist's
+own `detectionChance` by a flat `STAKEOUT_DETECTION_REDUCTION` (0.1)
+within a real recency window (`STAKEOUT_RECENCY_TICKS`, 14) -- it never
+touches `successChance`, because watching a target first is planning,
+not skill. Witness intimidation (`server/intimidation.js`, new) is
+about what happens AFTER an offence: `intimidationChanceFor` weighs the
+real, previously-unread `reputation.Fear Factor`/`Notoriety` traits
+against the witness's own real `emotional.Resilience`, centred 50-vs-50
+so an ordinary pairing is a coin flip. A success suppresses (never
+deletes) the witness's existing `entity_knowledge` confidence about the
+perpetrator by a real, bounded fraction (`INTIMIDATION_SUPPRESSION`,
+0.7) -- the same "a knowledge row is a point-in-time record" discipline
+task #35's bystander-witness rows already hold -- and real stress/memory
+land on the witness either way. No ninth `crime.CRIME_CATEGORIES` entry
+was added; this acts on an existing knowledge row, not a new offence
+type. See CLAUDE.md's hundred-and-eighteenth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

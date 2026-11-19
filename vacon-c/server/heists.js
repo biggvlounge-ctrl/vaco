@@ -94,6 +94,21 @@ const CREW_CAP = 4;
 const SIZE_BONUS_PER_MEMBER = 5;
 const LOOT_SHARE = 0.15;
 
+// **A stakeout — by direct instruction: "witnesses, stakeouts, and
+// safe-cracking/intimidation variance."** Real intel narrows a real
+// risk, rather than raising the odds of getting the loot: watching a
+// target first is planning, not skill, and `successChanceFor` already
+// has its own real skill/crew terms. `STAKEOUT_DETECTION_REDUCTION`
+// (0.1, flagged interpretive the same honesty every other hand-fitted
+// band here carries) comes straight off `detectionChanceFor`'s own
+// result — knowing the guard pattern lowers the chance of being
+// IDENTIFIED, not the chance of getting away with less.
+// `STAKEOUT_RECENCY_TICKS` (14, two real weeks at this engine's "a
+// tick is a day" convention) is how long that intel stays good before
+// the target's own patterns could have changed under it.
+const STAKEOUT_DETECTION_REDUCTION = 0.1;
+const STAKEOUT_RECENCY_TICKS = 14;
+
 function clamp01(x) {
   return Math.max(0, Math.min(1, x));
 }
@@ -133,6 +148,37 @@ function detectionChanceFor(meanAptitude, defense) {
   const base = 0.3 + defense * 0.4;
   const scaled = base * (1 - (meanAptitude - 50) / 100);
   return Math.max(0.05, Math.min(0.9, scaled));
+}
+
+// Real, immediate information, not a hidden roll — watching a real
+// target reveals its real, already-computed `targetDefenseOf`
+// (otherwise only known inside `attemptHeist`'s own closure), and the
+// record it leaves is what a subsequent `attemptHeist` reads for the
+// real detection reduction above.
+function stakeOut(worldState, entityId, targetOrganizationId, options = {}) {
+  const { tick = worldState.tick ?? 0 } = options;
+  const target = (worldState.organizations || []).find((o) => o.id === Number(targetOrganizationId));
+  if (!target) throw new Error(`stakeOut: no organization with id ${targetOrganizationId}.`);
+
+  const record = {
+    entityId: Number(entityId),
+    targetOrganizationId: target.id,
+    tick,
+    defense: targetDefenseOf(worldState, target.id),
+  };
+  (worldState.stakeouts || (worldState.stakeouts = [])).push(record);
+  return record;
+}
+
+// Any of this crew, staking out THIS target, recently enough that the
+// intel is still real.
+function hasRecentStakeout(worldState, crewIds, targetOrganizationId, tick) {
+  return (worldState.stakeouts || []).some(
+    (s) => crewIds.includes(s.entityId)
+      && s.targetOrganizationId === Number(targetOrganizationId)
+      && tick - s.tick <= STAKEOUT_RECENCY_TICKS
+      && tick - s.tick >= 0,
+  );
 }
 
 function attemptHeist(worldState, sponsorEntityId, options = {}) {
@@ -201,7 +247,11 @@ function attemptHeist(worldState, sponsorEntityId, options = {}) {
     .reduce((sum, id) => sum + robberyAptitudeOf(worldState, id), 0) / compliedCrew.length;
   const defense = targetDefenseOf(worldState, target.id);
   const successChance = successChanceFor(meanAptitude, compliedCrew.length, defense);
-  const detectionChance = detectionChanceFor(meanAptitude, defense);
+  const staked = hasRecentStakeout(worldState, compliedCrew, target.id, tick);
+  const detectionChance = Math.max(
+    0,
+    detectionChanceFor(meanAptitude, defense) - (staked ? STAKEOUT_DETECTION_REDUCTION : 0),
+  );
 
   const successDraw = seededDraw([
     worldState.seed ?? 'world', 'attempt-heist-success', target.id, tick, ...compliedCrew,
@@ -251,7 +301,7 @@ function attemptHeist(worldState, sponsorEntityId, options = {}) {
 
   return {
     complied: true, crew: compliedCrew, refused: refusedCrew, success, detected, loot,
-    successChance, detectionChance, meanAptitude, defense,
+    successChance, detectionChance, meanAptitude, defense, staked,
   };
 }
 
@@ -259,9 +309,13 @@ module.exports = {
   CREW_CAP,
   SIZE_BONUS_PER_MEMBER,
   LOOT_SHARE,
+  STAKEOUT_DETECTION_REDUCTION,
+  STAKEOUT_RECENCY_TICKS,
   robberyAptitudeOf,
   targetDefenseOf,
   successChanceFor,
   detectionChanceFor,
+  stakeOut,
+  hasRecentStakeout,
   attemptHeist,
 };
