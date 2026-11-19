@@ -7231,3 +7231,40 @@ honesty `oilProducer` already holds for most of the deep table. Full
 global coverage AT THE DEEP TABLE'S OWN STANDARD remains a real,
 stated, much larger gap — this closes the income-level slice of it,
 not the whole thing.
+
+**A hundred-and-thirteenth, picking the tracker's next pending task
+up: a real opposing force and real variance for whether an area holds
+or falls.** `territory.js#resolveTerritoryControl` was purely
+deterministic — `controlScore = avg(territory, power)` against a
+fixed `CONTESTED_THRESHOLD`/`FORTIFIED_THRESHOLD`, zero opposition,
+zero randomness — distinct from the already-real, already-calibrated
+abstract `statecraft.garrisonIn` signal `authority.js` reads
+elsewhere, which this round deliberately leaves untouched.
+`orgArchetypes.js` gains a real `'national guard'` entry (`type:
+government`, `reach: region`, never `isFaction` — a state institution,
+not a landholding faction), which required extending
+`orgArchetypes.REACHES` to include `'region'` (enforced by
+`test/org-archetypes.test.js`'s own enum check, caught before this
+shipped). `worldgen.js` founds one per region, opt-in behind a new
+`nationalGuard: false` default — every existing `generateWorld()` call
+is byte-for-byte unaffected — and deliberately coupled to
+`scopedGovernments` also being true, since a Guard answering to a
+region government that was never founded would be incoherent.
+
+`territory.js#nationalGuardPowerFor` reads a founded Guard's own LIVE
+`power` trait for a block's region (through `migration.regionOfCity`,
+required lazily to avoid a require-cycle, same precedent
+`authority.js`'s own lazy `statecraft` require already set) and
+`resolveTerritoryControl` subtracts it, scaled by
+`NATIONAL_GUARD_OPPOSITION_WEIGHT = 0.2` — measured, not guessed: a
+real generated world's factions span controlScore 34-62 (median 59),
+and a weight any higher would make an ordinary Guard dominate every
+hold outright. `controlVariance` adds real seeded jitter
+(`seeded.seededDraw`, keyed on `[seed, 'territory-control-variance',
+blockId, tick]`) across `VARIANCE_RANGE = 10`, closing the actual gap
+the task named — a deterministic score before this round could never
+produce two different outcomes for the same inputs, so "holds or
+falls" was never actually a question. Mutation-verified: zeroing
+`NATIONAL_GUARD_OPPOSITION_WEIGHT` is caught by exactly one of
+`test/territory-national-guard.test.js`'s six tests, confirming the
+weight is load-bearing rather than decorative.

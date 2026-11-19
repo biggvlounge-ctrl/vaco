@@ -1634,6 +1634,23 @@ guessed level. `globalIncomeLevelFor` always defers to
 `countryPacks.COUNTRIES` first, so the two tables never disagree about
 a country both happen to cover.
 
+## National Guard / federal enforcement archetype + area holds-or-falls variance
+`territory.js#resolveTerritoryControl` was purely deterministic before
+this round -- the same inputs always produced the same control score,
+so an area never actually held or fell differently between two
+otherwise-identical runs. `orgArchetypes.js` gains a real
+`'national guard'` entry (a state institution, never a landholding
+faction), founded per-region by `worldgen.js` behind a new, opt-in
+`nationalGuard: false` default so every existing world is unaffected.
+`territory.js` now subtracts a founded Guard's own live `power` as a
+real opposing force (weight measured against a real generated world's
+controlScore distribution, not guessed) and adds real seeded jitter,
+so the same block can genuinely hold in one run and fall in another.
+Deliberately distinct from, and leaves untouched, the already-real,
+already-calibrated abstract `statecraft.garrisonIn` signal
+`authority.js` reads elsewhere. See CLAUDE.md's hundred-and-thirteenth
+standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

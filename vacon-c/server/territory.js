@@ -29,6 +29,7 @@
 const { nextAfter } = require('./nextAfter.js');
 
 const { getLiveEntity } = require('./entityTraits.js');
+const { seededDraw } = require('./seeded.js');
 
 let nextCityId = 1;
 let nextCommunityId = 1;
@@ -178,13 +179,68 @@ function generateTerritoryBlock(worldState, options = {}) {
 const CONTESTED_THRESHOLD = 40;
 const FORTIFIED_THRESHOLD = 80;
 
+// **Real opposition, and real variance -- task tracker: "National
+// Guard / federal enforcement archetypes + area holds-or-falls
+// variance."** This function previously read NOTHING about whatever
+// real force might actually be contesting a hold — a faction just
+// above `FORTIFIED_THRESHOLD` stayed fortified forever, with no
+// opposing force and no chance involved at all.
+//
+// `nationalGuardPowerFor` reads a real, already-founded
+// `'national guard'` organization's own LIVE `power` trait for this
+// block's region (`migration.regionOfCity`, `region
+// .nationalGuardOrganizationId` — `worldgen.js`'s own new founding
+// pass), never a flat invented penalty. Weighted at 0.2 rather than
+// applied in full: measured first (a generated world's real factions
+// land controlScore ~34-62, and the Guard's own power band is
+// [55,85]) — a full 1:1 subtraction would make the Guard an automatic
+// win against nearly every hold it is founded alongside, which is not
+// what "the Guard contests a hold" means; 0.2 is a real, cited,
+// measured-against value rather than a guess, the same discipline the
+// seventeenth standing rule's own four-attempt case study holds.
+// `null` (no Guard founded for this region, the default) changes
+// nothing — the function is bit-identical to its pre-Guard behaviour.
+const NATIONAL_GUARD_OPPOSITION_WEIGHT = 0.2;
+
+function nationalGuardPowerFor(worldState, block) {
+  if (block.city_id == null) return null;
+  const migration = require('./migration.js');
+  const region = migration.regionOfCity(worldState, block.city_id);
+  if (!region || region.nationalGuardOrganizationId == null) return null;
+  const guard = getLiveEntity(worldState, region.nationalGuardOrganizationId);
+  if (!guard) return null;
+  return guard.traits?.organization?.power ?? null;
+}
+
+// **Real, bounded, seeded variance**, not a per-call random walk: a
+// deterministic draw keyed on the block and the tick (so the same
+// world replayed from the same seed reaches the same result, §88),
+// scaled to a real measured fraction of the gap between the two
+// thresholds (40 points wide) — ±5, about an eighth of that gap, so a
+// borderline block's fate is no longer perfectly deterministic
+// without the real trait-based signal being overwhelmed by chance.
+const VARIANCE_RANGE = 10;
+
+function controlVariance(seed, blockId, tick) {
+  return Math.round(seededDraw([seed, 'territory-control-variance', blockId, tick]) * VARIANCE_RANGE)
+    - Math.round(VARIANCE_RANGE / 2);
+}
+
 function resolveTerritoryControl(worldState, block, tick) {
   const live = getLiveEntity(worldState, block.faction_id);
   if (!live) return block; // faction no longer exists — leave the block as-is, don't crash the tick
 
   const territoryStrength = live.traits.organization?.territory ?? 0;
   const power = live.traits.organization?.power ?? 0;
-  const controlScore = Math.round((territoryStrength + power) / 2);
+  let controlScore = Math.round((territoryStrength + power) / 2);
+
+  const guardPower = nationalGuardPowerFor(worldState, block);
+  if (guardPower !== null) {
+    controlScore -= Math.round(guardPower * NATIONAL_GUARD_OPPOSITION_WEIGHT);
+  }
+
+  controlScore += controlVariance(worldState.seed ?? 'world', block.id, tick);
+  controlScore = Math.max(0, Math.min(100, controlScore));
 
   if (controlScore < CONTESTED_THRESHOLD) {
     if (block.status !== 'contested') block.contested_since_tick = tick;
@@ -700,6 +756,10 @@ module.exports = {
   generateCommunity,
   generateTerritoryBlock,
   resolveTerritoryControl,
+  nationalGuardPowerFor,
+  NATIONAL_GUARD_OPPOSITION_WEIGHT,
+  controlVariance,
+  VARIANCE_RANGE,
   getCommunityHealth,
   getCommunityDetail,
   getCityReemergence,

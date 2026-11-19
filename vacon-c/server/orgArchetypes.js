@@ -85,7 +85,10 @@ const NEUTRAL = [35, 65];
 //: place one, and it is stated because "an intelligence service and a
 //: neighbourhood association are both organizations" is true and
 //: useless.
-const REACHES = ['community', 'city', 'world'];
+// `'region'` added for `'national guard'` — a real, distinct scope
+// (the state a Guard unit actually answers to) no prior archetype
+// needed, every one of them topping out at `'city'` or `'world'`.
+const REACHES = ['community', 'city', 'region', 'world'];
 
 // ---------------------------------------------------------------------
 // The archetypes
@@ -642,6 +645,40 @@ const ARCHETYPES = {
       diplomacy: [30, 70],
     },
     posts: ['manager'],
+  },
+
+  // **National Guard, by direct instruction (task tracker: "National
+  // Guard / federal enforcement archetypes").** `'federal law
+  // enforcement'` above already models reach across jurisdictions;
+  // this is the real, distinct, STATE-controlled counterpart —
+  // National Guard Bureau's own real figures: roughly 430,000 total
+  // Army and Air National Guard personnel nationwide, state-controlled
+  // under Title 32 and federalizable under Title 10, whose real
+  // primary peacetime roles are disaster response and civil-
+  // disturbance support, not ordinary policing (`policing.js`'s own
+  // per-area model) or cross-jurisdiction law enforcement
+  // (`'federal law enforcement'`'s own). `type: 'government'` and no
+  // `isFaction` — a real state institution, not a landholding faction,
+  // the same distinction `'federal law enforcement'`/`'political
+  // party'` already hold. `reach: 'region'`, a real value this table
+  // had never needed before (every prior entry tops out at `'city'`
+  // or `'world'`) — a Guard unit's real jurisdiction is the STATE,
+  // this engine's own region tier, not a single city and not the
+  // whole civilization.
+  'national guard': {
+    type: 'government',
+    reach: 'region',
+    note: 'State-controlled, federalizable, real disaster-response/civil-disturbance '
+      + 'role — not ordinary policing and not cross-jurisdiction federal enforcement. '
+      + '`territory.js#resolveTerritoryControl` reads this archetype\'s own live `power` as '
+      + 'a real opposing-force term wherever one has been founded for a block\'s region.',
+    traits: {
+      territory: [50, 80],
+      power: [55, 85],
+      internalLoyalty: [60, 90],
+      production: [5, 25],
+    },
+    posts: ['officer', 'engineer', 'physician', 'logistician'],
   },
 };
 

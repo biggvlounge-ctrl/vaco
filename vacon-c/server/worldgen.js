@@ -389,6 +389,16 @@ const DEFAULTS = {
   landmarksPerCity: 6,
   // Per AREA now, not per city — see the placement block below.
   shopsPerArea: 3,
+  // **Opt-in, same posture -- task tracker: "National Guard / federal
+  // enforcement archetypes."** One real `'national guard'`
+  // organization (`server/orgArchetypes.js`'s own new entry) founded
+  // per REGION, alongside the real Statehouse government already
+  // founded there -- a state-controlled real institution, not a
+  // landholding faction. Off, every existing call to
+  // `generateWorld()` gets the exact unchanged world the whole suite
+  // already asserts against -- no National Guard ever founded, same
+  // as today.
+  nationalGuard: false,
 };
 
 // The ten infrastructure types a city gets, with capacity expressed
@@ -2440,6 +2450,33 @@ function generateWorld(options = {}) {
       scopeId: region.id,
     });
     summary.regionGovernmentIds.push(regionGov.id);
+
+    // **One real National Guard organization per region, opt-in
+    // (`config.nationalGuard`) -- and, by construction, also gated on
+    // `config.scopedGovernments`, since a Guard answering to a region
+    // government that was never founded would be incoherent.**
+    // `isFaction` is absent -- the same
+    // real `'government'`/non-faction shape `'federal law
+    // enforcement'`/`'political party'` already hold -- so this is
+    // founded with `generateOrganization` alone, never
+    // `generateFaction`. Idempotent via `region.nationalGuardFounded`,
+    // the same in-memory marker shape `city.drugOrgFounded` already
+    // holds for the identical "a second `generateWorld()` call on a
+    // growing world must not found a second one" reason.
+    if (config.nationalGuard && !region.nationalGuardFounded) {
+      const guard = orgArchetypes.found(w, {
+        archetype: 'national guard',
+        name: `${region.name} National Guard`,
+        seed: config.seed,
+        key: region.id,
+        generateOrganization: engine.generateOrganization,
+        generateFaction: engine.generateFaction,
+      });
+      region.nationalGuardFounded = true;
+      region.nationalGuardOrganizationId = guard.id;
+      summary.organizations += 1;
+      summary.nationalGuardOrganizationId = guard.id;
+    }
   }
 
   // **Real prisons need a real operator too, or a Correctional
