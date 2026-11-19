@@ -1651,6 +1651,20 @@ already-calibrated abstract `statecraft.garrisonIn` signal
 `authority.js` reads elsewhere. See CLAUDE.md's hundred-and-thirteenth
 standing rule.
 
+## Carry-capacity / bags / storage
+`vehicles.js`'s own header had already declared this gap honestly --
+"a real number with nothing real to multiply." `server/carryCapacity.js`
+closes it, measuring capacity by real item COUNT rather than weight,
+since no item in this engine's catalogue carries a weight/size field.
+The "bags" half of the request turns out to already exist:
+`salvage.js`'s own `container` product (Tier 1, Crafting, real
+materials) had been real and craftable with zero consumers anywhere --
+found rather than built from scratch. Wired into exactly one real
+consumer this round -- `discovery.search` -- so a find that would put
+the searcher over capacity still costs the location a real find but is
+reported `carried: false` rather than added to inventory. See CLAUDE.md's
+hundred-and-fourteenth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

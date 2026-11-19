@@ -7268,3 +7268,32 @@ falls" was never actually a question. Mutation-verified: zeroing
 `NATIONAL_GUARD_OPPOSITION_WEIGHT` is caught by exactly one of
 `test/territory-national-guard.test.js`'s six tests, confirming the
 weight is load-bearing rather than decorative.
+
+**A hundred-and-fourteenth, closing the next pending task: a real
+carry-capacity limit, and the "bags" half of the request turned out
+to already exist.** `vehicles.js`'s own header had already declared
+this gap honestly — "a real number with nothing real to multiply."
+`server/carryCapacity.js` closes it, and measures capacity by real
+item COUNT rather than weight, because no item in this engine's own
+catalogue (`items.js`'s real §26/§27/§28 vocabulary) carries a
+weight or size field — the same honest "declare the simpler real
+thing rather than invent the harder one" choice this file's own
+thirty-third standing rule already made for a body-composition
+index. `salvage.js`'s own `container` product (Tier 1, Crafting,
+real materials — plastic/scrap_metal/junk) had been real and
+craftable since that file was written, with zero consumers anywhere
+in `server/` — the eleventh standing rule's own trap, found rather
+than built from scratch.
+
+Wired into exactly one real consumer this round: `discovery.search`
+is the one place a player actually ACQUIRES an item through a real
+action, so a find that would put the searcher over capacity is still
+a real find (the location still loses it, the same honest "searched
+and found nothing you could carry" cost the existing empty-candidates
+branch already pays) but is not added to the holder's own inventory —
+reported as `carried: false` rather than silently dropped.
+`heists.js`/`barter.js`/other `inventory.give` call sites are
+deliberately NOT gated this round, named here as real, separate,
+future work rather than silently implied. Mutation-verified: removing
+the capacity check from `discovery.search`'s book-kind branch is
+caught by exactly one of `test/carry-capacity.test.js`'s eight tests.

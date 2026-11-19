@@ -297,6 +297,8 @@ function search(worldState, entityId, propertyId, options = {}) {
   const knowledge = require('./knowledge.js');
   // eslint-disable-next-line global-require
   const missions = require('./missions.js');
+  // eslint-disable-next-line global-require
+  const carryCapacity = require('./carryCapacity.js');
 
   const property = (worldState.properties || []).find((p) => p.id === propertyId);
   if (!property) throw new Error(`no property ${propertyId}`);
@@ -328,8 +330,9 @@ function search(worldState, entityId, propertyId, options = {}) {
     const field = fields[Math.floor(seeded.seededDraw(['find-field', tick, propertyId]) * fields.length)];
     const source = BOOK_SOURCE_BY_POOL[field] ?? 'books';
     const itemName = knowledge.itemNameFor(field, source);
-    inventory.give(worldState, { entityId, itemName, quantity: 1, tick });
-    found = { kind: 'book', itemName, field, source };
+    const carried = carryCapacity.canCarry(worldState, entityId, 1);
+    if (carried) inventory.give(worldState, { entityId, itemName, quantity: 1, tick });
+    found = { kind: 'book', itemName, field, source, carried };
   } else if (kind === 'artifact') {
     // **`location_id` is the point.** `artifacts.location_id` has been
     // a real column since the schema was written and `generateArtifact`
@@ -370,8 +373,9 @@ function search(worldState, entityId, propertyId, options = {}) {
     const item = candidates[
       Math.floor(seeded.seededDraw(['find-item', tick, propertyId, entityId]) * candidates.length)
     ];
-    inventory.give(worldState, { entityId, itemName: item.name, quantity: 1, tick });
-    found = { kind: 'item', itemName: item.name, category };
+    const carried = carryCapacity.canCarry(worldState, entityId, 1);
+    if (carried) inventory.give(worldState, { entityId, itemName: item.name, quantity: 1, tick });
+    found = { kind: 'item', itemName: item.name, category, carried };
   }
 
   property.discoveries_taken = takenAt(worldState, propertyId) + 1;
