@@ -255,7 +255,13 @@ function valueOfHoldings(worldState, entityId, options = {}) {
 // the agreed price in their own favour. That trait existed on every
 // NPC in every world and was read by nothing.
 function agreedPrice(worldState, itemName, options = {}) {
-  const { buyerId = null, sellerId = null, cityId = null, quantity = 1 } = options;
+  const {
+    buyerId = null, sellerId = null, cityId = null, quantity = 1,
+    // **`fencing.js`'s own real discount, not a second pricing model.**
+    // Default 1 — every call before this one stays byte-for-byte
+    // unaffected.
+    priceMultiplier = 1,
+  } = options;
   const key = barterScore(worldState, itemName, { cityId });
 
   const skillOf = (id) => {
@@ -282,7 +288,8 @@ function agreedPrice(worldState, itemName, options = {}) {
   const standing = (trustOf(sellerId) - 50) / 50;
   const unit = key.Final_Barter_Score
     * (1 + edge * BARTER_SKILL_SWING)
-    * (1 + standing * TRUST_PREMIUM);
+    * (1 + standing * TRUST_PREMIUM)
+    * priceMultiplier;
   return {
     ...key,
     quantity,
@@ -299,7 +306,10 @@ function agreedPrice(worldState, itemName, options = {}) {
 // something is a lending decision, not a purchase. A buyer who cannot
 // pay does not buy.
 function exchange(worldState, options = {}) {
-  const { buyerId, sellerId, itemName, quantity = 1, cityId = null, tick = worldState.tick ?? 0 } = options;
+  const {
+    buyerId, sellerId, itemName, quantity = 1, cityId = null, tick = worldState.tick ?? 0,
+    priceMultiplier = 1,
+  } = options;
 
   if (buyerId === sellerId) throw new Error('exchange: an entity cannot trade with itself');
   if (!Number.isFinite(quantity) || quantity <= 0) {
@@ -311,7 +321,27 @@ function exchange(worldState, options = {}) {
     }
   }
 
-  const deal = agreedPrice(worldState, itemName, { buyerId, sellerId, cityId, quantity });
+  // **A stolen holding needs a real fence, not an ordinary buyer.**
+  // `vehicles.stealVehicle` is the one real writer of `stolen: true`
+  // today (see `fencing.js`'s own header); this check is generic over
+  // ANY item carrying it, so a future stolen-goods producer closes the
+  // same real gap for free rather than needing its own copy of this
+  // guard. Checked against every one of the seller's holdings for this
+  // item — a stacked holding has no finer real grain than that.
+  const sellerHoldings = inventory.holdingsOf(worldState, sellerId).filter((h) => h.item_name === itemName);
+  if (sellerHoldings.some((h) => h.stolen === true)) {
+    // eslint-disable-next-line global-require
+    const fencing = require('./fencing.js');
+    if (!fencing.isFence(worldState, buyerId)) {
+      return {
+        settled: false,
+        reason: `${itemName} is stolen — only a real fence (Black Market Ties `
+          + `${fencing.FENCE_BLACK_MARKET_TIES_FLOOR}+) will take it`,
+      };
+    }
+  }
+
+  const deal = agreedPrice(worldState, itemName, { buyerId, sellerId, cityId, quantity, priceMultiplier });
   const buyer = economy.getLatestFinances(worldState, buyerId);
 
   // **Affordability is SAVINGS, not net worth**, and the first version

@@ -215,6 +215,19 @@ function stealVehicle(worldState, thiefEntityId, victimEntityId, type, options =
   inventory.transfer(worldState, {
     fromId: victimId, toId: Number(thiefEntityId), itemName: type, quantity: 1, tick,
   });
+  // **Real provenance, where none existed before.** No inventory
+  // holding anywhere in this engine ever carried where it came from —
+  // `fencing.js`'s own header on why that made a legitimately-owned
+  // vehicle and a stolen one indistinguishable the moment either
+  // reached `barter.exchange`. The flag lands on the holding ROW
+  // (itemName + condition), the real grain this schema has — a known,
+  // stated limitation for the rare case a thief already held an
+  // identical, legitimately-owned vehicle of the same type and
+  // condition, named here rather than quietly swept aside.
+  const stolenHolding = inventory.findHolding(worldState, Number(thiefEntityId), type, {
+    condition: holding.condition,
+  });
+  if (stolenHolding) stolenHolding.stolen = true;
   const incident = crime.recordCrime(worldState, {
     category: 'theft',
     perpetratorId: Number(thiefEntityId),

@@ -1696,6 +1696,22 @@ no second confidence model. `mask`/`wig` are real, craftable
 build one" and "what it means." See CLAUDE.md's hundred-and-sixteenth
 standing rule.
 
+## Car fencing (stolen-vehicle resale market)
+A stolen vehicle had nowhere to record where it came from, so it sold
+through `barter.exchange` at the exact same price a legitimate owner
+would get. `vehicles.stealVehicle` now sets a real `stolen: true` flag
+on the resulting holding row. `server/fencing.js`'s `isFence` reads the
+real `criminal.'Black Market Ties'` trait `policing.evasionOf` already
+treats as "moves things without getting caught" -- measured against a
+real 180-NPC generated population, with the floor set at the measured
+p90 (87). `barter.exchange` now refuses to move ANY `stolen: true`
+holding to a buyer who is not a real fence (generic over every item,
+not vehicle-specific), and a real fence pays a real discount
+(`FENCE_PRICE_MULTIPLIER = 0.6`) through a new, optional
+`priceMultiplier` on `agreedPrice`/`exchange` that defaults to 1 --
+every existing call stays byte-for-byte unaffected. See CLAUDE.md's
+hundred-and-seventeenth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

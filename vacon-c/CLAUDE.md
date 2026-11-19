@@ -7366,3 +7366,38 @@ second confidence model or a second clearance check. Bounded to 1, the
 same clamp the function's own base skill average already carries.
 Mutation-verified: zeroing the bonus in `evasionOf` is caught by 4 of
 `test/disguise.test.js`'s seven tests.
+
+**A hundred-and-seventeenth, closing the next pending task: a stolen
+car was priced identically to a clean one, because nothing in this
+schema ever recorded where it came from.** `vehicles.stealVehicle`
+moved a real vehicle via `inventory.transfer` and recorded a real
+theft; what happened after that was an ordinary holding, sellable to
+anybody through `barter.exchange` at the exact same price a legitimate
+owner would get. A resale market needs a real difference between a hot
+car and a clean one, and there was none.
+
+`vehicles.stealVehicle` now sets a real `stolen: true` flag directly on
+the resulting holding row — a known, stated limitation named in its own
+comment: the flag lives on the row (itemName + condition), the real
+grain `inventory.js` has, so the rare case of a thief already holding
+an identical legitimate vehicle is not separately tracked.
+`server/fencing.js` is the new module: `isFence` reads the real
+`criminal.'Black Market Ties'` trait `policing.evasionOf` already
+treats as "moves things without getting caught" — measured, not
+guessed, against a real 180-NPC generated population (min 10, median
+52, p75 75, **p90 87**, p95 92, max 95), and `FENCE_BLACK_MARKET_TIES_
+FLOOR = 87` is that measured p90, the real top tenth of this
+population by the trait that already means this.
+
+`barter.agreedPrice`/`exchange` both gained a real, optional
+`priceMultiplier` (default 1 — every existing call stays byte-for-byte
+unaffected) rather than a second pricing path, and `exchange` itself
+now refuses to move ANY holding carrying `stolen: true` to a buyer who
+is not a real fence — generic over every item, not hardcoded to
+vehicles, so a future stolen-goods producer closes the same gap for
+free. `FENCE_PRICE_MULTIPLIER = 0.6`, flagged interpretive the same
+honesty `VICTIM_BONUS`/`DISGUISE_EVASION_BONUS` already carry — a fence
+prices in the real risk of moving stolen goods. Mutation-verified
+twice: disabling the stolen-goods gate is caught by 2 of
+`test/fencing.test.js`'s eight tests; removing `priceMultiplier` from
+`agreedPrice`'s own computation is caught by 1 more.
