@@ -9624,3 +9624,47 @@ assigns. 3 new tests in `test/recruitment.test.js`, both real gates
 mutation-verified (the idle-youth check: caught; the redundant
 employment check: confirmed genuinely redundant rather than silently
 dropped).
+
+**A hundred-and-sixty-fifth, tasks #185 and #196, and both close with
+a confirmation rather than new code.** Asked directly whether
+hospitals and returning guns already work the way two new requests
+described, checking against a real generated world rather than
+assuming either was a gap.
+
+**Hospital takeover (task #185): real, confirmed end to end.**
+"If you get a medical physician or a certain amount... you can take
+over certain things like hospitals" is `control.js`'s own nineteenth
+standing rule worked example, and it already runs: a real generated
+world (`worldgen.generateWorld`) produces a real `hospital`-type
+organization, `control.compositionFor` reads its real `physician`
+specialist requirement off `occupations.postFor('hospital')`, and
+`control.viableTargetsFor` lists it as a real candidate target —
+confirmed directly against a freshly generated world, not only against
+`test/control.test.js`'s own hand-built fixture ("a hospital needs
+medical experts"). The one honest, narrower finding: a small generated
+world (1 city, 10 communities, 1,000 residents) produced the real
+hospital ORGANIZATION but no real hospital PROPERTY/landmark row — real
+per-capita landmark density (task #76) evidently needs a larger
+population than that before one is placed. The organization-scale
+takeover is the one this engine's own existing tests already exercise
+and the one the standing rule's own worked example describes; the
+property-scale path (a hospital BUILDING inheriting the same
+specialist requirement via `operating_organization_id`) is the
+identical real mechanism `control.js#SCALES.property.specialists`
+already provides once a hospital property exists, so nothing new is
+needed there either — only a bigger generated world to observe it in.
+
+**Gun-reflux chaos (task #196): also real, also confirmed.** "When
+guns come back, that will also start different chaoses" is already
+`crime.GUN_SEVERITY_RATIO` (a real, measured ~1.14 ratio, not invented
+— see the fiftieth standing rule) scaling `tick.js#GUN_CHAOS_MULTIPLIER`,
+which raises how often an armed aggressor's flashpoint fires once a
+real firearm is both equipped AND loaded
+(`weapons.isFunctioningFirearm`). `test/tick-security.test.js` already
+holds the real boundary-draw proof: the identical pair at the identical
+tick flashes when armed and does not when unarmed. Ammunition
+manufacture itself is real and era-gated
+(`weapons.MANUFACTURING_ERA = 'industrialization'`), so "guns coming
+back" is already a real, reachable, measured event in this engine
+rather than a flat always-on state. No new mechanic — the request was
+already answered before it was asked.

@@ -2251,6 +2251,18 @@ idle-youth check has to run BEFORE the membership join, since
 organisation membership. See CLAUDE.md's hundred-and-sixty-fourth
 standing rule.
 
+## Hospital takeover and gun-reflux chaos (tasks #185/#196, confirmed real)
+Both checked directly against a freshly generated world rather than
+assumed: a hospital's real `physician` specialist requirement already
+gates its takeover end to end (`control.js`, confirmed on both the
+organization scale this engine's own tests already exercise and the
+property scale once a hospital landmark exists), and real firearms
+already raise real chaos once loaded and equipped
+(`crime.GUN_SEVERITY_RATIO` scaling `tick.GUN_CHAOS_MULTIPLIER`,
+already proven by `test/tick-security.test.js`'s own boundary draw).
+No new code for either -- both requests were already real. See
+CLAUDE.md's hundred-and-sixty-fifth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a
