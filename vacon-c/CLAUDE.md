@@ -8272,3 +8272,102 @@ private-school-only religious-affiliation gate, the (fixed)
 already-assigned guard, and the secondary-only performing-arts gate —
 all three caught.
 
+**A hundred-and-thirty-first, by direct instruction, outside "the next
+five": Mission Chain #0, "Secure Your Household" — the first real
+missions a new citizen gets, and they are not the five reference-game
+chains already built.**
+
+The owner's own words, in order: "see what's going on, secure your
+household... get your family together... secure food, weapons,
+[check on] outside family and friends." `server/tutorialMissions.js`'s
+existing five chains (Zelda/Maniac Mansion/Carmen Sandiego/Oregon
+Trail/River City Ransom/Contra) are a gameplay-variety tour; none of
+them is the one thing a person in this engine's own collapse premise
+would really do first. Numbered zero rather than inserted before
+Chain #1, deliberately — renumbering 1-5 would have meant rewriting
+every existing reference to them for no real behavioural reason.
+
+**Five real, ordered steps, no new mechanic except one, and the one
+new mechanic closes a real, checked gap rather than assuming one.**
+`characterCreation.createCharacter` never assigns a new player a real
+home — checked directly (`grep -n "home_property_id" server/
+characterCreation.js` returns nothing) before writing anything, the
+same "citation is not presence" discipline this file opened with.
+"Secure your household" is therefore a real action, not a fact to
+confirm: `migration.vacanciesByCommunity` (task #47's own real
+vacant-property finder) names one real, reachable, non-condemned home,
+and the player takes it with the existing `attempt-takeover` verb —
+the identical shape Chain #4 already uses for a harder target. Every
+other step reuses a real mechanism directly: `authority.writOf`/
+`crime.dangerByCommunity` for "see what's going on"; the player's own
+real, living immediate family named by name for "gather who's coming
+with you," handed the existing `assemble-party` verb; `salvage.make`'s
+real crafted `protection` items for "secure a way to defend it," the
+identical honest limit Chain #4's own design note already states ("no
+dedicated weapon category"); `characterCreation.describeFamilyTree`
+for "check on everyone else."
+
+**"Secure food and water" is not a sixth new mechanic — it is Chain
+#3's own `offerSurvivalMission`, called once and reported under both
+chains' labels.** The two phrasings are the identical real concern
+(`mortality.survivalScarcity` against the real poverty line); building
+a second, parallel scarcity check would have been two disagreeing
+answers to one real question, the third standing rule's own shape.
+`CHAIN_MISSIONS` lists the one real missionKey twice, once per real
+label, so completing it correctly advances both chains' own count
+rather than leaving one permanently short of 100%.
+
+**A non-robust mutation test, caught the same way this session's own
+gossip.js/familyDominance.js/schoolSystem.js rounds already found one:
+a guard whose removal changes nothing is decoration, not a gate.**
+`offerSecureHouseholdMission`'s first version checked `vacancies
+.length === 0` immediately before checking `!property` — removing the
+first check changed no test result at all (36/36 still passing),
+because an empty real list already makes `vacancies[0]` `undefined`,
+which the second, real check catches on its own. Removed rather than
+left in place with a test that could not tell the two states apart —
+the twentieth standing rule's own shape, found here before it shipped
+rather than after. Mutation-verified three times in total: the real
+`!property` guard (the one that actually does the job), the deceased-
+member exclusion in "gather who's coming with you," and the
+named-count gate in "check on everyone else" — all three caught.
+
+**Extended the same day, by the owner's own further words: "If you
+have kids, get the kids from school. If you're coming from work, deal
+with your work colleagues."** Two more real steps, same chain, same
+discipline — neither invents a mechanic, both anchor at a real
+property the way every other Chain #0 step already does.
+`offerKidsFromSchoolMission` names the citizen's own real, living,
+still-enrolled, school-age children (`statecraft.SCHOOL_AGE_MIN` to
+the new `CHILD_SCHOOL_AGE_MAX = 18`, chosen specifically so it meets
+`students.COLLEGE_AGE_MIN` without overlap — a school-age child is
+fetched FROM school, a college-age adult is not) and anchors at a
+real school via the new `schoolSystem.schoolsOf`, falling back to the
+same community anchor every other step without a dedicated building
+uses. `offerWorkColleaguesMission` names the citizen's own real,
+currently-active coworkers at the real same employer
+(`economy.listEmployment` filtered on `economy.getEmployment`'s own
+`employer_organization_id`, excluding the citizen), anchored at the
+caller's own `anchorPropertyId` or the community anchor. Both return
+`null` on an honest unmet precondition — no real family, no real job,
+no real coworkers left — never throwing. `CHAIN_MISSIONS` grew from 5
+to 7 real Chain #0 entries; `seedTutorialStart`'s own returned object
+and `recordTutorialProgress` both carry the two new mission ids
+alongside the originals.
+
+**A non-robust mutation test found and fixed a fourth time, same
+session: the deceased-coworker exclusion in `offerWorkColleaguesMission`
+was untested and the mutation that removed it passed clean.** The
+three dedicated tests written first (names a real active coworker;
+null with no real job; null with no other real coworker) never
+constructed a deceased one, so mutating `.filter((n) => n &&
+n.status !== 'deceased')` down to `.filter((n) => n)` left the whole
+suite green. Fixed by adding a fourth test that hires a colleague and
+then sets their own `status` to `'deceased'` before asserting `null`
+— the same diagnostic this session already ran on gossip.js's
+resident-order mutation and schoolSystem.js's idempotence check: mutate
+the gate, and if nothing fails, the test was lying about what it
+verified. All three of this round's real gates (the school-age band,
+the deceased-coworker exclusion, the real employer-id match) are
+mutation-verified now; `server/tutorialMissions.js` confirmed
+byte-identical to its own pre-mutation backup after each check.

@@ -61,6 +61,16 @@ function hire(worldState, entityId, position) {
   });
 }
 
+// A real, ordinary (non-landmark) home — the exact shape
+// `migration.vacanciesByCommunity` looks for: `type: 'residential'`,
+// no `landmark_category`, condition above the real condemned floor.
+function vacantHome(worldState, id, communityId, condition = 100) {
+  worldState.properties.push({
+    id, type: 'residential', condition, community_id: communityId, landmark_category: null,
+  });
+  return worldState.properties[worldState.properties.length - 1];
+}
+
 test('giveStartingBook hands a real, study-able book to a real entity', () => {
   const npc = engine.generateNPC({ education: 'basic' });
   const result = tutorialMissions.giveStartingBook(engine.WorldState, npc.id);
@@ -82,6 +92,262 @@ test('giveStartingBook refuses a field §24 does not name', () => {
     () => tutorialMissions.giveStartingBook(engine.WorldState, npc.id, { field: 'combat' }),
     /not a real §24 field/,
   );
+});
+
+// ---------------------------------------------------------------------
+// Chain #0, "Secure Your Household"
+// ---------------------------------------------------------------------
+
+test('offerAssessSurroundingsMission names the real regime and real danger reading', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 68001;
+  engine.WorldState.communities.push({ id: 68001, city_id: 69801 });
+  landmark(engine.WorldState, 68101, 'library', 68001);
+
+  const offer = tutorialMissions.offerAssessSurroundingsMission(engine.WorldState, npc.id);
+  assert.ok(offer, 'no assess-surroundings mission was opened');
+  assert.equal(offer.mission.location_property_id, 68101);
+  assert.match(offer.mission.objective, /this area reads/);
+});
+
+test('offerAssessSurroundingsMission returns null for a citizen with no real community', () => {
+  const npc = engine.generateNPC();
+  assert.equal(tutorialMissions.offerAssessSurroundingsMission(engine.WorldState, npc.id), null);
+});
+
+test('offerKidsFromSchoolMission names a real, still-enrolled, school-age child by name', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 68011;
+  engine.WorldState.communities.push({ id: 68011, city_id: 69811 });
+  const family = engine.generateFamily({ surname: 'Fetched' });
+  engine.addFamilyMember(family.id, npc.id, 'founder', 1);
+  const kid = engine.generateNPC({ name: 'Riley Fetched' });
+  kid.createdTick = engine.WorldState.tick - 10 * YEAR; // real, school-age
+  kid.schoolEnrolled = true;
+  engine.addFamilyMember(family.id, kid.id, 'child', 2);
+  landmark(engine.WorldState, 68111, 'school', 68011);
+
+  const offer = tutorialMissions.offerKidsFromSchoolMission(engine.WorldState, npc.id);
+  assert.ok(offer, 'no kids-from-school mission was opened');
+  assert.ok(offer.childIds.includes(kid.id));
+  assert.match(offer.mission.objective, /Riley Fetched/);
+  assert.equal(offer.mission.location_property_id, 68111);
+});
+
+test('offerKidsFromSchoolMission never names a real adult child, or one not really enrolled', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 68012;
+  engine.WorldState.communities.push({ id: 68012, city_id: 69812 });
+  const family = engine.generateFamily({ surname: 'Grown-Up' });
+  engine.addFamilyMember(family.id, npc.id, 'founder', 1);
+  const adultChild = engine.generateNPC();
+  adultChild.createdTick = engine.WorldState.tick - 25 * YEAR; // real adult
+  adultChild.schoolEnrolled = true;
+  engine.addFamilyMember(family.id, adultChild.id, 'child', 2);
+  const unenrolledChild = engine.generateNPC();
+  unenrolledChild.createdTick = engine.WorldState.tick - 9 * YEAR;
+  unenrolledChild.schoolEnrolled = false;
+  engine.addFamilyMember(family.id, unenrolledChild.id, 'child', 2);
+  landmark(engine.WorldState, 68112, 'school', 68012);
+
+  assert.equal(tutorialMissions.offerKidsFromSchoolMission(engine.WorldState, npc.id), null);
+});
+
+test('offerKidsFromSchoolMission returns null for a citizen with no real family', () => {
+  const npc = engine.generateNPC();
+  assert.equal(tutorialMissions.offerKidsFromSchoolMission(engine.WorldState, npc.id), null);
+});
+
+test('offerWorkColleaguesMission names real, currently-active coworkers at the real same employer', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 68013;
+  engine.WorldState.communities.push({ id: 68013, city_id: 69813 });
+  const employer = engine.generateOrganization({ name: 'Shared Employer', type: 'business' });
+  hire(engine.WorldState, npc.id, 'trader');
+  engine.WorldState.employmentRecords[engine.WorldState.employmentRecords.length - 1].employer_organization_id = employer.id;
+  const colleague = engine.generateNPC({ name: 'Morgan Coworker' });
+  hire(engine.WorldState, colleague.id, 'trader');
+  engine.WorldState.employmentRecords[engine.WorldState.employmentRecords.length - 1].employer_organization_id = employer.id;
+  landmark(engine.WorldState, 68113, 'shop', 68013);
+
+  const offer = tutorialMissions.offerWorkColleaguesMission(engine.WorldState, npc.id);
+  assert.ok(offer, 'no work-colleagues mission was opened');
+  assert.ok(offer.colleagueIds.includes(colleague.id));
+  assert.match(offer.mission.objective, /Morgan Coworker/);
+});
+
+test('offerWorkColleaguesMission returns null for a citizen who holds no real job', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 68014;
+  engine.WorldState.communities.push({ id: 68014, city_id: 69814 });
+  landmark(engine.WorldState, 68114, 'shop', 68014);
+  assert.equal(tutorialMissions.offerWorkColleaguesMission(engine.WorldState, npc.id), null);
+});
+
+test('offerWorkColleaguesMission returns null when nobody else really works there', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 68015;
+  engine.WorldState.communities.push({ id: 68015, city_id: 69815 });
+  const employer = engine.generateOrganization({ name: 'Solo Employer', type: 'business' });
+  hire(engine.WorldState, npc.id, 'trader');
+  engine.WorldState.employmentRecords[engine.WorldState.employmentRecords.length - 1].employer_organization_id = employer.id;
+  landmark(engine.WorldState, 68115, 'shop', 68015);
+  assert.equal(tutorialMissions.offerWorkColleaguesMission(engine.WorldState, npc.id), null);
+});
+
+test('offerWorkColleaguesMission never names a real deceased coworker, and returns null when that was the only one', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 68016;
+  engine.WorldState.communities.push({ id: 68016, city_id: 69816 });
+  const employer = engine.generateOrganization({ name: 'Bereaved Employer', type: 'business' });
+  hire(engine.WorldState, npc.id, 'trader');
+  engine.WorldState.employmentRecords[engine.WorldState.employmentRecords.length - 1].employer_organization_id = employer.id;
+  const deceasedColleague = engine.generateNPC({ name: 'Late Coworker' });
+  hire(engine.WorldState, deceasedColleague.id, 'trader');
+  engine.WorldState.employmentRecords[engine.WorldState.employmentRecords.length - 1].employer_organization_id = employer.id;
+  deceasedColleague.status = 'deceased';
+  landmark(engine.WorldState, 68116, 'shop', 68016);
+
+  assert.equal(tutorialMissions.offerWorkColleaguesMission(engine.WorldState, npc.id), null);
+});
+
+test('offerSecureHouseholdMission names a real, specific vacant home and hands over attempt-takeover', () => {
+  const npc = engine.generateNPC();
+  npc.createdTick = engine.WorldState.tick - 30 * YEAR;
+  npc.communityId = 68002;
+  engine.WorldState.communities.push({ id: 68002, city_id: 69802 });
+  const family = engine.generateFamily({ surname: 'Household' });
+  engine.addFamilyMember(family.id, npc.id, 'founder', 1);
+  vacantHome(engine.WorldState, 68202, 68002);
+  inventory.give(engine.WorldState, {
+    entityId: npc.id, itemName: 'Hammer', quantity: 1, tick: engine.WorldState.tick,
+  });
+
+  const offer = tutorialMissions.offerSecureHouseholdMission(engine.WorldState, npc.id);
+  assert.ok(offer, 'no secure-household mission was opened');
+  assert.equal(offer.propertyId, 68202);
+  assert.match(offer.mission.objective, /Secure your household/);
+
+  // Real end to end: the same two verbs Chain #4 already hands a
+  // citizen for a harder target.
+  const player = engine.generatePlayer({ linkedEntityId: npc.id });
+  const accepted = engine.dispatchAction(player.id, {
+    action: 'accept-mission', missionId: offer.mission.id,
+  });
+  assert.equal(accepted.result.mission.status, 'accepted');
+  engine.dispatchAction(player.id, {
+    action: 'attempt-takeover', scale: 'property', locationId: 68202,
+  });
+  const resolved = engine.dispatchAction(player.id, {
+    action: 'resolve-mission', missionId: offer.mission.id, outcome: 'completed',
+  });
+  assert.equal(resolved.result.paid.amount, tutorialMissions.TUTORIAL_HOUSEHOLD_REWARD);
+});
+
+test('offerSecureHouseholdMission returns null when the community has no real vacancy', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 68003;
+  engine.WorldState.communities.push({ id: 68003, city_id: 69803 });
+  assert.equal(tutorialMissions.offerSecureHouseholdMission(engine.WorldState, npc.id), null);
+});
+
+test('offerSecureHouseholdMission never offers a real condemned property', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 68004;
+  engine.WorldState.communities.push({ id: 68004, city_id: 69804 });
+  vacantHome(engine.WorldState, 68204, 68004, 5); // at/below the real condemned floor
+  assert.equal(tutorialMissions.offerSecureHouseholdMission(engine.WorldState, npc.id), null);
+});
+
+test('offerGatherFamilyMission names the real, living immediate family to bring along', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 68005;
+  engine.WorldState.communities.push({ id: 68005, city_id: 69805 });
+  const family = engine.generateFamily({ surname: 'Together' });
+  engine.addFamilyMember(family.id, npc.id, 'founder', 1);
+  const spouse = engine.generateNPC({ name: 'Jordan Together' });
+  engine.addFamilyMember(family.id, spouse.id, 'spouse', 1);
+  landmark(engine.WorldState, 68105, 'library', 68005);
+
+  const offer = tutorialMissions.offerGatherFamilyMission(engine.WorldState, npc.id);
+  assert.ok(offer, 'no gather-family mission was opened');
+  assert.ok(offer.memberIds.includes(spouse.id));
+  assert.match(offer.mission.objective, /Jordan Together/);
+});
+
+test('offerGatherFamilyMission returns null for a citizen with no real family', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 68006;
+  engine.WorldState.communities.push({ id: 68006, city_id: 69806 });
+  landmark(engine.WorldState, 68106, 'library', 68006);
+  assert.equal(tutorialMissions.offerGatherFamilyMission(engine.WorldState, npc.id), null);
+});
+
+test('offerGatherFamilyMission never names a real deceased family member', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 68010;
+  engine.WorldState.communities.push({ id: 68010, city_id: 69810 });
+  const family = engine.generateFamily({ surname: 'Bereaved' });
+  engine.addFamilyMember(family.id, npc.id, 'founder', 1);
+  const deceasedParent = engine.generateNPC({ name: 'Departed Bereaved' });
+  deceasedParent.status = 'deceased';
+  engine.addFamilyMember(family.id, deceasedParent.id, 'parent', 1);
+  landmark(engine.WorldState, 68110, 'library', 68010);
+
+  // Nobody real and living left to gather -- the whole mission is a
+  // real, correct absence, not just a filtered-down objective.
+  assert.equal(tutorialMissions.offerGatherFamilyMission(engine.WorldState, npc.id), null);
+});
+
+test('offerWeaponsMission names the real honest limit -- crafted protection, not a shop', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 68007;
+  engine.WorldState.communities.push({ id: 68007, city_id: 69807 });
+  landmark(engine.WorldState, 68107, 'library', 68007);
+
+  const offer = tutorialMissions.offerWeaponsMission(engine.WorldState, npc.id);
+  assert.ok(offer, 'no weapons mission was opened');
+  assert.match(offer.mission.objective, /defend/);
+});
+
+test('offerWeaponsMission returns null for a citizen with no real community', () => {
+  const npc = engine.generateNPC();
+  assert.equal(tutorialMissions.offerWeaponsMission(engine.WorldState, npc.id), null);
+});
+
+test('offerCheckOnFamilyMission names real parents/siblings/cousins by name', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 68008;
+  engine.WorldState.communities.push({ id: 68008, city_id: 69808 });
+  const family = engine.generateFamily({ surname: 'Checked-On' });
+  engine.addFamilyMember(family.id, npc.id, 'child', 1);
+  const sibling = engine.generateNPC({ name: 'Riley Checked-On' });
+  engine.addFamilyMember(family.id, sibling.id, 'sibling', 1);
+  landmark(engine.WorldState, 68108, 'library', 68008);
+
+  const offer = tutorialMissions.offerCheckOnFamilyMission(engine.WorldState, npc.id);
+  assert.ok(offer, 'no check-on-family mission was opened');
+  assert.ok(offer.namedCount >= 1);
+  assert.match(offer.mission.objective, /Riley Checked-On/);
+});
+
+test('offerCheckOnFamilyMission returns null for a citizen with no real family to name', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 68009;
+  engine.WorldState.communities.push({ id: 68009, city_id: 69809 });
+  landmark(engine.WorldState, 68109, 'library', 68009);
+  assert.equal(tutorialMissions.offerCheckOnFamilyMission(engine.WorldState, npc.id), null);
+});
+
+test('offerSurvivalMission is the real, shared mission behind Chain #0\'s own "secure food and water" step', () => {
+  // Not a new assertion about offerSurvivalMission's own behaviour --
+  // this documents, in a test, the real reuse `seedTutorialStart` and
+  // `CHAIN_MISSIONS` both rely on: one real function, one real
+  // missionKey, counted under two real chain labels.
+  const entries = tutorialMissions.CHAIN_MISSIONS.filter((e) => e.missionKey === 'survivalMission');
+  assert.equal(entries.length, 2);
+  assert.ok(entries.some((e) => e.chain === 0));
+  assert.ok(entries.some((e) => e.chain === 3));
 });
 
 test('offerExploreMission opens a real Mission over a real searchable landmark', () => {
@@ -453,7 +719,7 @@ test('Chain #5 end to end: entering the real fight costs real stress either way,
   }
 });
 
-test('seedTutorialStart composes all seven, and each half is independently real', () => {
+test('seedTutorialStart composes all fourteen (seven Chain #0, seven Chain 1-5), and each half is independently real', () => {
   const npc = engine.generateNPC({ education: 'basic' });
   npc.communityId = 7005;
   // Order matters: offerMysteryMission casts the first two OTHER real
@@ -474,6 +740,17 @@ test('seedTutorialStart composes all seven, and each half is independently real'
   });
 
   const start = engine.seedTutorialStart(npc.id);
+  // Chain #0: this citizen has no real family, so household/gather-
+  // family/check-on-family all stay a real, correct null — only the
+  // two steps with no family precondition (assess, weapons) fire.
+  assert.ok(start.assessMission, 'the real community reading should have opened an assess mission');
+  assert.equal(start.kidsFromSchoolMission, null, 'this citizen has no real family, so no real kids to fetch');
+  assert.equal(start.workColleaguesMission, null, 'this citizen holds no real job, so no real colleagues');
+  assert.equal(start.householdMission, null, 'no real vacancy exists in this fixture');
+  assert.equal(start.gatherFamilyMission, null, 'this citizen belongs to no family to gather');
+  assert.ok(start.weaponsMission);
+  assert.equal(start.checkOnFamilyMission, null, 'this citizen has no real family tree to check on');
+
   assert.equal(start.book.field, tutorialMissions.DEFAULT_FIELD);
   assert.ok(start.exploreMission);
   assert.ok(start.mentorMission);
@@ -486,15 +763,17 @@ test('seedTutorialStart composes all seven, and each half is independently real'
   assert.ok(start.showdownMission, 'real other people in the community means a real opponent exists');
   assert.ok([victim.id, perpetrator.id, mentor.id].includes(start.showdownOpponentId));
 
-  // The tracker reports the same six real Missions, live.
+  // The tracker reports all twelve real chain-mission slots, live.
   const progress = engine.tutorialProgressFor(npc.id);
-  assert.equal(progress.totalMissions, 6);
+  assert.equal(progress.totalMissions, 14);
   assert.equal(progress.completedCount, 0);
   assert.equal(progress.allComplete, false);
   assert.equal(progress.book.given, true);
   assert.equal(progress.book.field, tutorialMissions.DEFAULT_FIELD);
 
   const byKey = (key) => progress.chainMissions.find((m) => m.missionId === start[key]?.id);
+  assert.equal(byKey('assessMission').status, 'available');
+  assert.equal(byKey('weaponsMission').status, 'available');
   assert.equal(byKey('exploreMission').status, 'available');
   assert.equal(byKey('mentorMission').status, 'available');
   assert.equal(byKey('mysteryMission').status, 'available');
@@ -506,6 +785,14 @@ test('seedTutorialStart composes all seven, and each half is independently real'
   const takeoverRow = progress.chainMissions.find((m) => m.chain === 4);
   assert.equal(takeoverRow.missionId, null);
   assert.equal(takeoverRow.status, 'not offered');
+
+  // Chain 0's own household/gather-family/check-on-family/kids/
+  // colleagues rows are real, correct absences too, same shape.
+  for (const part of ['get your kids from school', 'deal with your work colleagues', 'secure your household', 'gather who\'s coming with you', 'check on everyone else']) {
+    const row = progress.chainMissions.find((m) => m.chain === 0 && m.part === part);
+    assert.equal(row.missionId, null, part);
+    assert.equal(row.status, 'not offered', part);
+  }
 });
 
 test('tutorialProgressFor reflects real mission status changes, live', () => {
@@ -550,7 +837,7 @@ test('tutorialProgressFor is refused for an entity that does not exist', () => {
 test('tutorialProgressFor for a citizen who was never seeded reports every chain as not offered', () => {
   const npc = engine.generateNPC();
   const progress = engine.tutorialProgressFor(npc.id);
-  assert.equal(progress.totalMissions, 6);
+  assert.equal(progress.totalMissions, 14);
   assert.ok(progress.chainMissions.every((m) => m.status === 'not offered' && m.missionId === null));
   assert.equal(progress.book.given, false);
 });

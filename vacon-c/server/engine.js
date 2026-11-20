@@ -1797,14 +1797,15 @@ function survivalStatusFor(entityId) {
 }
 
 // ---------------------------------------------------------------------
-// Mission Chain #1 — "Start Here"
+// Mission Chain #0 — "Secure Your Household" — Chain #1 — "Start Here"
 // ---------------------------------------------------------------------
 // Not a player action — this seeds a fresh citizen's own opening state
-// (a starting book, up to two real missions) once, explicitly, rather
-// than firing automatically inside generatePlayer(). generatePlayer()
-// is used by tests and other flows that do not want tutorial content
-// appearing uninvited; a caller who wants the tutorial asks for it. See
-// dev-docs/TUTORIAL_MISSIONS_DESIGN.md.
+// (a starting book, up to fourteen real missions across both chains)
+// once, explicitly, rather than firing automatically inside
+// generatePlayer(). generatePlayer() is used by tests and other flows
+// that do not want tutorial content appearing uninvited; a caller who
+// wants the tutorial asks for it. See dev-docs/TUTORIAL_MISSIONS_DESIGN.md
+// and server/tutorialMissions.js's own header for Chain #0.
 function seedTutorialStart(entityId, options = {}) {
   if (!getLiveEntity(entityId)) throw new Error(`no entity with id ${entityId}`);
   return tutorialMissions.seedTutorialStart(WorldState, entityId, options);

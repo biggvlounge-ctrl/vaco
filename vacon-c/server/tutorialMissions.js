@@ -1,11 +1,73 @@
 // server/tutorialMissions.js
 //
-// Mission Chain #1 — "Start Here" — Chain #2 — "Ask Around" — Chain #3
-// — "Keep Enough Set Aside" — Chain #4 — "Take the Block" — and Chain
-// #5 — "Pick Your Fights". See `dev-docs/TUTORIAL_MISSIONS_DESIGN.md`
-// for the full design note (the six-reference mapping this closes all
-// five real slices of, and why each step is real rather than
-// invented).
+// Mission Chain #0 — "Secure Your Household" — Chain #1 — "Start
+// Here" — Chain #2 — "Ask Around" — Chain #3 — "Keep Enough Set
+// Aside" — Chain #4 — "Take the Block" — and Chain #5 — "Pick Your
+// Fights". See `dev-docs/TUTORIAL_MISSIONS_DESIGN.md` for the
+// original five-chain design note (the six-reference mapping, and why
+// each step is real rather than invented).
+//
+// ---------------------------------------------------------------------
+// Chain #0, by direct instruction — real, before anything else
+// ---------------------------------------------------------------------
+// The original five chains are a gameplay-variety tour (explore,
+// gather clues, manage scarcity, take territory, pick a fight) and
+// none of them is about the one thing a person in this engine's own
+// collapse premise would really do first: get their own household in
+// order. **Numbered zero rather than inserted before Chain #1**,
+// deliberately — renumbering 1-5 would have meant rewriting every
+// existing reference to them (this file's own doc comments, dev-docs,
+// CLAUDE.md) for no real behavioural reason; "zero" says "runs first"
+// without disturbing five chains that already work and are already
+// documented elsewhere.
+//
+// Five real, ordered steps, in the order asked for directly — "see
+// what's going on, secure your household... get your family
+// together... secure food, weapons, [check on] outside family and
+// friends" — each anchored to the SAME real property once one exists,
+// no new mechanic, no schema change:
+//
+//   0a. **Assess your surroundings.** `authority.writOf` (the real
+//       regime — governed/contested/lawless) and `crime
+//       .dangerByCommunity` (the real, already-measured danger
+//       reading) are read directly into the objective text, not
+//       re-derived or guessed at.
+//   0b. **Secure your household.** `characterCreation.createCharacter`
+//       never assigns a new player a home (checked directly before
+//       writing this — `grep -n "home_property_id" server/
+//       characterCreation.js` returns nothing), so this is a REAL gap
+//       a new citizen starts in, not a fact to confirm. `migration
+//       .vacanciesByCommunity` is the exact real vacant-property
+//       finder `migration.js` already built for task #47's own
+//       "vacant/abandoned/condemned property takeover" — this mission
+//       names one real, reachable, non-condemned home and hands the
+//       player the existing `attempt-takeover` verb, the identical
+//       shape Chain #4 already uses for a harder target.
+//   0c. **Gather who's coming with you.** Names the player's own real,
+//       living immediate family (`family_memberships`) by name; the
+//       player assembles them with the existing `assemble-party` verb
+//       — never a new one, same precedent `party.js`'s own header
+//       argues against inventing a second escort mechanic.
+//   0d. **Secure food and water.** This is NOT a new, parallel check —
+//       it is Chain #3's own `offerSurvivalMission`, reused directly
+//       rather than duplicated, because "keep enough set aside" and
+//       "secure food and water for your family" are the identical
+//       real concern (`mortality.survivalScarcity` against the real
+//       poverty line) asked for in two different rounds. Building a
+//       second scarcity check here would be two disagreeing answers
+//       to one question — the third standing rule's own shape.
+//   0e. **Secure a way to defend it.** The same honest limit Chain
+//       #4's own design note already states: "there is no dedicated
+//       weapon category, only tools... and crafted `protection`
+//       items." This names the real `salvage.make` crafting path
+//       (e.g. `zip_gun`, a real Tier 2 `protection`-category
+//       craftable) rather than implying a weapon shop this engine
+//       does not model.
+//   0f. **Check on everyone else.** `characterCreation
+//       .describeFamilyTree` is the real, live read of the player's
+//       own parents/siblings/cousins (alive or not — the same honest
+//       accounting that function already gives); named directly in
+//       the objective rather than left as "go find out."
 //
 // **Chain #1, three real steps, no new mechanic, no schema change:**
 //
@@ -111,6 +173,11 @@ const areaStats = require('./areaStats.js');
 const mortality = require('./mortality.js');
 const control = require('./control.js');
 const contest = require('./contest.js');
+const migration = require('./migration.js');
+const authority = require('./authority.js');
+const characterCreation = require('./characterCreation.js');
+const statecraft = require('./statecraft.js');
+const schoolSystem = require('./schoolSystem.js');
 
 //: Chosen, not measured — there is nothing in this engine a tutorial
 //: reward could be derived from, unlike the thresholds this project's
@@ -125,6 +192,20 @@ const TUTORIAL_MYSTERY_REWARD = 40;
 const TUTORIAL_SURVIVAL_REWARD = 40;
 const TUTORIAL_TAKEOVER_REWARD = 40;
 const TUTORIAL_SHOWDOWN_REWARD = 40;
+const TUTORIAL_ASSESS_REWARD = 40;
+const TUTORIAL_HOUSEHOLD_REWARD = 40;
+const TUTORIAL_FAMILY_REWARD = 40;
+const TUTORIAL_WEAPONS_REWARD = 40;
+const TUTORIAL_CHECKIN_REWARD = 40;
+const TUTORIAL_KIDS_REWARD = 40;
+const TUTORIAL_COLLEAGUES_REWARD = 40;
+
+// **Flagged interpretive.** `statecraft.SCHOOL_AGE_MIN` (5) is reused
+// directly; this upper bound is the standard compulsory K-12 age,
+// chosen so it partitions cleanly against `students
+// .COLLEGE_AGE_MIN` (18) rather than overlapping it — a school-age
+// child is fetched FROM school, a college-age adult is not.
+const CHILD_SCHOOL_AGE_MAX = 18;
 
 //: §26/crime.js's eight real categories, and the one that reads as
 //: Carmen Sandiego's own register — mundane, solvable, not disturbing.
@@ -406,20 +487,279 @@ function offerShowdownMission(worldState, npcId, options = {}) {
   };
 }
 
+// ---------------------------------------------------------------------
+// Chain #0, "Secure Your Household" — real, before anything else.
+// See the file header for the full real mapping.
+// ---------------------------------------------------------------------
+
+// A real, generic anchor property in the citizen's own community —
+// the same fallback every Chain 1-5 function already uses when a
+// mission is about something other than a specific place.
+function communityAnchor(worldState, communityId) {
+  return (worldState.properties || []).find((p) => p.community_id === communityId) ?? null;
+}
+
+// 0a. Real surroundings, read directly rather than guessed at.
+// `authority.writOf` can read `writ: null` for an area with nothing
+// measured yet — a real, honest state this names rather than hides.
+function offerAssessSurroundingsMission(worldState, npcId, options = {}) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`offerAssessSurroundingsMission: no NPC ${npcId}`);
+  if (npc.communityId == null) return null;
+
+  const anchor = options.anchorPropertyId != null
+    ? (worldState.properties || []).find((p) => p.id === options.anchorPropertyId)
+    : communityAnchor(worldState, npc.communityId);
+  if (!anchor) return null;
+
+  const reading = authority.writOf(worldState, npc.communityId);
+  const danger = crime.dangerByCommunity(worldState).get(npc.communityId) ?? null;
+  const regimeText = reading.regime ?? 'an unmeasured area';
+  const dangerText = danger === null ? 'an unmeasured danger level' : `a danger level of ${Math.round(danger * 100) / 100}`;
+
+  const mission = missions.generateMission(worldState, {
+    locationId: anchor.id,
+    objective: `See what's really going on here first — this area reads ${regimeText}, with ${dangerText}`,
+    reward: options.reward ?? TUTORIAL_ASSESS_REWARD,
+  });
+  return { mission, regime: reading.regime, danger };
+}
+
+// 0a2. "If you have kids, get the kids from school" — by direct
+// instruction. A real child is a real `family_memberships` row with
+// `role: 'child'` in the citizen's own family (the same real shape
+// `births.js#runBirths` already writes for a newborn, read rather
+// than duplicated), still really enrolled (`npc.schoolEnrolled`,
+// `statecraft.runSchooling`'s own real field) and still under the
+// real compulsory age. This engine has no PER-BUILDING attendance
+// record for a K-12 student — `students.js` built that for
+// university enrollment specifically (task #70) and school.js's own
+// `schoolSystemInventory` reports buildings, never who is in one — so
+// the real anchor is the nearest real school building in the
+// citizen's own city, context for where to go, not a claim about
+// which specific one this child attends.
+function offerKidsFromSchoolMission(worldState, npcId, options = {}) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`offerKidsFromSchoolMission: no NPC ${npcId}`);
+
+  const membership = (worldState.familyMemberships || []).find((m) => m.entity_id === npcId);
+  if (!membership) return null;
+
+  const children = (worldState.familyMemberships || [])
+    .filter((m) => m.family_id === membership.family_id && m.role === 'child')
+    .map((m) => (worldState.npcs || []).find((n) => n.id === m.entity_id))
+    .filter((n) => n && n.status !== 'deceased' && n.schoolEnrolled === true)
+    .filter((n) => {
+      const age = mortality.ageInYears(worldState, n, worldState.tick);
+      return age !== null && age >= statecraft.SCHOOL_AGE_MIN && age < CHILD_SCHOOL_AGE_MAX;
+    });
+  if (children.length === 0) return null;
+
+  const cityId = npc.communityId == null ? null : cityOf(worldState, npc);
+  const schools = cityId == null ? [] : schoolSystem.schoolsOf(worldState, cityId);
+  const anchor = schools[0] ?? communityAnchor(worldState, npc.communityId);
+  if (!anchor) return null;
+
+  const names = children.map((c) => c.name ?? `entity ${c.id}`).join(', ');
+  const mission = missions.generateMission(worldState, {
+    locationId: anchor.id,
+    objective: `Get your kids from school before anything else — ${names} are still there`,
+    reward: options.reward ?? TUTORIAL_KIDS_REWARD,
+  });
+  return { mission, childIds: children.map((c) => c.id) };
+}
+
+// 0a3. "If you're coming from work, deal with your work colleagues"
+// — by direct instruction. The citizen's own real, currently-active
+// coworkers (`economy.listEmployment`, the same real employer id
+// `economy.getEmployment` already reads), excluding the citizen
+// themselves.
+function offerWorkColleaguesMission(worldState, npcId, options = {}) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`offerWorkColleaguesMission: no NPC ${npcId}`);
+
+  const employment = economy.getEmployment(worldState, npcId);
+  if (!employment) return null;
+
+  const colleagues = economy.listEmployment(worldState, {
+    employerOrganizationId: employment.employer_organization_id, status: 'active',
+  })
+    .filter((r) => r.entity_id !== npcId)
+    .map((r) => (worldState.npcs || []).find((n) => n.id === r.entity_id))
+    .filter((n) => n && n.status !== 'deceased');
+  if (colleagues.length === 0) return null;
+
+  const anchor = options.anchorPropertyId != null
+    ? (worldState.properties || []).find((p) => p.id === options.anchorPropertyId)
+    : communityAnchor(worldState, npc.communityId);
+  if (!anchor) return null;
+
+  const names = colleagues.map((c) => c.name ?? `entity ${c.id}`).join(', ');
+  const mission = missions.generateMission(worldState, {
+    locationId: anchor.id,
+    objective: `Deal with your own people at work before you go — ${names} are in this too`,
+    reward: options.reward ?? TUTORIAL_COLLEAGUES_REWARD,
+  });
+  return { mission, colleagueIds: colleagues.map((c) => c.id) };
+}
+
+// 0b. The real gap: `createCharacter` never assigns a new player a
+// home (see the file header). `migration.vacanciesByCommunity` is the
+// exact real vacant-property finder task #47 already built — this
+// names one real, reachable, non-condemned home and hands the player
+// the existing `attempt-takeover` verb, the same shape Chain #4
+// already uses for a harder target. Returns null when the citizen's
+// own community genuinely has no real vacancy — possible, and honest,
+// the same way every other chain here can come up empty.
+function offerSecureHouseholdMission(worldState, npcId, options = {}) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`offerSecureHouseholdMission: no NPC ${npcId}`);
+  if (npc.communityId == null) return null;
+
+  // No separate "any vacancy at all" check — an empty real list makes
+  // `vacancies[0]` `undefined`, which the real `!property` guard below
+  // already catches on its own; a second check ahead of it would be
+  // the twentieth standing rule's own decorative-guard shape, found by
+  // mutating it and finding nothing broke.
+  const vacancies = migration.vacanciesByCommunity(worldState).get(npc.communityId) ?? [];
+  const property = (worldState.properties || []).find((p) => p.id === vacancies[0]);
+  if (!property) return null;
+  const label = property.name ?? 'a real, empty home nearby';
+
+  const mission = missions.generateMission(worldState, {
+    locationId: property.id,
+    objective: `Secure your household first — ${label} stands empty; hold it, and it is yours`,
+    reward: options.reward ?? TUTORIAL_HOUSEHOLD_REWARD,
+  });
+  return { mission, propertyId: property.id };
+}
+
+// 0c. The player's own real, living immediate family, named directly
+// — the player assembles them with the existing `assemble-party`
+// verb. Returns null when the citizen has no real family at all
+// (createCharacter always gives one, but a world built another way
+// might not) — the same honest-null posture Chain #4 already takes
+// for the identical "no family to act as a tribe" precondition.
+function offerGatherFamilyMission(worldState, npcId, options = {}) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`offerGatherFamilyMission: no NPC ${npcId}`);
+
+  const membership = (worldState.familyMemberships || []).find((m) => m.entity_id === npcId);
+  if (!membership) return null;
+
+  const members = (worldState.familyMemberships || [])
+    .filter((m) => m.family_id === membership.family_id && m.entity_id !== npcId)
+    .map((m) => (worldState.npcs || []).find((n) => n.id === m.entity_id))
+    .filter((n) => n && n.status !== 'deceased');
+  if (members.length === 0) return null;
+
+  const anchor = options.anchorPropertyId != null
+    ? (worldState.properties || []).find((p) => p.id === options.anchorPropertyId)
+    : communityAnchor(worldState, npc.communityId);
+  if (!anchor) return null;
+
+  const names = members.map((m) => m.name ?? `entity ${m.id}`).join(', ');
+  const mission = missions.generateMission(worldState, {
+    locationId: anchor.id,
+    objective: `Choose who's coming with you — gather ${names} before you do anything else`,
+    reward: options.reward ?? TUTORIAL_FAMILY_REWARD,
+  });
+  return { mission, memberIds: members.map((m) => m.id) };
+}
+
+// 0e. The same honest limit Chain #4's own design note already states
+// — no dedicated weapon category, only crafted real `protection`
+// items (`salvage.make`). Named directly rather than implying a
+// weapon shop this engine does not model.
+function offerWeaponsMission(worldState, npcId, options = {}) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`offerWeaponsMission: no NPC ${npcId}`);
+  if (npc.communityId == null) return null;
+
+  const anchor = options.anchorPropertyId != null
+    ? (worldState.properties || []).find((p) => p.id === options.anchorPropertyId)
+    : communityAnchor(worldState, npc.communityId);
+  if (!anchor) return null;
+
+  const mission = missions.generateMission(worldState, {
+    locationId: anchor.id,
+    objective: 'Find a real way to defend what\'s now yours — craft or carry something real, not nothing',
+    reward: options.reward ?? TUTORIAL_WEAPONS_REWARD,
+  });
+  return { mission };
+}
+
+// 0f. `characterCreation.describeFamilyTree` is the real, live read of
+// the player's own parents/siblings/cousins — named directly, alive
+// or not, the same honest accounting that function already gives.
+function offerCheckOnFamilyMission(worldState, npcId, options = {}) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`offerCheckOnFamilyMission: no NPC ${npcId}`);
+
+  const tree = characterCreation.describeFamilyTree(worldState, npcId);
+  const named = [...tree.parents, ...tree.siblings, ...tree.cousins]
+    .map((p) => p.name ?? `entity ${p.id}`);
+  if (named.length === 0) return null;
+
+  const anchor = options.anchorPropertyId != null
+    ? (worldState.properties || []).find((p) => p.id === options.anchorPropertyId)
+    : communityAnchor(worldState, npc.communityId);
+  if (!anchor) return null;
+
+  const mission = missions.generateMission(worldState, {
+    locationId: anchor.id,
+    objective: `Check on everyone else once your own house is in order — ${named.join(', ')}`,
+    reward: options.reward ?? TUTORIAL_CHECKIN_REWARD,
+  });
+  return { mission, namedCount: named.length };
+}
+
 // The whole chain, offered together — what a citizen-mode player
 // binding gets the instant they exist. Each half is independently
 // optional (a community with nothing searchable, or nobody else
 // employed, is a real state) so this reports what it actually managed
 // rather than pretending every world can offer all five.
 function seedTutorialStart(worldState, npcId, options = {}) {
+  // Chain #0 first, in the real order asked for — "secure your
+  // household" before anything else, so every later Chain #0 step
+  // anchors at the player's own new real home once one exists, same
+  // `(worldState.properties || []).find(...)` fallback otherwise.
+  const assess = offerAssessSurroundingsMission(worldState, npcId, options);
+  const kids = offerKidsFromSchoolMission(worldState, npcId, options);
+  const colleagues = offerWorkColleaguesMission(worldState, npcId, options);
+  const household = offerSecureHouseholdMission(worldState, npcId, options);
+  const chain0Options = { ...options, anchorPropertyId: household?.propertyId ?? null };
+  const gatherFamily = offerGatherFamilyMission(worldState, npcId, chain0Options);
+  const weapons = offerWeaponsMission(worldState, npcId, chain0Options);
+  const checkOnFamily = offerCheckOnFamilyMission(worldState, npcId, chain0Options);
+
   const book = giveStartingBook(worldState, npcId, options);
   const exploreMission = offerExploreMission(worldState, npcId, options);
   const mentor = offerMentorMission(worldState, npcId, options);
   const mystery = offerMysteryMission(worldState, npcId, options);
-  const survival = offerSurvivalMission(worldState, npcId, options);
+  // **One real call, two real roles.** Chain #0's own "secure food and
+  // water" step and Chain #3's "Keep Enough Set Aside" are the
+  // identical real concern (see the file header) — calling
+  // `offerSurvivalMission` a second time here would open a second,
+  // nearly-identical real Mission for the same scarcity reading,
+  // which is the third standing rule's own shape. One call, reported
+  // under both labels below.
+  const survival = offerSurvivalMission(worldState, npcId, chain0Options);
   const takeover = offerTakeoverMission(worldState, npcId, options);
   const showdown = offerShowdownMission(worldState, npcId, options);
   const start = {
+    assessMission: assess?.mission ?? null,
+    assessRegime: assess?.regime ?? null,
+    kidsFromSchoolMission: kids?.mission ?? null,
+    kidsFromSchoolChildIds: kids?.childIds ?? null,
+    workColleaguesMission: colleagues?.mission ?? null,
+    workColleaguesIds: colleagues?.colleagueIds ?? null,
+    householdMission: household?.mission ?? null,
+    householdPropertyId: household?.propertyId ?? null,
+    gatherFamilyMission: gatherFamily?.mission ?? null,
+    gatherFamilyMemberIds: gatherFamily?.memberIds ?? null,
+    weaponsMission: weapons?.mission ?? null,
+    checkOnFamilyMission: checkOnFamily?.mission ?? null,
     book,
     exploreMission,
     mentorMission: mentor?.mission ?? null,
@@ -450,7 +790,21 @@ function seedTutorialStart(worldState, npcId, options = {}) {
 // `missionKey` names the field `seedTutorialStart`'s own return object
 // already uses — one table, read in both directions, so a renamed
 // field here fails loudly instead of quietly tracking nothing.
+// **Chain 0's own "secure food and water" step and Chain 3's "Keep
+// Enough Set Aside" share one missionKey (`survivalMission`) on
+// purpose — see the file header and `seedTutorialStart`'s own
+// comment. Listing it twice here, once per real label, means
+// completing the one real mission correctly advances both chains'
+// own count rather than one of them silently never reaching 100%.**
 const CHAIN_MISSIONS = [
+  { chain: 0, name: 'Secure Your Household', part: 'see what\'s going on', missionKey: 'assessMission' },
+  { chain: 0, name: 'Secure Your Household', part: 'get your kids from school', missionKey: 'kidsFromSchoolMission' },
+  { chain: 0, name: 'Secure Your Household', part: 'deal with your work colleagues', missionKey: 'workColleaguesMission' },
+  { chain: 0, name: 'Secure Your Household', part: 'secure your household', missionKey: 'householdMission' },
+  { chain: 0, name: 'Secure Your Household', part: 'gather who\'s coming with you', missionKey: 'gatherFamilyMission' },
+  { chain: 0, name: 'Secure Your Household', part: 'secure food and water', missionKey: 'survivalMission' },
+  { chain: 0, name: 'Secure Your Household', part: 'secure a way to defend it', missionKey: 'weaponsMission' },
+  { chain: 0, name: 'Secure Your Household', part: 'check on everyone else', missionKey: 'checkOnFamilyMission' },
   { chain: 1, name: 'Start Here', part: 'explore the landmark', missionKey: 'exploreMission' },
   { chain: 1, name: 'Start Here', part: 'learn from the mentor', missionKey: 'mentorMission' },
   { chain: 2, name: 'Ask Around', part: null, missionKey: 'mysteryMission' },
@@ -471,6 +825,13 @@ function recordTutorialProgress(worldState, npcId, start) {
   if (!Array.isArray(worldState.tutorialProgress)) worldState.tutorialProgress = [];
   const row = {
     entityId: npcId,
+    assessMissionId: start.assessMission?.id ?? null,
+    kidsFromSchoolMissionId: start.kidsFromSchoolMission?.id ?? null,
+    workColleaguesMissionId: start.workColleaguesMission?.id ?? null,
+    householdMissionId: start.householdMission?.id ?? null,
+    gatherFamilyMissionId: start.gatherFamilyMission?.id ?? null,
+    weaponsMissionId: start.weaponsMission?.id ?? null,
+    checkOnFamilyMissionId: start.checkOnFamilyMission?.id ?? null,
     bookField: start.book?.field ?? null,
     exploreMissionId: start.exploreMission?.id ?? null,
     mentorMissionId: start.mentorMission?.id ?? null,
@@ -525,9 +886,23 @@ module.exports = {
   TUTORIAL_SURVIVAL_REWARD,
   TUTORIAL_TAKEOVER_REWARD,
   TUTORIAL_SHOWDOWN_REWARD,
+  TUTORIAL_ASSESS_REWARD,
+  TUTORIAL_KIDS_REWARD,
+  TUTORIAL_COLLEAGUES_REWARD,
+  TUTORIAL_HOUSEHOLD_REWARD,
+  TUTORIAL_FAMILY_REWARD,
+  TUTORIAL_WEAPONS_REWARD,
+  TUTORIAL_CHECKIN_REWARD,
   TUTORIAL_CRIME_CATEGORY,
   DEFAULT_FIELD,
   giveStartingBook,
+  offerAssessSurroundingsMission,
+  offerKidsFromSchoolMission,
+  offerWorkColleaguesMission,
+  offerSecureHouseholdMission,
+  offerGatherFamilyMission,
+  offerWeaponsMission,
+  offerCheckOnFamilyMission,
   offerExploreMission,
   offerMentorMission,
   offerMysteryMission,

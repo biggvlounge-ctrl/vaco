@@ -1163,7 +1163,7 @@ test('tutorial-progress answers a real, live read over HTTP', { skip: SKIP }, as
 
   await post(`/players/${player.id}/tutorial-start`, {});
   const progress = await (await get(`/players/${player.id}/tutorial-progress`)).json();
-  assert.equal(progress.totalMissions, 6);
+  assert.equal(progress.totalMissions, 14);
   // No community over HTTP means every chain but the book is a real,
   // correct "not offered" — the same absence tutorial-start's own
   // nulls already report.

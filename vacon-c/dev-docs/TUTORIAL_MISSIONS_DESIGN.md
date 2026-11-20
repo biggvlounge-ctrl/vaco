@@ -72,6 +72,88 @@ automatic one is a real second gain, not a bug.
 retelling" mechanic, already built, already tested — nothing here
 needed to be invented for Carmen Sandiego's clue-gathering to be real.
 
+## Mission Chain #0 — "Secure Your Household", real before anything else
+
+By direct instruction, not a reference-game mapping like the five
+chains below. The owner's own words, in order: "see what's going on,
+secure your household... get your family together... secure food,
+weapons, [check on] outside family and friends." Numbered zero rather
+than inserted before Chain #1 — renumbering 1-5 would have meant
+rewriting every existing reference to them (this file, `server
+/tutorialMissions.js`'s own doc comments, CLAUDE.md) for no real
+behavioural reason; "zero" says "runs first" without disturbing five
+chains that already work.
+
+Five real, ordered steps, each anchored to the same real property
+once one exists:
+
+- **Assess your surroundings.** `authority.writOf` (the real regime)
+  and `crime.dangerByCommunity` (the real, already-measured danger
+  reading), read directly into the objective text.
+- **Secure your household.** `characterCreation.createCharacter`
+  never assigns a new player a home — checked directly
+  (`grep -n "home_property_id" server/characterCreation.js` returns
+  nothing) before writing this, not assumed. `migration
+  .vacanciesByCommunity` (task #47's own real vacant-property finder)
+  names one real, reachable, non-condemned home; the player takes it
+  with the existing `attempt-takeover` verb, the identical shape
+  Chain #4 already uses for a harder target.
+- **Gather who's coming with you.** Names the player's own real,
+  living immediate family by name; `assemble-party` (already real)
+  is the verb, never a new escort mechanic.
+- **Secure food and water.** Not a new, parallel check — this IS
+  Chain #3's own `offerSurvivalMission`, reused directly. "Keep enough
+  set aside" and "secure food and water for your family" are the
+  identical real concern (`mortality.survivalScarcity` against the
+  real poverty line); a second scarcity check would be two
+  disagreeing answers to one real question.
+- **Secure a way to defend it.** The same honest limit Chain #4's own
+  section below already states: no dedicated weapon category, only
+  crafted real `protection` items (`salvage.make`). Named directly
+  rather than implying a weapon shop this engine does not model.
+- **Check on everyone else.** `characterCreation.describeFamilyTree`
+  — the real, live parents/siblings/cousins, alive or not, named
+  directly.
+
+Two more real steps, added the same day by the owner's own further
+words — "If you have kids, get the kids from school. If you're coming
+from work, deal with your work colleagues":
+
+- **Get your kids from school.** `offerKidsFromSchoolMission` names
+  the citizen's own real, living, still-enrolled, school-age children
+  (age gated between `statecraft.SCHOOL_AGE_MIN` and the new
+  `CHILD_SCHOOL_AGE_MAX = 18`, chosen so it meets
+  `students.COLLEGE_AGE_MIN` without overlap) and anchors at a real
+  school via `schoolSystem.schoolsOf`, falling back to the same
+  community anchor every other step without a dedicated building
+  uses.
+- **Deal with your work colleagues.** `offerWorkColleaguesMission`
+  names the citizen's own real, currently-active coworkers at the
+  real same employer (`economy.listEmployment` filtered on
+  `economy.getEmployment`'s own `employer_organization_id`, excluding
+  the citizen), anchored at the caller's own `anchorPropertyId` or the
+  community anchor.
+
+Both return `null` on an honest unmet precondition (no real family, no
+real job, no real coworkers left) rather than throwing, the same as
+every other Chain #0 step.
+
+A non-robust mutation test was found and fixed while verifying this:
+the first version of `offerSecureHouseholdMission` carried a
+`vacancies.length === 0` guard ahead of the real `!property` check —
+removing it changed nothing, because an empty real list already makes
+`vacancies[0]` `undefined`, which `!property` catches on its own. The
+twentieth standing rule's own decorative-guard shape, found the same
+way: mutate it, see if anything breaks. Removed rather than left in
+place with a test that could not actually tell the two states apart.
+
+A second non-robust test was found and fixed the same way while adding
+the two new steps: the first three `offerWorkColleaguesMission` tests
+never constructed a deceased coworker, so mutating out the
+`n.status !== 'deceased'` filter left the whole suite green. Fixed by
+adding a fourth test that hires a colleague and then kills them before
+asserting `null` — re-verified, the mutation is now caught.
+
 ## Mission Chain #1 — "Start Here", the narrowest real slice
 
 Three real, tested verbs, no new mechanic, no schema change:
@@ -335,20 +417,27 @@ shape as `study-sources`/`survival-status` — a read, not an action.
 ## Where the code lives
 
 `server/tutorialMissions.js` — `seedTutorialStart(worldState, npcId)`
-composes all five chains and records their Mission ids, and
+composes all six chains (Chain #0 included) and records their Mission
+ids, and `offerAssessSurroundingsMission`/`offerKidsFromSchoolMission`/
+`offerWorkColleaguesMission`/`offerSecureHouseholdMission`/
+`offerGatherFamilyMission`/`offerWeaponsMission`/`offerCheckOnFamilyMission`/
 `offerMysteryMission`/`offerSurvivalMission`/`offerTakeoverMission`/
 `offerShowdownMission`/`tutorialProgressFor` individually, all
 following the same "takes worldState explicitly" convention as every
 other module here. Not a new player mode, not a new schema table —
 real calls into `inventory.give`/`missions.generateMission`/
 `crime.recordCrime`/`mortality.survivalScarcity`/`areaStats
-.povertyLine`/`control.viableTargetsFor`/`contest.rateEntity` with
-content chosen for a first-time citizen. `server/actions.js`'s `trade`
+.povertyLine`/`control.viableTargetsFor`/`contest.rateEntity`/
+`migration.vacanciesByCommunity`/`authority.writOf`/`crime
+.dangerByCommunity`/`characterCreation.describeFamilyTree`/
+`schoolSystem.schoolsOf`/`economy.listEmployment` with content chosen
+for a first-time citizen. `server/actions.js`'s `trade`
 action and `server/engine.js`'s `tradeWith`/`quoteTrade`/
 `survivalStatusFor` are Chain #3's other half — `barter.exchange`,
-reachable at last. Chains #4 and #5 needed no new action verb at all:
-`assess-takeover`/`attempt-takeover`/`enter-contest` were already real
-and simply had no mission pointing at them yet (#4), or nothing real
-riding on the
-outcome (#5) — `server/engine.js#resolveContest`'s combat-stakes branch
-is that missing piece.
+reachable at last. Chains #0 (household step), #4 and #5 needed no
+new action verb at all: `attempt-takeover`/`assess-takeover`/
+`enter-contest` were already real and simply had no mission pointing
+at them yet (#0, #4), or nothing real riding on the outcome (#5) —
+`server/engine.js#resolveContest`'s combat-stakes branch is that
+missing piece. See CLAUDE.md's hundred-and-thirty-first standing rule
+for Chain #0.

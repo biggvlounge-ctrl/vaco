@@ -1762,6 +1762,21 @@ real referral elsewhere is found, since travelling to a specialist
 buys real expertise but not real speed. See CLAUDE.md's
 hundred-and-nineteenth standing rule.
 
+## Verified
+14 plain-Node checks on `server/missions.js` directly (rejects a
+missing artifact name, rejects a nonexistent `artifactId`, rejects a
+non-faction `controllingFactionId`, real ids/fields/status/tick
+returned correctly, `listMissions` filters by real status), plus a
+live pass against the real running server: `GET /api/state` confirmed
+an empty real world; a real NPC generated and reflected in both the
+response and a follow-up state fetch; `POST /api/tick` confirmed
+advancing the real tick counter; a real artifact created via the new
+`POST /api/artifacts`; a real mission generated from it via
+`POST /api/mission`, confirmed carrying the real linked `artifact_id`
+and default `available` status; a mission request against a
+nonexistent artifact confirmed rejected with a real, specific error.
+`vaco-shell`'s own registry updated with this project's real new URL
+(`http://localhost:8809`), closing that side's own `url: null` gap.
 ## Pervasive corruption + looting/B&E during collapse
 Generalizes a real cut this engine already made three times --
 `roguePolice.js`, `justice.js`'s prison breaks, `drugTrade.js`'s prison
