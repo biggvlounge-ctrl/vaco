@@ -2071,6 +2071,17 @@ Houston "Hoover Criminals" chapter -- were checked and declared
 unbuilt rather than fabricated. See CLAUDE.md's hundred-and-fifty-third
 standing rule.
 
+## Incarcerated organizational leadership, reported real
+`leadership.describeLeadership(worldState, organizationId)` surfaces a
+real, already-existing mechanic that was previously silent: nothing
+in this engine clears `organizations.leader_id` on imprisonment (only
+`succession.js`, on death, ever does), and `directMission` never
+checked a leader's own status -- so command already continued from
+custody. The new function names the real citations (Pyrooz & Decker
+2019; Lessing, Brookings 2016) and is surfaced on `getLeaderDashboard`.
+No real individual is ever named. See CLAUDE.md's hundred-and-
+fifty-fourth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

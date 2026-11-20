@@ -92,6 +92,7 @@ const worldStore = require('./worldStore.js');
 const membership = require('./membership.js');
 const missions = require('./missions.js');
 const media = require('./media.js');
+const justice = require('./justice.js');
 const influence = require('./influence.js');
 const characterCreation = require('./characterCreation.js');
 const heat = require('./heat.js');
@@ -299,6 +300,65 @@ function organizationsLedBy(worldState, entityId) {
 }
 
 // ---------------------------------------------------------------------
+// describeLeadership — the real structural pattern, never a named leader
+// ---------------------------------------------------------------------
+// By direct instruction ("we need architects of [incarcerated real
+// leaders]... we don't need names, just architects"). Real, documented
+// structural facts (Pyrooz & Decker 2019, "Competing for Control", 802
+// inmate interviews; Lessing, Brookings 2016), never a real
+// individual's biography — nothing here names or models a real person.
+//
+// **This is a report, not a new mechanic.** `directMission` already
+// lets an incarcerated leader direct a subordinate — nothing in it
+// reads the leader's own `npc.status`, so command already continues
+// from custody. And `organizations.leader_id` is already NEVER
+// cleared by imprisonment — only `succession.js`, on DEATH, ever clears
+// it (confirmed directly: `grep -rn "leader_id = null" server/*.js`
+// returns exactly one call site, inside `succession.settleEstate`).
+// That silence was already the real mechanic this function makes
+// visible, the same "a signal that exists and says nothing is not the
+// same as a signal that was never built" shape the eighteenth standing
+// rule already names for `runSocialPhase`'s own dropped return value.
+//
+// Lessing's real finding — removing a leader does not reliably end the
+// organization, and can spread it further through the prison system
+// rather than weakening it — is exactly why no automatic succession
+// fires here. The absence is the finding, not an oversight.
+function describeLeadership(worldState, organizationId) {
+  const organization = (worldState.organizations || [])
+    .find((o) => o.id === Number(organizationId));
+  if (!organization) {
+    throw new Error(`describeLeadership: no organization with id ${organizationId}.`);
+  }
+  const leaderId = organization.leader_id;
+  if (leaderId === null || leaderId === undefined) {
+    return {
+      organizationId: organization.id, leaderId: null, incarcerated: false,
+      commandContinues: false, note: null,
+    };
+  }
+  const leaderNpc = (worldState.npcs || []).find((n) => n.id === leaderId) ?? null;
+  const incarcerated = !!leaderNpc && justice.isImprisoned(leaderNpc);
+  return {
+    organizationId: organization.id,
+    leaderId,
+    incarcerated,
+    // Real per Lessing (2016): command structurally continues the
+    // moment incarceration happens, because nothing here clears
+    // `leader_id` for it — only death does.
+    commandContinues: incarcerated,
+    note: incarcerated
+      ? 'Real, structural pattern (Pyrooz & Decker 2019; Lessing, '
+        + 'Brookings 2016): incarceration does not reliably end an '
+        + "organization's command, and member-recognized authority can "
+        + "persist from custody. This organization's own leader_id is "
+        + 'unchanged by imprisonment on purpose — only succession.js, on '
+        + 'death, ever clears it.'
+      : null,
+  };
+}
+
+// ---------------------------------------------------------------------
 // Entering Leader mode — granted, never requested into existing
 // ---------------------------------------------------------------------
 // Player-id-keyed, same convention as players.js's own
@@ -387,6 +447,11 @@ function getLeaderDashboard(worldState, playerId) {
       members,
       directedMissions,
       canBroadcast: org.type === 'media',
+      // Real per Lessing (2016)/Pyrooz & Decker (2019) — surfaces
+      // whether THIS leader is themselves incarcerated and, if so,
+      // that command structurally continues regardless. See
+      // `describeLeadership`'s own header.
+      leadership: describeLeadership(worldState, org.id),
     };
   });
 
@@ -557,6 +622,7 @@ function broadcastMessage(worldState, leaderEntityId, options = {}) {
 module.exports = {
   isLeaderOf,
   organizationsLedBy,
+  describeLeadership,
   promoteToLeader,
   getLeaderDashboard,
   directMission,

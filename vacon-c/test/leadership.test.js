@@ -783,3 +783,67 @@ test('directMission and assignRole both really record service on compliance, and
   leadership.assignRole(w, leader.id, { organizationId: org.id, subordinateEntityId: loyalSoldier.id, role: 'escort', tick: 1 });
   assert.equal(leadership.serviceRecordOf(w, loyalSoldier.id), 2, 'a second real compliance -- this time via assignRole -- increments the same real counter');
 });
+
+// -- describeLeadership ------------------------------------------------
+// Placed at the end of the file on purpose, not beside isLeaderOf
+// above -- this file's own `nextId` is a module-level counter shared
+// across every test in generation ORDER, and `directMission`'s seeded
+// draw is keyed on entity ids (standing rule 8, seed on position never
+// identity -- but a TEST asserting a specific draw outcome is still
+// exposed to id drift if new tests are inserted earlier in the file).
+// Confirmed directly: inserting these tests between isLeaderOf and
+// promoteToLeader shifted every later id by five and flipped one
+// existing deterministic-refusal test's real seeded draw. Appending
+// instead leaves every earlier test's ids, and therefore its asserted
+// outcome, untouched.
+
+test('describeLeadership reports no incarceration for an ordinary, active leader', () => {
+  const w = world();
+  const leader = person(w);
+  const org = organization(w, { leaderId: leader.id });
+  const report = leadership.describeLeadership(w, org.id);
+  assert.equal(report.leaderId, leader.id);
+  assert.equal(report.incarcerated, false);
+  assert.equal(report.commandContinues, false);
+  assert.equal(report.note, null);
+});
+
+test('describeLeadership reports a real, structural fact when the leader is incarcerated -- never a real individual', () => {
+  const w = world();
+  const leader = person(w);
+  leader.status = 'imprisoned';
+  const org = organization(w, { leaderId: leader.id });
+  const report = leadership.describeLeadership(w, org.id);
+  assert.equal(report.incarcerated, true);
+  // Real per Lessing (2016)/Pyrooz & Decker (2019): command
+  // structurally continues, because nothing clears leader_id for it.
+  assert.equal(report.commandContinues, true);
+  assert.ok(typeof report.note === 'string' && report.note.length > 0);
+  assert.ok(!/larry hoover|malachi|big u|big sandy/i.test(report.note),
+    'this function names a structural pattern, never a real individual');
+});
+
+test('describeLeadership on an organization with no leader_id reports null, not a false positive', () => {
+  const w = world();
+  const org = organization(w, { leaderId: null });
+  const report = leadership.describeLeadership(w, org.id);
+  assert.equal(report.leaderId, null);
+  assert.equal(report.incarcerated, false);
+  assert.equal(report.commandContinues, false);
+});
+
+test('describeLeadership throws for an organization that does not exist', () => {
+  const w = world();
+  assert.throws(() => leadership.describeLeadership(w, 999999));
+});
+
+test('getLeaderDashboard surfaces describeLeadership for every organization the player leads', () => {
+  const w = world();
+  const leaderNpc = person(w);
+  const org = organization(w, { leaderId: leaderNpc.id });
+  const player = players.generatePlayer(w, { linkedEntityId: leaderNpc.id });
+  leadership.promoteToLeader(w, player.id);
+  const dashboard = leadership.getLeaderDashboard(w, player.id);
+  const reported = dashboard.organizations.find((o) => o.id === org.id);
+  assert.deepEqual(reported.leadership, leadership.describeLeadership(w, org.id));
+});

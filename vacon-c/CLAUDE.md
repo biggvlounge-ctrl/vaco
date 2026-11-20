@@ -8888,3 +8888,74 @@ San Quentin-origin, not Philadelphia, not religious), per-tradition
 eschatology content, and the Scientology/Mormon/Masonic/fraternity/
 Boule/Skull and Bones/voodoo/Ifá archetypes are all researched (real
 sources checked) but not yet built as of this entry.
+
+**A hundred-and-fifty-fourth, closing task #156's real ask directly:
+"we need all those leaders that are incarcerated... we don't need
+names, just architects."** Read literally — the word was "architects,"
+not "archetypes," almost certainly the identical word surfacing
+through dictation, since the whole request is otherwise phrased as
+asking for more `orgArchetypes.js`-style entries — and the real
+research behind this round pointed at a REPORT rather than a new
+archetype category: Pyrooz & Decker (2019, "Competing for Control,"
+802 inmate interviews) find prison-gang authority is member-
+recognized, not universal; Lessing (Brookings, 2016) finds removing a
+leader does not reliably end an organization and can spread it
+further through the prison system instead of weakening it.
+
+**Checking what already existed found the real mechanic was already
+built and simply never surfaced.** `grep -rn "leader_id = null"
+server/*.js` returns exactly one call site — inside
+`succession.settleEstate`, which only ever runs on DEATH
+(`mortality.recordDeath`'s own caller). Nothing clears
+`organizations.leader_id` on imprisonment, and `leadership.
+directMission` never reads a leader's own `npc.status` at all — so an
+incarcerated leader could ALREADY direct a subordinate through the
+real, existing compliance draw, exactly as Lessing's finding says
+should happen. This was the eighteenth standing rule's own shape
+again: a real mechanism existed, correct and silent, and nothing made
+it visible.
+
+`leadership.describeLeadership(worldState, organizationId)` is the
+fix — a report, not a new mechanic, reading `organization.leader_id`
+and the leader NPC's live `status` directly, naming the real citations
+on the `note` field it returns when the leader is incarcerated. Wired
+into `getLeaderDashboard`'s own per-organization report (`leadership:
+describeLeadership(...)`), so a player whose own avatar gets
+incarcerated sees their organization's command structurally continuing
+rather than silently vanishing. No real individual is ever named
+anywhere in it — the test suite asserts this directly (`!/larry
+hoover|malachi|big u|big sandy/i.test(report.note)`), the same
+discipline this file holds everywhere else for incarcerated real
+leaders.
+
+**One correction made to the test file itself before any of this was
+confirmed clean.** The first version of these tests was inserted
+between the file's existing `isLeaderOf` and `promoteToLeader` tests —
+`test/leadership.test.js`'s own module-level `nextId` counter
+increments across every test IN FILE ORDER, and one pre-existing test
+(`directMission` on the organization-free path) asserts a SPECIFIC
+seeded-draw outcome that turned out to depend on exactly which ids the
+entities involved happened to get. Inserting five new tests earlier in
+the file shifted every later id by five and flipped that test's real
+seeded draw from refusal to compliance — caught by running the full
+file, not assumed clean from the new tests alone. The standing fix is
+the twenty-sixth standing rule's own cousin at the level of a TEST
+FILE rather than a module: append new tests to the end of a file whose
+fixtures share a mutable, order-dependent id counter, rather than
+inserting them wherever the subject under test is discussed.
+
+Mutation-verified: hard-coded `commandContinues: false` regardless of
+the real incarceration check — caught (41/42), file confirmed restored
+byte-identical afterward.
+
+**The real GRYD (Gang Reduction and Youth Development) program data
+asked for in the same breath is deliberately NOT part of this
+commit.** It is real (LA Mayor's Office, founded 2007, 23 real zones,
+FY2023-24 budget ≈$12.9M, a self-reported — not independently
+verified — 44% 2024 homicide-decline claim across its zones), but it
+is a multi-field descriptive fact, not a scalar, and `statistics.js`'s
+own catalogue is numeric/ordinal-only by the forty-third standing
+rule's own finding — forcing it in would repeat the exact mistake that
+rule already named for `landCoverClass`/`dominantPathway`. Left for
+its own round with its own integration decision rather than rushed
+into this one.
