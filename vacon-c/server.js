@@ -1443,6 +1443,23 @@ app.get('/api/relationships/:entityId', (req, res) => {
   res.json({ relationships, total: relationships.length });
 });
 
+// The real single-pair lookup `worldStore.findRelationship` has always
+// supported internally (influence.js, heat.js, leadership.js all read
+// a specific pair this way) — the list route above never had a
+// sibling for "what is MY relationship with THIS one specific real
+// individual or group", so a caller had to fetch everything and
+// filter client-side. A read, never a create: `POST /api/
+// relationships` above is still the only writer.
+app.get('/api/relationships/:entityAId/:entityBId', (req, res) => {
+  const entityAId = Number(req.params.entityAId);
+  const entityBId = Number(req.params.entityBId);
+  const relationship = worldStore.findRelationship(engine.WorldState, entityAId, entityBId);
+  if (!relationship) {
+    return res.status(404).json({ error: `no relationship recorded between ${entityAId} and ${entityBId}` });
+  }
+  return res.json(relationship);
+});
+
 // audit-route-guards: open -- simulation social graph, no real-world principal
 app.post('/api/relationships', (req, res) => {
   const { entityAId, entityBId, type } = req.body || {};

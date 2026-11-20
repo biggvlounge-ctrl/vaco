@@ -20,7 +20,7 @@ There is a working simulation — traits across four tiers, seven Key
 resolvers, family, economy, territory, tick, players, artifacts and
 missions, plus Property, Culture DNA, Named Flow Templates, contest
 resolution and the Behavior Engine — and its HTTP surface is real:
-**127 routes** (the 122nd, `GET /api/entities/:id/journey`, is `travel.js`'s own real live journey-status read; the 123rd, `GET /api/entities/:id/camp`, is `camps.js`'s own; the 124th-126th, `GET /api/entities/:id/nomadic-status`, `GET /api/families/:id/nomadic-status` and `GET /api/organizations/:id/nomadic-status`, are `nomadic.js`'s own; the 127th, `GET /api/entities/:id/enrollment`, is `students.js`'s own, see CLAUDE.md's hundred-and-twenty-ninth standing rule), up from 8 before any of this -- 92 plus the two
+**128 routes** (the 122nd, `GET /api/entities/:id/journey`, is `travel.js`'s own real live journey-status read; the 123rd, `GET /api/entities/:id/camp`, is `camps.js`'s own; the 124th-126th, `GET /api/entities/:id/nomadic-status`, `GET /api/families/:id/nomadic-status` and `GET /api/organizations/:id/nomadic-status`, are `nomadic.js`'s own; the 127th, `GET /api/entities/:id/enrollment`, is `students.js`'s own, see CLAUDE.md's hundred-and-twenty-ninth standing rule; the 128th, `GET /api/relationships/:entityAId/:entityBId`, is the real single-pair sibling to the existing full-list route, see the hundred-and-thirty-third standing rule), up from 8 before any of this -- 92 plus the two
 cross-cutting reads (`/api/historical-records`,
 `/api/decision-log/:entityId`) a later audit found documented in
 `VACANCY_API_ENDPOINT_MAP.md` as built and missing from `server.js`,

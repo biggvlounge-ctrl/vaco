@@ -838,6 +838,25 @@ test('a relationship needs two different entities', { skip: SKIP }, async () => 
   assert.match((await same.json()).error, /itself/);
 });
 
+test('a single real pair can be looked up directly, from either side, without fetching the whole list', { skip: SKIP }, async () => {
+  const a = await (await post('/npc/generate')).json();
+  const b = await (await post('/npc/generate')).json();
+
+  await post('/relationships', { entityAId: a.npc.id, entityBId: b.npc.id, type: 'rival' });
+
+  const forward = await (await get(`/relationships/${a.npc.id}/${b.npc.id}`)).json();
+  assert.equal(forward.relationship_type, 'rival');
+  const reverse = await (await get(`/relationships/${b.npc.id}/${a.npc.id}`)).json();
+  assert.equal(reverse.relationship_type, 'rival');
+});
+
+test('a single-pair lookup is a real, honest 404 when nothing was ever recorded', { skip: SKIP }, async () => {
+  const a = await (await post('/npc/generate')).json();
+  const b = await (await post('/npc/generate')).json();
+  const res = await get(`/relationships/${a.npc.id}/${b.npc.id}`);
+  assert.equal(res.status, 404);
+});
+
 // -- the citizen, over HTTP ---------------------------------------------------
 //
 // The half of the Phase 1 Definition of Done that had no route: a

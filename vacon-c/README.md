@@ -1994,6 +1994,13 @@ unless `options.force: true`, which also costs real extra condition
 breaking a lock doubles the real cost of stripping. See CLAUDE.md's
 hundred-and-thirty-third standing rule.
 
+## Single-pair relationship lookup
+`GET /api/relationships/:entityAId/:entityBId` wraps the real
+`worldStore.findRelationship` directly -- a real, honest 404 when
+nothing has ever been recorded between the two, alongside the
+existing full-list route. See CLAUDE.md's hundred-and-thirty-third
+standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

@@ -8488,3 +8488,14 @@ the force-entry extra condition cost, and all three of `canLock`'s
 real branches (occupant, operating-organization membership, current
 owner) — each caught, `server/property.js` and `server/salvage.js`
 confirmed byte-identical to their own pre-mutation backups afterward.
+
+**A second, smaller real gap closed the same round: task #121, a
+single-pair relationship lookup.** `GET /api/relationships/:entityId`
+has always returned a player's FULL list; the real single-pair getter
+(`worldStore.findRelationship`) has been used internally for rounds
+now (`influence.js`, `heat.js`, `leadership.js` all read a specific
+pair this way) with no HTTP sibling of its own. `GET /api/
+relationships/:entityAId/:entityBId` is that sibling — a real,
+honest 404 when nothing has ever been recorded between the two,
+never an invented empty relationship. Mutation-verified: removing the
+404 guard is caught by a real test.
