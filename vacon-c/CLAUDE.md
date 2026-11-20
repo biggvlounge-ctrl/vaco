@@ -9019,3 +9019,221 @@ attempt accidentally edited an identical phrase inside this file's own
 header COMMENT rather than the real data field, which is itself a
 small case of "citation is not presence" aimed at a mutation test's
 own aim rather than at the code).
+
+**A hundred-and-fifty-sixth, closing tasks #159/#160 — six more real
+organizational traditions, and one explicit decline, by direct
+instruction** ("the Church of Scientology... the Mormons... the
+Masonic orders... fraternities... the Kappas, the Alphas, the
+Zetas... voodoo... the Ifá community").
+
+**`orgArchetypes.js` gains `'scientology church'` and `'latter-day
+saints congregation'`, each real, each flagged `confidence:
+'secondary-estimate'` for the identical reason the NOI/MSTA entries
+already are — neither has a reliable CURRENT membership figure.**
+Scientology's own claimed membership (millions) is kept separate from
+the real, independent range this round's research found (roughly
+20,000-40,000 active) — the Church's own unverified figure is never
+presented as if it were the real one. LDS/Mormon carries a real,
+dated (2022) directional fact instead of a precise current total: the
+Salt Lake Tribune's own analysis found the church holds the 5th-largest
+private land portfolio in the U.S. (≥1.7M acres, ≥$16B, a partial
+count) and has been Florida's largest private landowner since 2014.
+
+**`'masonic lodge'` and `'collegiate fraternity'` are real `club`-type
+archetypes, and both deliberately omit a current count rather than
+cite a weak one.** The real structure (Blue/Craft Lodge → York Rite/
+Scottish Rite) is reported with full confidence; a commonly-repeated
+~1.1M-member figure traces to a low-quality source and a real
+historical peak (~4.1M, 1959) would need primary verification before
+being cited at this file's normal confidence — so no current count is
+claimed at all, the twenty-fifth standing rule's "a declared gap beats
+a fabricated number" applied to an entire field rather than one value.
+
+**`'collegiate fraternity'`'s own note is where the real, specific,
+NAMEABLE organizations live — the Divine Nine (NPHC: Alpha Phi Alpha,
+Kappa Alpha Psi, Omega Psi Phi, Phi Beta Sigma, Iota Phi Theta;
+Alpha Kappa Alpha, Delta Sigma Theta, Zeta Phi Beta, Sigma Gamma Rho),
+Sigma Pi Phi ("the Boule," Philadelphia, 1904, ~5,000 members/139 real
+chapters), and Skull and Bones (Yale, 1832, 15 seniors tapped a year,
+the real incorporated Russell Trust Association) — the same "this
+file names nothing itself, but documents real nameable examples a
+scenario can use" posture `'nation of islam mosque'`'s own clergy
+title already holds one level over.** General (non-Black, NIC)
+fraternity chapter/member counts genuinely conflict across sources and
+dates and are reported as a real disagreement, not resolved to one
+figure.
+
+**Checked and explicitly declined: a present-day "Illuminati."** No
+real, documented, current organization by that name exists — only the
+real, historical 1776-1785 Bavarian Illuminati (Adam Weishaupt,
+suppressed by Bavarian state edict, banned outright in 1785, never
+reconstituted). Everything about a present-day "Illuminati" is
+post-French-Revolution myth and modern conspiracy theory with zero
+real organizational data behind it — the twenty-ninth standing rule's
+Antifa section again: there is no real fact here, so nothing is built
+to stand in for one. `test/org-archetypes.test.js`'s own new test
+asserts `definitionOf('illuminati')` is null, checked rather than
+assumed.
+
+**Checked and explicitly declined again, held the identical way all
+session: attaching any real celebrity to any real organization in
+this round.** Skull and Bones' own real, uncontroversial historical
+fact — two real U.S. presidents among its documented alumni — is
+named once, generically, as organizational history, the same posture
+Noble Drew Ali's name already holds for MSTA; no real celebrity is
+ever attached to any fraternity, Boule, lodge, or any other
+organization built this round, and a test asserts the note contains
+no such name.
+
+**`'vodou house'` and `'ifa house'` are real, respected spiritual
+traditions carried at a markedly lower confidence than this file's
+Census-Bureau-adjacent entries, because the real finding IS the
+disagreement between sources, not a number to resolve it to.** Haitian
+Vodou and Louisiana Voodoo are real, distinct traditions (never
+interchangeable, per EBSCO); estimates for New Orleans alone range
+from the low hundreds (post-Katrina) to an unverified 1.5 million
+nationally (advocacy source) — both carried, neither chosen. Ifá/
+Santería/Lucumí estimates found this round span 22,000 to 1,000,000
+depending on source and definition (practitioners vs. initiated
+priests) — the same wide-range-not-point-estimate discipline.
+
+Mutation-verified twice: Scientology's own real membership range
+widened past its cited bounds (caught, 25/26); and a fabricated
+present-day `'illuminati'` archetype added directly to the file
+(caught, 24/26 — two tests failed, since the forbidden-entry check and
+at least one generic cross-archetype check both correctly noticed an
+archetype that should not exist). Both confirmed restored
+byte-identical afterward.
+
+**A hundred-and-fifty-seventh, closing task #163 — a direct follow-up
+naming seven more specific St. Louis places/cliques, and the right
+answer was six declines and one real addition, checked exactly the
+same careful way as everything else in this file.** "Jimmy of St.
+Louis," Walnut Park/"Six Soul Way," Shreve, "the Peabody," O'Fallon
+Place, O'Fallon Park, "OPAC," and a "62 Crips" set at "Clarence and
+Carter" were all researched directly. Six of those failed to clear
+this registry's own sourcing bar — the same tier the "62/Six-Deuce
+Hoover Crips" claim already failed at in the hundred-and-fifty-third
+standing rule: hobbyist gang-map sites and a single unverified
+Substack post, never a court record or named, dedicated piece of
+journalism. None are built. "Jimmy" itself resolves to no real gang
+at all — almost certainly a mis-transcription of JVL (Jeff-Vander-Lou,
+a real St. Louis neighborhood), with no source tying any gang to that
+name either.
+
+**The one real exception the same search surfaced: Riverfront Times'
+own "Battle Lines," a dedicated investigative piece naming the "49 BAD
+Bloods"** (the 4900 blocks of Beacon, Alcott and Davison, bounded by
+Union Boulevard — within Walnut Park, the one real geography the
+original follow-up actually named correctly). Added to `namedGangPacks
+.js`'s St. Louis entry as a third real gang, `confidence:
+'current-activity-only'` (same tier as Cochran Crips/55 Boyz — real
+current documentation, no founding date fabricated). This is the
+twenty-fifth standing rule's own shape again, now run six times in a
+row on an escalating list of specific local names without once
+lowering the bar for any of them: a declared gap beats a fabricated
+number, checked per name, not assumed from the fact that a user
+listed several names together.
+
+Mutation-verified: the new entry's own name swapped for "OPAC" (one
+of the declined leads) — caught (20/21), file confirmed restored
+byte-identical afterward.
+
+**A hundred-and-fifty-eighth, closing task #164 — Detroit, by direct
+instruction** ("Detroit's neighborhood crime factions, from Puritan to
+8 Mile, 9 Mile... all the neighborhoods in Detroit... the different
+cliques"), and the first city in this registry's round-trip where the
+real sourcing turned out STRONGER than the request's own framing
+rather than weaker.
+
+**"8 Mile" and "9 Mile" are real Detroit-area roads, not gang names —
+checked rather than assumed, same as "Jimmy" resolved to no real gang
+in the prior St. Louis round.** No source names a gang literally "8
+Mile" or "9 Mile." The real substance behind "8 Mile" is Seven Mile
+Bloods (SMB) — multiple real USAO-EDMI/DEA press releases and
+convictions (a leader sentenced to life on racketeering conspiracy
+plus murder, 22 counts), whose own documented territory runs from
+Seven Mile Road up TO Eight Mile Road (Gratiot to Kelly, the real "Red
+Zone") — named for the boundary the request was almost certainly
+pointing at, not fabricated to match the request's own wording. "9
+Mile" has no documented gang tie at all; declared, not built.
+
+**Detroit cleared this registry's own sourcing bar at DOJ-RICO depth
+on six of nine real entries, the same tier Chicago's Gangster/Black
+Disciples sit at — stronger than St. Louis's own round needed to be.**
+`namedGangPacks.js`'s new Detroit pack carries Young Boys Incorporated
+(1978, University of Michigan's "Crackdown on Detroit" academic
+project plus a real 1987 federal indictment), the Chambers Brothers
+organization (1982-1988, a real DEA/Detroit PD joint arrest and 1989
+conviction), Puritan Avenue Boys (a real DEA press release, Nov 2003 —
+the request's own "Puritan," real and confirmed, unlike every St.
+Louis follow-up name checked the prior round), Seven Mile Bloods, Band
+Crew (a real 2015 federal RICO indictment whose own text describes a
+loose "CEO"/"Co-CEO" coalition of smaller gangs rather than a single
+hierarchy — a real structural fact, not this file's invention), the
+Almighty Vice Lord Nation's real, separately-documented Detroit
+chapter (multiple 2023-2024 USAO-EDMI RICO convictions), and three
+more real, DOJ-documented sets (6 Mile Chedda Grove, 42 Hustle Boys,
+Purple Heart Vets).
+
+**"Best Friends" — a commonly-repeated Detroit gang name — is checked
+and explicitly excluded, on a finer distinction than any prior
+decline in this file.** Every other declined name this round (St.
+Louis's "Six Soul Way," "OPAC," etc.) failed because no real source
+named them convincingly at all. "Best Friends" is different: its own
+EXISTENCE, not just its founding details, rests on a single History
+Channel documentary episode plus a user-edited wiki and one blog post
+— no DOJ or court record found anywhere. That is a thinner real basis
+than even this file's own `'Mickey Cobras'` entry (Chicago), whose
+existence several independent sources agree on even though its
+founding details conflict. The twenty-fifth standing rule's "a
+declared gap beats a fabricated number," now distinguishing a gang
+whose EXISTENCE is uncertain from one whose DETAILS merely disagree.
+
+Mutation-verified: Seven Mile Bloods renamed to "Best Friends" directly
+in the pack — caught (21/23, two tests failing exactly where expected),
+file confirmed restored byte-identical afterward.
+
+**A hundred-and-fifty-ninth, closing task #165 — a generic youth
+clique, explicitly NOT criminal by default, by direct instruction**
+("little young cliques all over the country that don't have to be
+criminal... some are smart, some are not... could grow up to be
+bigger groups... especially in the high school age to 20 something to
+30"). A deliberate contrast to this whole round's own named-roster
+entries: this archetype names nothing, the same as `'nationalist
+movement'`, because the real finding here is a universal PATTERN, not
+a roster of specific groups.
+
+**Real, and the real finding is the heterogeneity the request itself
+describes.** Frederic Thrasher's foundational "The Gang: A Study of
+1,313 Gangs in Chicago" (1927) documents organized gangs very often
+originating from ordinary, unsupervised adolescent "play groups" with
+no criminal purpose at founding — only some, through real conflict,
+ever cross into what criminology calls a gang. The National Gang
+Center's own definitional framework (building on Klein & Maxson's
+Eurogang criteria) distinguishes a mere "troublesome youth group" from
+a "street gang" on specific, real criteria. Dunphy's classic "The
+Social Structure of Urban Adolescent Peer Groups" (Sociometry, 1963)
+is the real developmental-psychology basis for the request's own age
+range. `orgArchetypes.js`'s new `'youth clique'` entry (`type: 'club'`,
+no `isFaction`) reports this as genuinely WIDE trait bands
+(`internalLoyalty: [20, 90]`) rather than a narrow profile — the
+spread itself is the documented finding, same shape the thirty-second
+standing rule's secondary-estimate ranges already take for a thinner
+source, here applied to a real but deliberately wide band instead of
+a thin one.
+
+**No growth-into-a-gang probability is invented.** The seventeenth
+standing rule's own four-attempt `resolveAggression` case study is
+exactly the cost of calibrating a transition like this one without
+measuring against this engine's real distributions first — the
+pattern (most stay ordinary; a minority escalate) is reported; the
+transition itself is left for a future, separately-calibrated round.
+`posts: ['influencer']` — a clique's real organizing axis is peer
+status (Dunphy), never `enforcer`, which would assert violence as
+this archetype's own baseline against what the real literature
+actually supports for most such groups.
+
+Mutation-verified: the wide `internalLoyalty` band narrowed from
+`[20, 90]` to `[40, 60]` directly in the file — caught (27/28), file
+confirmed restored byte-identical afterward.

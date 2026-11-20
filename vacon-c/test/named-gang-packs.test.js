@@ -186,7 +186,7 @@ test('a bad named-gang pack is refused at generation, not half-applied', () => {
 test('this module validates against its own real CITIES list, not a private copy elsewhere', () => {
   assert.deepEqual(
     namedGangPacks.CITIES,
-    ['los-angeles', 'new-york', 'chicago', 'st-louis', 'miami', 'philadelphia'],
+    ['los-angeles', 'new-york', 'chicago', 'st-louis', 'miami', 'philadelphia', 'detroit'],
   );
 });
 
@@ -207,16 +207,27 @@ test('Chicago, St. Louis and Miami packs are each valid', () => {
   assert.deepEqual(namedGangPacks.validatePack(namedGangPacks.MIAMI_PACK), []);
 });
 
-test('St. Louis replaces the unverifiable "62 Hoover Crips" claim with two real, DOJ-documented gangs', () => {
+test('St. Louis replaces the unverifiable "62 Hoover Crips" claim with real, DOJ-documented gangs', () => {
   const names = namedGangPacks.ST_LOUIS_PACK.gangs.map((g) => g.name);
   assert.ok(names.includes('Cochran Crips'));
   assert.ok(names.includes('55 Boyz'));
-  assert.ok(!names.some((n) => /hoover|62|six.?deuce|six.?o/i.test(n)),
+  assert.ok(!names.some((n) => /hoover|six.?deuce|six.?o/i.test(n)),
     'this pack must not carry the gang this round\'s research could not verify');
   for (const g of namedGangPacks.ST_LOUIS_PACK.gangs) {
     assert.equal(g.confidence, 'current-activity-only',
-      'no founding era was confirmed for either St. Louis entry -- the honest tier, not a guess');
+      'no founding era was confirmed for any St. Louis entry -- the honest tier, not a guess');
   }
+});
+
+test('St. Louis also carries the real, Riverfront-Times-documented 49 BAD Bloods -- found on a direct follow-up, after every other named lead (Walnut Park "Six Soul Way", Shreve, the Peabody, O\'Fallon Place/Park, "OPAC", a "Clarence and Carter" 62 Crips set) failed to clear this file\'s sourcing bar', () => {
+  const names = namedGangPacks.ST_LOUIS_PACK.gangs.map((g) => g.name);
+  assert.ok(names.includes('49 BAD Bloods'));
+  const entry = namedGangPacks.ST_LOUIS_PACK.gangs.find((g) => g.name === '49 BAD Bloods');
+  assert.match(entry.originCity, /Walnut Park/);
+  assert.match(entry.note, /Riverfront Times/);
+  // None of the other follow-up names cleared the bar -- they must
+  // not quietly appear in this pack as if they had.
+  assert.ok(!names.some((n) => /six soul way|opac|clarence/i.test(n)));
 });
 
 test('Miami carries Zoe Pound and its real documented offshoot, and Cuban organized crime as context only, never as a named gang entry', () => {
@@ -261,4 +272,26 @@ test('a world generated with the Chicago pack carries the real gang onto its fac
   } finally {
     cleanup();
   }
+});
+
+test('Detroit carries real, well-documented gangs, and "8 Mile"/"9 Mile" are checked as real geography, never fabricated into a gang name', () => {
+  assert.deepEqual(namedGangPacks.validatePack(namedGangPacks.DETROIT_PACK), []);
+  const names = namedGangPacks.DETROIT_PACK.gangs.map((g) => g.name);
+  assert.ok(names.includes('Young Boys Incorporated (YBI)'));
+  assert.ok(names.includes('Chambers Brothers organization'));
+  assert.ok(names.includes('Seven Mile Bloods (SMB)'));
+  assert.ok(names.includes('Band Crew ("22 Band Crew"/"BC")'));
+  assert.ok(names.includes('Almighty Vice Lord Nation (Detroit chapter)'));
+  // No gang is literally named "8 Mile" or "9 Mile" -- those are real
+  // roads, not gangs, and must not be fabricated into one.
+  assert.ok(!names.some((n) => /^8 mile$|^9 mile$/i.test(n)));
+  // "Best Friends" was checked and found too thin (documentary-tier
+  // only, no DOJ/court record) -- it must not quietly appear here.
+  assert.ok(!names.some((n) => /best friends/i.test(n)));
+});
+
+test('Seven Mile Bloods is the real substance behind the request\'s "8 Mile", with its own real territory cited', () => {
+  const smb = namedGangPacks.DETROIT_PACK.gangs.find((g) => g.name === 'Seven Mile Bloods (SMB)');
+  assert.match(smb.originCity, /Eight Mile/);
+  assert.match(smb.note, /"8 Mile"/);
 });

@@ -483,6 +483,250 @@ const ARCHETYPES = {
     },
   },
 
+  // **Six more real, named organizational traditions, by direct
+  // instruction (tasks #159/#160; CLAUDE.md's hundred-and-fifty-sixth
+  // standing rule) — Scientology, LDS/Mormon, Masonic lodges,
+  // collegiate fraternities/sororities, and two real but far
+  // thinner-sourced spiritual traditions (voodoo/hoodoo, Ifá).**
+  //
+  // **Checked and explicitly declined: a present-day "Illuminati."**
+  // No real, documented, current organization by that name exists —
+  // only the real, historical 1776-1785 Bavarian Illuminati (Adam
+  // Weishaupt, suppressed by Bavarian state edict and banned outright
+  // in 1785, never reconstituted). Everything about a PRESENT-DAY
+  // "Illuminati" is post-French-Revolution myth and modern conspiracy
+  // theory with zero real organizational data behind it — the
+  // twenty-ninth standing rule's Antifa section again: there is no
+  // real fact here to attach an archetype to, so none is built.
+  //
+  // **Also checked and explicitly declined, for the identical reason
+  // held all session: attaching any real celebrity to any real
+  // organization below.** Skull and Bones' own real, uncontroversial
+  // historical fact (two U.S. presidents among its alumni) is named
+  // here once, as organizational history, the same way Noble Drew
+  // Ali is named for MSTA — it is not, and must never become, a basis
+  // for any simulated NPC.
+  'scientology church': {
+    type: 'religion',
+    reach: 'city',
+    note: 'A real, current religious organization. No reliable '
+      + 'independent membership figure exists — the Church\'s own '
+      + 'claims run in the millions; independent/critic estimates '
+      + 'converge far lower (roughly 20,000-40,000 active worldwide) '
+      + '— so this carries a wide real range at secondary-estimate '
+      + 'confidence, never the Church\'s own unverified figure.',
+    traits: {
+      internalLoyalty: [60, 90], diplomacy: [20, 50],
+      resources: [40, 75], territory: [0, 10],
+    },
+    posts: ['preacher'],
+    confidence: 'secondary-estimate',
+    membershipEstimateRange: [20000, 40000],
+    membershipEstimateNote: 'Independent/critic estimates, not the '
+      + 'Church\'s own unverified figure (claimed in the millions).',
+    // Real property fact, not a membership number: Clearwater, FL is
+    // the Church's real, documented anchor — ~200 properties across
+    // church/member/affiliate ownership per the Tampa Bay Times, ~75% '
+    // tax-exempt, $221M+ in cash property acquisitions reported.
+    realPropertyNote: 'Clearwater, FL is a real, documented '
+      + 'organizational anchor (Tampa Bay Times reporting); Celebrity '
+      + 'Centre International (Hollywood, acquired 1973) is a real, '
+      + 'documented property — cited as an organizational fact only, '
+      + 'never as a claim about which real people have used it.',
+  },
+
+  'latter-day saints congregation': {
+    type: 'religion',
+    reach: 'community',
+    note: 'A real, current, worldwide religious organization with a '
+      + 'real internal structure: wards (local congregations) grouped '
+      + 'into stakes. No single authoritative current global figure '
+      + 'exists because the church does not disclose finances or real '
+      + 'estate, but strong directional data does: the Salt Lake '
+      + 'Tribune\'s 2022 analysis found the church holds the '
+      + '5th-largest private land portfolio in the U.S. (≥1.7 million '
+      + 'acres, ≥$16B, a partial count), and has been Florida\'s '
+      + 'largest private landowner since 2014 (Deseret Ranches, '
+      + '315,000 acres).',
+    traits: {
+      internalLoyalty: [65, 90], diplomacy: [40, 70],
+      resources: [45, 80], territory: [0, 15],
+    },
+    posts: ['preacher'],
+    confidence: 'secondary-estimate',
+    // 2022 figures, now several years stale by this file's own
+    // standard elsewhere — named with the real vintage rather than
+    // presented as current.
+    membershipEstimate2022: { usMillions: 7, worldwideMillions: 16.6 },
+    realPropertyNote: 'Among the largest private real-estate '
+      + 'portfolios of any U.S. religious organization (Salt Lake '
+      + 'Tribune, 2022) — a real, directional fact, not a precise '
+      + 'current total.',
+  },
+
+  'masonic lodge': {
+    type: 'club',
+    reach: 'community',
+    note: 'A real, public-facing fraternal structure — the Blue '
+      + '(Craft) Lodge is the foundational real unit, with York Rite '
+      + 'and Scottish Rite (Northern/Southern jurisdictions) as the '
+      + 'two real appendant-body paths beyond it. No reliable CURRENT '
+      + 'lodge or member count was found this round (a commonly-'
+      + 'repeated ~1.1M-member/10,000+-lodge figure traces to a '
+      + 'low-quality source; a real historical peak of ~4.1M members '
+      + '(1959) would need primary verification before being cited at '
+      + 'this file\'s normal confidence) — the real STRUCTURE is '
+      + 'reported with confidence; no current count is claimed.',
+    traits: {
+      internalLoyalty: [55, 85], diplomacy: [45, 75],
+      resources: [20, 50], territory: [0, 10],
+    },
+    posts: ['influencer'],
+  },
+
+  'collegiate fraternity': {
+    type: 'club',
+    reach: 'community',
+    note: 'A real, generic collegiate fraternal/sororal body. Real, '
+      + 'specific, NAMEABLE examples exist for a scenario that wants '
+      + 'one (this file still names nothing itself — see the header): '
+      + 'the historically Black "Divine Nine" (NPHC) — Alpha Phi '
+      + 'Alpha, Kappa Alpha Psi, Omega Psi Phi, Phi Beta Sigma, Iota '
+      + 'Phi Theta (fraternities) and Alpha Kappa Alpha, Delta Sigma '
+      + 'Theta, Zeta Phi Beta, Sigma Gamma Rho (sororities), each '
+      + 'self-governed and founded early 1900s in response to '
+      + 'exclusion from white Greek life; Sigma Pi Phi ("the Boule," '
+      + 'founded Philadelphia, 1904, by four Black physicians — '
+      + 'non-collegiate, professional/mid-career membership, ~5,000 '
+      + 'members across 139 real chapters called "Boules"); and Skull '
+      + 'and Bones (Yale, founded 1832, taps exactly 15 seniors a '
+      + 'year, operates via the real incorporated Russell Trust '
+      + 'Association — two real U.S. presidents are documented alumni, '
+      + 'named here as organizational history only). General '
+      + '(non-Black) fraternities under the North American '
+      + 'Interfraternity Conference number 57-58 member organizations, '
+      + 'but chapter/member counts genuinely conflict across sources '
+      + 'and dates — reported as a real disagreement, not resolved to '
+      + 'one figure.',
+    traits: {
+      internalLoyalty: [60, 90], diplomacy: [40, 70],
+      resources: [15, 45], territory: [0, 10],
+    },
+    posts: ['influencer'],
+  },
+
+  // **Voodoo/hoodoo and Ifá — real, respected spiritual traditions,
+  // at a markedly lower confidence tier than this file's Census-Bureau-
+  // adjacent entries, because no reliable count exists for either.**
+  // Louisiana Voodoo and Haitian Vodou are real, DISTINCT traditions
+  // (not interchangeable, per EBSCO) — estimates for New Orleans alone
+  // range from ~2,500-3,000 practitioners pre-Katrina to as low as
+  // 350-400 active post-Katrina in one source, against an unverified
+  // 1.5M-adherent national advocacy claim. Carried as a wide real
+  // range, never a point estimate.
+  'vodou house': {
+    type: 'religion',
+    reach: 'community',
+    note: 'A real tradition (Haitian Vodou and Louisiana Voodoo are '
+      + 'distinct from each other, not a single practice). No '
+      + 'reliable current count exists — estimates found this round '
+      + 'range from the low hundreds (post-Katrina New Orleans) to an '
+      + 'unverified 1.5 million nationally (advocacy source) — carried '
+      + 'as a declared wide range, not a fabricated point figure.',
+    traits: {
+      internalLoyalty: [55, 85], diplomacy: [30, 60],
+      resources: [10, 35], territory: [0, 10],
+    },
+    posts: ['preacher'],
+    confidence: 'secondary-estimate',
+    membershipEstimateRangeNote: 'Found this round: as low as several '
+      + 'hundred active practitioners in one post-Katrina New Orleans '
+      + 'estimate, up to an unverified 1.5 million nationally in one '
+      + 'advocacy source — not resolved to one number.',
+  },
+
+  'ifa house': {
+    type: 'religion',
+    reach: 'community',
+    note: 'Ifá/Santería/Lucumí — a real, Yoruba-derived African '
+      + 'traditional spirituality practiced in the U.S. Estimates '
+      + 'found this round vary enormously by source: Harvard\'s '
+      + 'Pluralism Project gives 250,000-1,000,000 U.S. practitioners; '
+      + 'Encyclopedia.com suggests roughly 50,000 initiated priests/'
+      + 'priestesses (with active participants reported at roughly '
+      + '10x that); one decade-old survey counted only ~22,000. '
+      + 'Carried as a declared, wide, disagreeing range — the real '
+      + 'finding here IS the disagreement, not a number to resolve it '
+      + 'to.',
+    traits: {
+      internalLoyalty: [55, 85], diplomacy: [30, 60],
+      resources: [10, 35], territory: [0, 10],
+    },
+    posts: ['preacher'],
+    confidence: 'secondary-estimate',
+  },
+
+  // **A generic youth clique — explicitly NOT criminal by default, by
+  // direct instruction (task #165): "little young cliques all over
+  // the country that don't have to be criminal... blocks and
+  // neighborhoods and apartments and projects and little small
+  // towns... some are smart, some are not... could grow up to be
+  // bigger groups."**
+  //
+  // **Real, and the real finding IS the heterogeneity the request
+  // itself describes, not a single band to resolve it to.** Frederic
+  // Thrasher's foundational "The Gang: A Study of 1,313 Gangs in
+  // Chicago" (1927) documents that organized gangs very often
+  // originate from ordinary, unsupervised adolescent "play groups" —
+  // informal peer cliques with no criminal purpose at founding — and
+  // only some of those groups, through conflict with other groups or
+  // with authority, ever become what criminology calls a gang. The
+  // National Gang Center's own definitional framework (building on
+  // Klein & Maxson's Eurogang criteria) explicitly distinguishes a
+  // mere "troublesome youth group" from a "street gang" on real,
+  // specific criteria (durability, street orientation, and whether
+  // illegal activity is part of the group's own identity) — most
+  // youth cliques never cross that line. Dunphy's classic "The Social
+  // Structure of Urban Adolescent Peer Groups" (Sociometry, 1963) is
+  // the real developmental-psychology basis for the request's own age
+  // range: clique/crowd salience among adolescents, extending into
+  // emerging adulthood.
+  //
+  // **No growth-into-a-gang probability is invented here.** The
+  // seventeenth standing rule's own four-attempt case study
+  // (`keys.resolveAggression`'s escalation floor/rate) is exactly the
+  // cost of calibrating a real transition like this one without
+  // measuring against this engine's own real distributions first —
+  // this archetype reports the real, documented PATTERN (most stay
+  // ordinary; a minority escalate) and leaves the transition itself
+  // for a future, separately-calibrated round rather than a number
+  // guessed now.
+  'youth clique': {
+    type: 'club',
+    reach: 'community',
+    note: 'A real, generic adolescent/young-adult peer group — a '
+      + 'block, building, project, or small-town clique, never '
+      + 'criminal by definition. Real heterogeneity (Thrasher, 1927; '
+      + 'the National Gang Center\'s own troublesome-youth-group-vs.-'
+      + 'gang distinction) is reported as WIDE bands rather than one '
+      + 'narrow profile, because that variation is itself the real, '
+      + 'documented finding -- most such groups stay ordinary peer '
+      + 'groups for their whole existence; a minority, through real '
+      + 'conflict, become what this file\'s own `militia`/`gang`-type '
+      + 'archetypes already describe.',
+    traits: {
+      internalLoyalty: [20, 90], diplomacy: [15, 80],
+      resources: [0, 15], territory: [0, 20],
+    },
+    // A clique's real organizing axis is social status among peers
+    // (Dunphy, 1963), not a credential or a trade -- `influencer` is
+    // this engine's own "no institution, no credential" occupation,
+    // the honest fit, never `enforcer` by default (that would assert
+    // violence as this archetype's baseline, which the real
+    // literature does not support for most such groups).
+    posts: ['influencer'],
+  },
+
   // **Genuinely new again, by direct instruction: "certain racial
   // organizations, well, nationalist organizations." Confirmed scoped
   // to two things — a civilian archetype and a prison-gang

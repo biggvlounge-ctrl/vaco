@@ -3,9 +3,10 @@
 // **Real, named, documented street gangs — an organizational fact,
 // not an individual one — for the real cities this registry's own
 // sources actually cover at this detail: Los Angeles, New York,
-// Chicago, St. Louis, Miami, and Philadelphia (CLAUDE.md's
-// hundred-and-fifty-first, hundred-and-fifty-third and
-// hundred-and-fifty-fifth standing rules).**
+// Chicago, St. Louis, Miami, Philadelphia, and Detroit (CLAUDE.md's
+// hundred-and-fifty-first, hundred-and-fifty-third,
+// hundred-and-fifty-fifth, hundred-and-fifty-seventh and
+// hundred-and-fifty-eighth standing rules).**
 //
 // ---------------------------------------------------------------------
 // Scope decision made directly with the user
@@ -107,7 +108,9 @@ const SOURCES = ['fbi-ngic-doj-academic', 'sample'];
 //: the two registries are not guaranteed to cover the same cities
 //: forever, and a cross-reference would be the eighteenth standing
 //: rule's own trap (two modules trusting one undeclared constant).
-const CITIES = ['los-angeles', 'new-york', 'chicago', 'st-louis', 'miami', 'philadelphia'];
+const CITIES = [
+  'los-angeles', 'new-york', 'chicago', 'st-louis', 'miami', 'philadelphia', 'detroit',
+];
 
 // **`'current-activity-only'`, added for Chicago/St. Louis/Miami
 // (CLAUDE.md's hundred-and-fifty-third standing rule).** Different
@@ -415,6 +418,32 @@ const ST_LOUIS_PACK = {
       confidence: 'current-activity-only',
       note: 'Real and DOJ-documented (Eastern District of Missouri).',
     },
+    {
+      // Found on a direct follow-up naming several specific St. Louis
+      // places/cliques (Walnut Park, Six Soul Way, Shreve, the
+      // Peabody, O'Fallon Place/Park, OPAC, a "62 Crips" set at
+      // "Clarence and Carter") — every one of those was re-checked
+      // this round and NONE cleared this file's own sourcing bar
+      // (hobbyist gang-map sites and a single unverified Substack
+      // post, same tier the "62 Hoover Crips" claim already failed
+      // at). This one entry is the real exception the same search
+      // surfaced: Riverfront Times' own "Battle Lines" investigative
+      // piece, a named, dedicated piece of journalism about this
+      // specific set.
+      name: '49 BAD Bloods',
+      originCity: 'St. Louis (Walnut Park and the 4900 blocks of Beacon, '
+        + 'Alcott and Davison, bounded by Union Boulevard)',
+      originEra: 'not confirmed by the research behind this pack -- '
+        + 'Riverfront Times\' own reporting documents real current '
+        + 'territory and identity, not a founding date',
+      confidence: 'current-activity-only',
+      note: 'Source: Riverfront Times, "Battle Lines" — real, named, '
+        + 'dedicated investigative journalism, not a hobbyist gang-map '
+        + 'site. The set\'s name is itself the real source for its own '
+        + 'block-range boundary (4900 Beacon/Alcott/Davison, Union '
+        + 'Boulevard) — carried as what this one real source reports, '
+        + 'not an official city-released boundary dataset.',
+    },
   ],
   territoryNote: 'No official city-released gang-territory dataset was '
     + 'found for St. Louis either -- same posture as Chicago and Los '
@@ -517,6 +546,140 @@ const PHILADELPHIA_PACK = {
   ],
 };
 
+// ---------------------------------------------------------------------
+// Detroit — task #164, by direct instruction ("Detroit's neighborhood
+// crime factions, from Puritan to 8 Mile, 9 Mile... all the
+// neighborhoods in Detroit... the different cliques")
+// ---------------------------------------------------------------------
+// Checked the same way every city in this file is checked, and
+// Detroit turned out far better-documented than St. Louis's follow-up
+// round — DOJ/USAO-EDMI RICO cases at the same tier as Chicago's
+// Gangster/Black Disciples, plus two real historical organizations.
+//
+// **"8 Mile" is not itself a gang name — Seven Mile Bloods is the
+// real, DOJ-documented substance behind it.** 8 Mile and 9 Mile are
+// real Detroit-area roads; no documented gang exists under either
+// name. Seven Mile Bloods' own real territory runs from Seven Mile up
+// TO Eight Mile Road (Gratiot to Kelly Road, the real "Red Zone"),
+// which is almost certainly what the request's "8 Mile" referred to.
+// "9 Mile" has no documented gang tie found at all — declared, not
+// built.
+//
+// **"Best Friends" (a commonly-repeated Detroit gang name) is checked
+// and NOT carried — its own existence, not just its founding details,
+// rests on a History Channel documentary episode plus a user-edited
+// wiki and one blog post, no DOJ/court record found.** A weaker real
+// basis than even this file's own Mickey Cobras entry (Chicago),
+// whose EXISTENCE several independent sources agree on even though
+// its founding details conflict — here the existence itself is the
+// part only a single documentary-tier source attests to, so it is
+// left out rather than carried at an invented confidence.
+const DETROIT_PACK = {
+  region: 'us-detroit',
+  source: 'fbi-ngic-doj-academic',
+  city: 'detroit',
+  gangs: [
+    {
+      name: 'Young Boys Incorporated (YBI)',
+      originCity: 'Detroit',
+      originEra: '1978',
+      confidence: 'well-sourced',
+      note: 'University of Michigan\'s "Crackdown on Detroit" academic '
+        + 'digital-history project, an OJP library abstract of a U.S. '
+        + 'Attorney statement, and a 1987 federal indictment of 26 '
+        + 'people (Detroit Free Press, cited via the UMich project). '
+        + 'The widely-repeated "controlled 80% of Detroit heroin" '
+        + 'figure is an unverified secondary claim and is not carried '
+        + 'here.',
+    },
+    {
+      name: 'Chambers Brothers organization',
+      originCity: 'Detroit (Arkansas-origin family)',
+      originEra: '1982-1988',
+      confidence: 'well-sourced',
+      note: 'DEA/Detroit PD joint task force arrest (February 1988), '
+        + 'convicted March 1989 of running a crack-cocaine network. '
+        + 'Dollar-figure claims for the operation conflict sharply '
+        + 'across sources ($3M-$55M) and are not carried as a single '
+        + 'number.',
+    },
+    {
+      name: 'Puritan Avenue Boys',
+      originCity: 'Detroit (Puritan Avenue)',
+      originEra: 'not confirmed by the research behind this pack -- a '
+        + 'real DEA press release (November 2003) documents the '
+        + 'indictment, not a founding date',
+      confidence: 'current-activity-only',
+      note: 'Real: DEA press release, Nov 2003, 8 high-ranking members '
+        + 'indicted on a narcotics-distribution conspiracy. Thin beyond '
+        + 'that one release, but it is a real, primary federal source.',
+    },
+    {
+      name: 'Seven Mile Bloods (SMB)',
+      originCity: 'Detroit (between Seven and Eight Mile Roads, Gratiot '
+        + 'to Kelly Road -- the real "Red Zone")',
+      originEra: 'not confirmed by the research behind this pack -- '
+        + 'multiple real USAO-EDMI/DEA press releases and convictions '
+        + 'document current activity, not a founding date',
+      confidence: 'current-activity-only',
+      note: 'Real and heavily documented: a leader sentenced to life '
+        + '(racketeering conspiracy plus murder, 22 counts), another '
+        + 'member to 40 years. The real substance behind the request\'s '
+        + '"8 Mile" -- not a gang literally named "8 Mile," but the '
+        + 'real set whose own documented turf runs up to that road.',
+    },
+    {
+      name: 'Band Crew ("22 Band Crew"/"BC")',
+      originCity: 'Detroit (northwest Detroit, between Seven and Eight '
+        + 'Mile)',
+      originEra: '2015 (federal RICO indictment, case 2:15-cr-20574, '
+        + 'USAO-EDMI)',
+      confidence: 'well-sourced',
+      note: 'Real, DOJ-documented. The indictment itself describes a '
+        + 'loose coalition of smaller gangs led by "CEOs"/"Co-CEOs," '
+        + 'not a formal single hierarchy -- a real structural fact, '
+        + 'not this file\'s own invention. All eight defendants were '
+        + 'convicted; one leader received roughly 20 years.',
+    },
+    {
+      name: 'Almighty Vice Lord Nation (Detroit chapter)',
+      originCity: 'Detroit',
+      originEra: 'not confirmed by the research behind this pack -- '
+        + 'multiple real 2023-2024 USAO-EDMI RICO convictions document '
+        + 'current activity, not a founding date',
+      confidence: 'current-activity-only',
+      note: 'Real and current: multiple leaders/members convicted on '
+        + 'murder, drug and weapons charges; 20+ further members '
+        + 'indicted and awaiting trial as of this research. The parent '
+        + 'Vice Lords organization is the same real, Chicago-founded '
+        + 'body this pack\'s own Chicago entry already names -- this '
+        + 'is its real, separately documented Detroit chapter.',
+    },
+    {
+      name: '6 Mile Chedda Grove',
+      originCity: 'Detroit',
+      originEra: 'not confirmed by the research behind this pack',
+      confidence: 'current-activity-only',
+      note: 'Real: USAO-EDMI/DOJ press release documenting real '
+        + 'murder/assault charges.',
+    },
+    {
+      name: '42 Hustle Boys',
+      originCity: 'Detroit',
+      originEra: 'not confirmed by the research behind this pack',
+      confidence: 'current-activity-only',
+      note: 'Real: a 2025 USAO-EDMI drug-conspiracy sentencing.',
+    },
+    {
+      name: 'Purple Heart Vets',
+      originCity: 'Detroit',
+      originEra: 'not confirmed by the research behind this pack',
+      confidence: 'current-activity-only',
+      note: 'Real: an August 2023 federal RICO indictment (USAO-EDMI).',
+    },
+  ],
+};
+
 module.exports = {
   CITIES,
   CONFIDENCE_LEVELS,
@@ -530,4 +693,5 @@ module.exports = {
   ST_LOUIS_PACK,
   MIAMI_PACK,
   PHILADELPHIA_PACK,
+  DETROIT_PACK,
 };

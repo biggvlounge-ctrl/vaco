@@ -376,3 +376,109 @@ test('occupations.clergyTitleFor maps real per-tradition titles, and declines to
   assert.equal(occupations.clergyTitleFor('buddhist'), null);
   assert.equal(occupations.clergyTitleFor(undefined), null);
 });
+
+// -- Scientology / LDS / Masonic lodge / collegiate fraternity / vodou / Ifá --
+// Tasks #159/#160. Appended at the end of the file on purpose, same
+// discipline the hundred-and-fifty-fourth standing rule's own
+// leadership-test correction records -- this file's own generation
+// tests draw on `engine.WorldState`, not a local id counter, so there
+// is no equivalent ordering hazard here, but appending keeps every
+// existing test's own line numbers and this file's own read order
+// stable regardless.
+
+test('scientology church and latter-day saints congregation are both real, distinct, secondary-estimate-tier religion archetypes', () => {
+  const scientology = orgArchetypes.definitionOf('scientology church');
+  const lds = orgArchetypes.definitionOf('latter-day saints congregation');
+  assert.equal(scientology.type, 'religion');
+  assert.equal(lds.type, 'religion');
+  assert.equal(scientology.confidence, 'secondary-estimate');
+  assert.equal(lds.confidence, 'secondary-estimate');
+  assert.deepEqual(scientology.membershipEstimateRange, [20000, 40000]);
+  assert.equal(lds.membershipEstimate2022.worldwideMillions, 16.6);
+});
+
+test('masonic lodge and collegiate fraternity are real club archetypes, and neither fabricates a current membership count', () => {
+  const lodge = orgArchetypes.definitionOf('masonic lodge');
+  const frat = orgArchetypes.definitionOf('collegiate fraternity');
+  assert.equal(lodge.type, 'club');
+  assert.equal(frat.type, 'club');
+  assert.equal(lodge.confidence, undefined, 'no current lodge/member count is claimed, so no confidence tier is attached to one');
+  assert.equal(frat.membershipEstimateRange, undefined);
+  // Real, nameable examples are documented for a scenario to use —
+  // this file still names nothing itself.
+  assert.match(frat.note, /Divine Nine/);
+  assert.match(frat.note, /Sigma Pi Phi/);
+  assert.match(frat.note, /Skull and Bones/);
+});
+
+test('this file names no real celebrity anywhere, including inside the new fraternity note', () => {
+  const frat = orgArchetypes.definitionOf('collegiate fraternity');
+  assert.ok(!/kardashian|obama\b/i.test(frat.note));
+  // The one real, historical, uncontroversial fact this file allows
+  // (two U.S. presidents among Skull and Bones' real alumni) is
+  // organizational history, not a celebrity attachment, and is named
+  // generically rather than by name.
+  assert.match(frat.note, /two real U\.S\. presidents/i);
+});
+
+test('no present-day "Illuminati" archetype exists -- checked and declined, not omitted by accident', () => {
+  assert.equal(orgArchetypes.definitionOf('illuminati'), null);
+  const frat = orgArchetypes.definitionOf('collegiate fraternity');
+  assert.ok(!/illuminati/i.test(frat.note), 'the decline belongs in this file\'s own header comment, never smuggled in as if it were a real archetype');
+});
+
+test('vodou house and ifa house are real, distinct, secondary-estimate-tier traditions with a declared wide range, never a point estimate', () => {
+  const vodou = orgArchetypes.definitionOf('vodou house');
+  const ifa = orgArchetypes.definitionOf('ifa house');
+  assert.equal(vodou.type, 'religion');
+  assert.equal(ifa.type, 'religion');
+  assert.equal(vodou.confidence, 'secondary-estimate');
+  assert.equal(ifa.confidence, 'secondary-estimate');
+  assert.ok(typeof vodou.membershipEstimateRangeNote === 'string');
+  // Neither pretends to a single settled figure -- the disagreement
+  // itself is the real, reported finding.
+  assert.equal(vodou.membershipEstimateRange, undefined);
+  assert.equal(ifa.membershipEstimateRange, undefined);
+});
+
+test('all six new archetypes generate a real organization via found()', () => {
+  for (const archetype of [
+    'scientology church', 'latter-day saints congregation', 'masonic lodge',
+    'collegiate fraternity', 'vodou house', 'ifa house',
+  ]) {
+    const org = orgArchetypes.found(engine.WorldState, {
+      archetype, name: `Fixture ${archetype}`, seed: `${archetype}-test`,
+      generateOrganization: engine.generateOrganization,
+    });
+    assert.equal(org.archetype, archetype);
+  }
+});
+
+// -- youth clique (task #165) --------------------------------------
+
+test('youth clique is a real, generic, non-criminal-by-default peer group with wide bands reflecting real heterogeneity', () => {
+  const clique = orgArchetypes.definitionOf('youth clique');
+  assert.equal(clique.type, 'club');
+  assert.equal(clique.isFaction, undefined, 'a clique does not hold formal territory by default');
+  assert.deepEqual(clique.posts, ['influencer']);
+  // The wide bands ARE the real finding (most stay ordinary; a
+  // minority escalate) -- not a narrow profile like a real gang's.
+  const gangProfile = orgArchetypes.profileOf('prison gang');
+  const cliqueProfile = orgArchetypes.profileOf('youth clique');
+  assert.ok(cliqueProfile.resources[1] - cliqueProfile.resources[0]
+    <= gangProfile.resources[1] - gangProfile.resources[0] + 50,
+    'sanity: clique resources stay a real low band, not an invented high one');
+  assert.ok(cliqueProfile.internalLoyalty[1] - cliqueProfile.internalLoyalty[0] >= 50,
+    'the real heterogeneity (some smart, some not) must be a wide band, not a narrow invented one');
+});
+
+test('youth clique generates a real organization via found(), the same way every other generic archetype does', () => {
+  const org = orgArchetypes.found(engine.WorldState, {
+    archetype: 'youth clique',
+    name: 'Fixture Block Clique',
+    seed: 'youth-clique-test',
+    generateOrganization: engine.generateOrganization,
+  });
+  assert.equal(org.type, 'club');
+  assert.equal(org.archetype, 'youth clique');
+});

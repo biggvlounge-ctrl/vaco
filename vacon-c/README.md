@@ -2096,6 +2096,61 @@ of Islam wing -- correcting the Black Guerrilla Family mix-up (BGF is
 real but San Quentin-origin and Marxist-political, not Philadelphia,
 not religious). See CLAUDE.md's hundred-and-fifty-fifth standing rule.
 
+## Scientology, LDS, Masonic lodges, fraternities, vodou, Ifá
+`orgArchetypes.js` gains six real organizational-tradition archetypes
+-- Scientology and LDS/Mormon (each real, each `confidence:
+'secondary-estimate'` for lack of a reliable current membership
+figure), masonic lodge and collegiate fraternity (real structure
+reported with full confidence; no current count claimed for either,
+since no reliable one was found -- the real, nameable Divine Nine/
+Boule/Skull and Bones organizations are documented in the fraternity
+archetype's own note for a scenario to use), and vodou house/ifa
+house (real traditions carried at a declared wide range, since the
+real finding is the disagreement between sources). A present-day
+"Illuminati" is checked and explicitly declined -- no real
+organization exists by that name today, only the defunct 1776-1785
+Bavarian Illuminati. No real celebrity is ever attached to any
+organization here. See CLAUDE.md's hundred-and-fifty-sixth standing
+rule.
+
+## St. Louis: one real addition, six declines on a specific follow-up
+A direct follow-up named seven specific St. Louis places/cliques
+(Walnut Park "Six Soul Way", Shreve, the Peabody, O'Fallon Place/Park,
+"OPAC", a "Clarence and Carter" 62 Crips set). Six failed to clear
+this registry's sourcing bar (hobbyist gang-map sites, one unverified
+Substack post) and are not built. The one real find --
+Riverfront Times' "Battle Lines," naming the real 49 BAD Bloods
+(Walnut Park, 4900 Beacon/Alcott/Davison, bounded by Union Boulevard)
+-- is added to `namedGangPacks.js`'s St. Louis entry. See CLAUDE.md's
+hundred-and-fifty-seventh standing rule.
+
+## Detroit: nine real gangs, and "8 Mile"/"9 Mile" checked as roads, not names
+`namedGangPacks.js` gains a seventh city. "8 Mile" and "9 Mile" are
+real Detroit roads with no gang literally named for either -- the
+real substance behind "8 Mile" is Seven Mile Bloods, whose own
+documented territory runs up to Eight Mile Road. Detroit cleared this
+registry's sourcing bar at DOJ-RICO depth on six of nine entries
+(Young Boys Incorporated, Chambers Brothers, Puritan Avenue Boys,
+Seven Mile Bloods, Band Crew, Almighty Vice Lord Nation's Detroit
+chapter, plus three more real USAO-EDMI-documented sets) -- stronger
+sourcing than St. Louis needed. "Best Friends," a commonly-repeated
+Detroit gang name, is checked and excluded: its existence rests on a
+single documentary episode, no DOJ/court record. See CLAUDE.md's
+hundred-and-fifty-eighth standing rule.
+
+## Generic youth clique archetype -- not criminal by default
+`orgArchetypes.js` gains `'youth clique'`, a generic, unnamed peer-group
+archetype (the same "names nothing" posture as `'nationalist
+movement'`) grounded in Thrasher's 1927 "The Gang" (organized gangs
+often originate from ordinary unsupervised peer groups) and the
+National Gang Center's own troublesome-youth-group-vs.-gang
+distinction. Wide trait bands (`internalLoyalty: [20, 90]`) report the
+real heterogeneity directly -- most such groups stay ordinary; a
+minority escalate -- rather than a narrow invented profile. No
+growth-into-a-gang probability is invented; that would need its own
+calibration round. See CLAUDE.md's hundred-and-fifty-ninth standing
+rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a
