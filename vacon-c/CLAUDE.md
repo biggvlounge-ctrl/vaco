@@ -8371,3 +8371,77 @@ verified. All three of this round's real gates (the school-age band,
 the deceased-coworker exclusion, the real employer-id match) are
 mutation-verified now; `server/tutorialMissions.js` confirmed
 byte-identical to its own pre-mutation backup after each check.
+
+**A hundred-and-thirty-second, by direct instruction — a large list of
+mission types, most real reuse, three real gaps named rather than
+built around.**
+
+"It should be a business mission. It should be a barter mission...
+recruiting mission. It should be a spy mission... collaboration
+mission with another crew or organization" — checked each one against
+the real engine before writing anything, the nineteenth standing
+rule's own discipline a third time. `server/missionVariety.js` is the
+new, separate home — not `tutorialMissions.js`, which is scoped to the
+onboarding chains specifically, and not `missionTriggers.js`, which is
+an ambient location-visit trigger, a different real shape from a
+player explicitly asking for a mission of a named type.
+
+**Four built, each a thin wrapper over a real, already player-facing
+verb, checked one at a time:** `offerRecruitMission` points at
+`call-meeting` purpose `'recruit'` (real, `meetings.js`'s own
+`PURPOSES`), naming a real eligible non-member resident
+(`recruitment.eligibleCandidates` — reused for NAMING, the chaos-
+recruitment module's own candidate pool, not its automatic draw).
+`offerAllianceMission` points at the same real `call-meeting`, purpose
+`'form alliance'`, naming the real OTHER organization with the most
+real members present (`membership.organizationPresence`, the
+identical real rollup `familyDominance.dominantFamilyOf` already
+established). `offerSpyMission` points at the real `send-spy` action
+(`espionage.sendSpy`, already wired), naming a real living family or
+organization member and a real OTHER community. `offerBarterMission`
+points at the real `trade` action (`barter.exchange`, already wired),
+naming a real resident holding a real item in whichever category the
+city's real scarcest `mortality.SURVIVAL_RESOURCES` type maps to.
+
+**That last one needed a real correction before it worked at all: a
+resource TYPE and an item NAME are two different real vocabularies,
+and conflating them would have searched for an item that does not
+exist.** `worldState.resources`' `resource_type` is `'water'`;
+nothing in `items.itemsFor`'s own real catalogue is literally named
+that — `produce.js`'s `clean_water`/`bottled_water` carry `category:
+'water'` instead. The first version called
+`inventory.quantityOf(worldState, n.id, 'water')`, which would never
+find anything in any real world; fixed by filtering `items.itemsFor`
+on `category === resourceName` first, then checking quantity against
+each real item NAME that category actually contains.
+
+**Three of the seven named were NOT built this round, and checked
+directly rather than assumed to be thin wrapping too.**
+`businesses.foundBusiness`, `drugTrade.produceMarijuana`/
+`convertCrack`/`importSubstance`, and `extortion.runExtortion` all
+have no real player-facing verb anywhere —
+`grep -rn "foundBusiness\|produceMarijuana\|convertCrack\|
+importSubstance" server/actions.js server/engine.js` returns nothing,
+and the identical check for `extortion.runExtortion` (an ambient,
+tick-driven NPC mechanic, never called by a player) found the same
+gap. A "business mission" or "drug mission" pointing at any of them
+would be the eleventh standing rule's own trap one layer up — a
+mission over a verb nothing routes to, not a real reuse. Left for
+their own round, named here rather than silently built shallow or
+silently dropped.
+
+**Two non-robust mutation tests found and fixed the same way this
+session's own recurring diagnostic already works: mutate the gate, and
+if nothing fails, the test was lying.** The first `offerRecruitMission`
+"no real organization" test built no other real candidate in the
+community at all, so the function returned `null` through candidate-
+absence whether or not the real organization-required gate existed;
+fixed by adding a real, reachable candidate and re-verifying the
+mutation is now caught. The `offerSpyMission`/`offerBarterMission`
+deceased-exclusion and scarcity-threshold gates had the identical
+shape — no deceased family member, no present-but-irrelevant holder —
+and were fixed the same way. All four of this round's real gates
+(organization-required, own-org exclusion, deceased-family exclusion,
+scarcity threshold) are mutation-verified now; `server/
+missionVariety.js` confirmed byte-identical to its own pre-mutation
+backup after each check.

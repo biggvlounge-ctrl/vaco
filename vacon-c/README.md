@@ -1969,6 +1969,21 @@ computed-never-stored per-city rollup. Opt-in
 (`config.schoolSystemDepth`, default false). See CLAUDE.md's
 hundred-and-thirtieth standing rule.
 
+## Direct-reuse gameplay missions
+`server/missionVariety.js`. Four real mission types, each a thin
+wrapper over an already player-facing verb: recruit (`call-meeting`
+purpose `recruit`, naming a real eligible non-member), alliance
+(`call-meeting` purpose `form alliance`, naming the real other
+organization with the most real members), spy (`send-spy`, naming a
+real family/org member and a real other community), and barter
+(`trade`, naming a real resident holding a real item in the category
+the city's real scarcest survival resource maps to). Business, drug
+and extortion mission types were explicitly not built this round --
+each needs a real player verb built first (checked directly: none of
+`businesses.foundBusiness`, `drugTrade`'s production functions, or
+`extortion.runExtortion` are callable by a player today). See
+CLAUDE.md's hundred-and-thirty-second standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a
