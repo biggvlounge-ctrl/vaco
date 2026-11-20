@@ -123,6 +123,10 @@ const PRODUCTS = {
   // firearm; this file knows how to build one, the same split every
   // other product here already has from its consuming module.
   zip_gun: { category: 'protection', origin: 'producible' },
+  // The real, classic inmate-made weapon — `penitentiary.js` knows its
+  // name; this file knows how to build one, the identical split
+  // `zip_gun` already has from `weapons.js`.
+  shank: { category: 'protection', origin: 'producible' },
   hand_tool: { category: 'tools', origin: 'producible' },
   furniture: { category: 'materials', origin: 'producible' },
   container: { category: 'tools', origin: 'producible' },
@@ -215,6 +219,23 @@ const RECIPES = {
     from: [{ scrap_metal: 2, wire: 2 }, { scrap_metal: 3, rubber: 1 }],
     skill: 'Crafting',
     tier: 2,
+  },
+  // The real, classic inmate-made weapon — a toothbrush handle,
+  // melted and sharpened into a point. The real ingredient this
+  // engine's own closed-loop materials vocabulary already has for
+  // that is `plastic` (a toothbrush's own real material, `MATERIALS.
+  // plastic`'s real `remnant` origin, never `penitentiary.js
+  // #COMMISSARY_CATALOG`'s purchased `toothbrush` item directly —
+  // `test/salvage.test.js`'s own guard requires every recipe
+  // ingredient to be a real `MATERIALS`/`produce.PRIMARY_PRODUCE`
+  // entry, which a purchased commissary good is not). Tier 1, the
+  // same `protection`-category gate `blade`/`club` already use, never
+  // a second, prison-specific crafting path.
+  shank: {
+    from: [{ plastic: 1 }],
+    skill: 'Crafting',
+    tier: 1,
+    note: 'the classic real inmate-made weapon: a toothbrush handle (plastic), melted and sharpened into a point',
   },
   shield: {
     from: [{ timber: 2, scrap_metal: 1 }, { scrap_metal: 3 }],

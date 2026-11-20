@@ -85,6 +85,7 @@ const drugTrade = require('./drugTrade.js');
 const groupFights = require('./groupFights.js');
 const corruption = require('./corruption.js');
 const extortion = require('./extortion.js');
+const penitentiary = require('./penitentiary.js');
 const tribeMissions = require('./tribeMissions.js');
 const migration = require('./migration.js');
 const environment = require('./environment.js');
@@ -1342,6 +1343,19 @@ function runSecurityPhase(worldState) {
       affected_entity_ids: [incident.perpetrator_entity_id, incident.victim_entity_id]
         .filter((id) => id !== null),
       global_effects: { crimeIncidentId: incident.id, crimeCategory: incident.category },
+    });
+  }
+
+  // **Commissary** (server/penitentiary.js) -- a real, legitimate
+  // purchase, not a crime, so it gets its own event type rather than
+  // being folded into the `crime` events just above.
+  for (const purchase of penitentiary.runCommissaryPurchases(worldState, worldState.tick)) {
+    events.push({
+      type: 'commissary_purchase', severity: 'low',
+      note: `Entity ${purchase.inmateId} bought ${purchase.itemName} from the commissary.`,
+      tick: worldState.tick,
+      affected_entity_ids: [purchase.inmateId],
+      global_effects: { prisonPropertyId: purchase.prisonPropertyId, itemName: purchase.itemName },
     });
   }
 

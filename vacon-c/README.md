@@ -1810,6 +1810,29 @@ own real magnitude, and real heat (`heat.raiseHeat`) rises between the
 defiant leader and the faction, recorded as a real `property`
 incident. See CLAUDE.md's hundred-and-twenty-second standing rule.
 
+## Penitentiary inventory (inmate-made weapons, commissary)
+`shank` needed no new crafting mechanic -- `salvage.js`'s real
+`PRODUCTS`/`RECIPES`/`canMake`/`make` is the one real crafting system
+this engine has, already the home for `blade`/`club`/`zip_gun`. It is
+a real Tier 1, `protection`-category product, crafted from real
+`plastic` (a toothbrush's own real material) rather than a purchased
+item directly, so `test/salvage.test.js`'s own closed-loop-ingredient
+guard stays true. It is reachable the identical way every other
+weapon already is -- the real, existing `make-thing` player verb --
+because crafting in this engine has never had an ambient, NPC-driven
+caller for any product. Commissary IS a real new ambient mechanic,
+because nothing else in this engine lets an NPC spend real money on a
+real item outside production or theft: `server/penitentiary.js
+#runCommissaryPurchases` finds every real inmate at every real prison
+(`justice.inmatesOf`, already built) with real, positive savings, has
+them draw a real, affordable item from a small, flagged-interpretive
+`COMMISSARY_CATALOG` (soap, a toothbrush, instant noodles, a postage
+stamp, playing cards), pays its real price out of their own real
+savings, and credits that real money to the prison's own real
+operating organization's `assets` -- the same direct-mutation pattern
+`corruption.js` already uses for organization assets. See CLAUDE.md's
+hundred-and-twenty-third standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

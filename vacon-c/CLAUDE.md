@@ -7726,3 +7726,77 @@ self-exclusion check, and forcing every demand to comply regardless of
 the business leader's real Composure — each caught by a real test in
 `test/extortion.test.js`.
 
+**A hundred-and-twenty-third, closing the next pending task: a
+penitentiary inventory list (inmate-made weapons, commissary, etc.) —
+and a decorative-guard catch found writing its own mutation check.**
+
+**Inmate-made weapons needed no new crafting mechanic at all — only a
+new real name in the one real crafting system this engine already
+has.** `salvage.js`'s `PRODUCTS`/`RECIPES`/`canMake`/`make` already
+hold `blade`/`club`/`zip_gun`, each split the identical way across two
+files: the consuming module knows the item's real name and meaning,
+`salvage.js` knows how to build it. `shank` follows the same split.
+Checked directly before writing an ambient caller for it: `grep -n
+"salvage\.\(make\|canMake\)" server/tick.js` returns nothing at all —
+crafting in this engine has never had an ambient, NPC-driven caller
+for ANY product, so giving `shank` one would be a double standard
+against every weapon already in the catalogue. It is reachable the
+same way `blade`/`zip_gun` already are: the real, existing
+`make-thing` player verb.
+
+**The first version of the recipe broke a real, pre-existing guard,
+and the fix is worth recording because it is this project's own
+"everything has value" claim pointed at a new ingredient rather than
+a new output.** `shank`'s first recipe needed one `toothbrush` —
+`penitentiary.js#COMMISSARY_CATALOG`'s own real, purchasable item —
+and `test/salvage.test.js`'s own "every ingredient in every
+alternative is a real material or a real primary-harvest item" guard
+failed immediately: a toothbrush is a purchased commissary good, not
+a real `salvage.MATERIALS` entry or a `produce.PRIMARY_PRODUCE` one,
+so it broke the exact closed-loop claim that test exists to hold.
+Fixed by using the real material a toothbrush is actually made of —
+`plastic`, already a real, reachable `MATERIALS` entry — never a
+second vocabulary and never weakening the guard to let a purchased
+good through. The real "buy one, then sharpen it" narrative survives
+in the comments; the mechanical ingredient is the real material.
+
+**Commissary is the real new mechanic, because nothing else in this
+engine lets an NPC spend real money on a real item outside production
+or theft.** Checked directly: `grep -n "'buy'\|'purchase'"
+server/actions.js` returns nothing. `runCommissaryPurchases` reuses
+`justice.inmatesOf` (already built and exported — never a second
+"who is locked up here" query) over every real prison property
+(`properties.landmark_category === 'prison'`, the identical filter
+`drugTrade.js#runPrisonSmuggling` already uses), draws a real,
+affordable item from `COMMISSARY_CATALOG` against
+`crime.BASE_DEPRIVATION_RISK` (the identical reused per-person-per-
+tick rate `corruption.js`/`extortion.js` already established this
+round), pays its real price out of the inmate's own real savings, and
+credits the real money to the prison's own real operating
+organization's `assets` — the same direct-mutation pattern
+`corruption.js#runEmbezzlement` already uses, so a purchase is never
+money vanishing into nowhere. `registerCommissaryItems` follows the
+identical real registration shape `drugTrade.js#registerDrugItems`
+already established.
+
+**A decorative-guard catch, found while writing this round's own
+mutation check rather than years later.** The first version of
+`runCommissaryPurchases` had a separate `if (savings <= 0) continue;`
+ahead of the real affordability filter. Mutating it away changed
+NOTHING observable — `affordableItemsFor` already returns an empty
+list for any non-positive balance, because every real catalogue price
+is positive, so the dedicated check was fully subsumed by the one two
+lines below it. This is the twentieth standing rule's shape one size
+smaller: not a guard whose own output is its evidence, but a guard
+with no real effect a mutation can ever expose, found specifically
+BECAUSE this round's own discipline requires trying to break every
+gate and checking that something actually fails. Removed rather than
+kept as harmless decoration, with the real, demonstrable gate
+(`affordableItemsFor`'s price filter) left to do the one job both
+lines were attempting. Mutation-verified three times on the corrected
+source: the real affordability filter, the real operator-asset
+credit, and the real `justice.inmatesOf` call (swapped for a bare
+`status === 'imprisoned'` scan, which a real inmate with no actual
+open court case would then wrongly pass) — each caught by a real test
+in `test/penitentiary.test.js`.
+
