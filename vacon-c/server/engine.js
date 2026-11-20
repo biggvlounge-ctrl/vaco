@@ -84,6 +84,7 @@ const missionTriggers = require('./missionTriggers.js');
 const contacts = require('./contacts.js');
 const bluff = require('./bluff.js');
 const gossip = require('./gossip.js');
+const students = require('./students.js');
 const territory = require('./territory.js');
 const missions = require('./missions.js');
 const property = require('./property.js');
@@ -939,6 +940,15 @@ function getFamilyNomadicStatus(familyId) {
 
 function getOrganizationNomadicStatus(organizationId) {
   return nomadic.isNomadicOrganization(WorldState, organizationId);
+}
+
+// Real, live university-enrollment status -- never stored, read fresh
+// off `npc.enrolledUniversityId` every call. `null` for anyone not
+// currently enrolled. See students.js's own header.
+function getEnrollmentStatus(entityId) {
+  const npc = (WorldState.npcs || []).find((n) => n.id === entityId);
+  if (!npc) return null;
+  return students.isEnrolled(npc) ? { universityId: npc.enrolledUniversityId } : null;
 }
 
 // A real vehicle system -- see vehicles.js's own header. Crafting a
@@ -2031,6 +2041,7 @@ module.exports = {
   assessThreat,
   callBluff,
   askAround,
+  getEnrollmentStatus,
   getInfluenceRating,
   getPersonalInfluence,
   getFamilyPoliticalInfluence,

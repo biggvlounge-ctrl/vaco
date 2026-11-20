@@ -1918,6 +1918,26 @@ modifier on an ordinary conversation. `POST /api/players/:id/action`
 verb `ask-around` (modes `citizen`/`leader`). See CLAUDE.md's
 hundred-and-twenty-eighth standing rule.
 
+## University students (not employees)
+`server/students.js`. The obvious build — joining students onto the
+university's own real operator organization (the region/civilization
+government, per `landmarks.KEY_BUILDING_TYPES.university`) via
+`membership.joinOrganization` — was checked against its real
+consumers (`control.js#compositionFor`'s takeover defender count,
+`subGovernment.organizationCohesionOf`'s member-scaled cohesion) and
+rejected: it would have silently diluted both. `npc.enrolledUniversityId`
+is a real, in-memory-only field instead, the same posture
+`npc.schoolEnrolled`/`worldState.familyTerritory` already hold. Real
+capacity, not a guess: NCES's College Enrollment Rates indicator (last
+updated May 2024) — 39% of 18-24-year-olds enrolled in a
+degree-granting postsecondary institution or graduate school in 2022
+— is the real target share `runEnrollment` fills every tick from each
+city's own real eligible population. "Not employees" is read
+literally: an active employment record anywhere disqualifies someone
+from this population on both sides of the crossing. `GET
+/api/entities/:id/enrollment` is the real, live, never-stored read.
+See CLAUDE.md's hundred-and-twenty-ninth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

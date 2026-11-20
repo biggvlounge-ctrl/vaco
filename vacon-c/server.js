@@ -317,6 +317,12 @@ app.get('/api/organizations/:id/nomadic-status', (req, res) => {
   res.json({ organizationId: Number(req.params.id), nomadic: engine.getOrganizationNomadicStatus(Number(req.params.id)) });
 });
 
+// Real, live university-enrollment status -- never stored. See
+// students.js's own header.
+app.get('/api/entities/:id/enrollment', (req, res) => {
+  res.json({ entityId: Number(req.params.id), enrollment: engine.getEnrollmentStatus(Number(req.params.id)) });
+});
+
 // Real, computed rollup -- property + inventory + a notable-people
 // roster for a real organization or family, never a stored or
 // invented composite score. See tribeWealth.js's own header.

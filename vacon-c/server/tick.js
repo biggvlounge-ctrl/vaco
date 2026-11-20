@@ -97,6 +97,7 @@ const control = require('./control.js');
 const salvage = require('./salvage.js');
 const discovery = require('./discovery.js');
 const knowledge = require('./knowledge.js');
+const students = require('./students.js');
 const snapshots = require('./snapshots.js');
 const weapons = require('./weapons.js');
 const events = require('./events.js');
@@ -966,6 +967,15 @@ function runOrganizationPhase(worldState, options = {}) {
   // there and had nothing pushing current through it. See
   // server/knowledge.js.
   events.push(...knowledge.runStudy(worldState, worldState.tick));
+
+  // **Real university students, right after real schooling and real
+  // self-taught study for the identical reason `knowledge.runStudy`
+  // sits here: a real resident's own education ladder is one question
+  // asked by three different real mechanisms (the state's schools, a
+  // real university building, and self-teaching).** Naturally a no-op
+  // in a city with no real `university` landmark. See
+  // CLAUDE.md's hundred-and-twenty-ninth standing rule.
+  events.push(...students.runEnrollment(worldState, worldState.tick));
 
   // **§7 system 28, Business: formation, then the lifecycle it drives.**
   // Formation first, so a business founded this tick is already staffed

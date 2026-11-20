@@ -8125,3 +8125,58 @@ mutation then failed as expected (10/11). Mutation-verified twice in
 total: the confidence comparison and `residentsToAsk`'s community
 filter — both caught.
 
+**A hundred-and-twenty-ninth, opening the next pair after "the next
+five" set: university students as a real population, not employees —
+and the obvious build was the wrong one, caught by checking its real
+consumers before writing it.**
+
+`VACANCY_CONSOLIDATED_MASTER_SPEC.md` §65 EDUCATION SYSTEM names
+"schools, teachers, students, libraries, books, knowledge, literacy" —
+teachers are real, and nothing had ever generated the real population
+a real `university` landmark (task #69's own multi-role staffing round)
+implies: the students themselves. `statecraft.runSchooling` already
+moves every resident up a real six-rung ladder on a blanket, city-wide
+funding check with no building attached to it at all.
+
+**The obvious build — `membership.joinOrganization(..., role:
+'student')` on the university's own real operator — was checked
+against its real consumers and rejected before being written.**
+`landmarks.KEY_BUILDING_TYPES.university`'s `propertyType:
+'government'` already points every real university's operator at the
+SAME organization a prison or a government building uses — the
+region/civilization government. `membership.memberCount`/`membersOf`
+are read by real, already-calibrated mechanics that were never
+measured against a membership this large: `control.js#compositionFor`'s
+own takeover DEFENDER count for the government itself, and
+`subGovernment.organizationCohesionOf`'s own "organization level IS
+memberCount" (the hundred-and-twenty-seventh standing rule's own
+sibling round, from the same "next five" set). Joining thousands of
+real students onto the government's own membership roster would make
+a city's government functionally un-takeable and silently collapse
+its real sub-government coverage ratio — the seventeenth standing
+rule's own dilution trap, caught here before it shipped rather than
+after, by reading `grep -rn "memberCount\|membersOf(" server/*.js`
+first rather than assuming the obvious mechanism was safe to reuse.
+
+**The real fix is `server/students.js`'s own `npc.enrolledUniversityId`
+— the identical declared, in-memory-only posture `npc.schoolEnrolled`
+and `worldState.familyTerritory` already hold**, never a schema
+addition. Real capacity, not a guess: NCES's own College Enrollment
+Rates indicator (last updated May 2024) — **39% of 18-to-24-year-olds**
+enrolled in a degree-granting postsecondary institution or graduate
+school in 2022 — is the real, cited target SHARE of each city's own
+real eligible-age population that `runEnrollment` fills every tick,
+never a per-person probability and never a one-time snap to the
+national figure. "Not employees," read literally: an active
+employment record anywhere disqualifies a resident from this
+population on both sides of the crossing — a stated simplification,
+not a silent one, named in the file's own header. Wired into
+`tick.js` right after `statecraft.runStatecraft`/`knowledge.runStudy`,
+for the identical reason those two sit together: a resident's own
+education ladder is one question asked by three different real
+mechanisms. `GET /api/entities/:id/enrollment` is the real, live,
+never-stored read, the same posture every other dashboard-style field
+in this file already holds. Three gates mutation-verified: the
+employment exclusion, the real NCES-derived capacity bound, and the
+top-rung graduation/dropout distinction — all three caught.
+
