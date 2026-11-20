@@ -70,6 +70,7 @@
 'use strict';
 
 const { seededDraw } = require('./seeded.js');
+const beliefs = require('./beliefs.js');
 
 // ---------------------------------------------------------------------
 // The vocabularies
@@ -185,6 +186,13 @@ const SEVERE = {
   freeze: { resourceType: 'food', supplyDelta: -3, demandDelta: 1, ticks: 10 },
   storm: { resourceType: 'food', supplyDelta: -2, demandDelta: 0, ticks: 4 },
 };
+
+//: Flagged interpretive (task #158) — Bentzen (2019) measures a real
+//: direction (sudden local disaster raises local religiosity) but no
+//: source gives a number on THIS engine's own 0-100 belief-strength
+//: scale. Kept modest and in the same order as this file's own other
+//: "one event" shifts (`control.SHARED_UNDERTAKING` = 2).
+const RELIGIOSITY_CRISIS_SHIFT = 3;
 
 //: Exactly `Object.keys(SEVERE)` — `server/riskPacks.js` duplicates
 //: this list rather than requiring this file (no cross-module
@@ -364,6 +372,32 @@ function runEnvironment(worldState, options = {}) {
         communityId: null,
         startedTick: tick,
       });
+      // **Real, cited crisis-religiosity shift (task #158) — Bentzen
+      // (2019, Economic Journal, World Values Survey/EVS, 96
+      // countries): a sudden local disaster raises LOCAL religiosity,
+      // strongest among lower-income/less-educated populations;
+      // predictable/gradual hardship (her own storm/hurricane finding)
+      // shows no such effect.** A severe weather condition STARTING is
+      // the real sudden-onset moment this finding describes — not
+      // every tick the condition remains active, the same "a crossing,
+      // not a condition" discipline the seventh standing rule already
+      // holds. Scoped to the city's own real communities, never
+      // world-wide, because the real finding is local. The magnitude
+      // is flagged interpretive — no source gives a number on this
+      // engine's own 0-100 belief-strength scale — kept modest and in
+      // the same order as this file's own other "one event" shifts
+      // (`control.SHARED_UNDERTAKING` = 2).
+      const cityCommunities = (worldState.communities || [])
+        .filter((cm) => cm.city_id === city.id);
+      for (const community of cityCommunities) {
+        beliefs.shiftCommunityBelief(worldState, {
+          communityId: community.id,
+          beliefType: 'religious',
+          beliefName: 'personal-faith',
+          delta: RELIGIOSITY_CRISIS_SHIFT,
+          tick,
+        });
+      }
     }
 
     events.push({

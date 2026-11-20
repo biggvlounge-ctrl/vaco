@@ -13,10 +13,12 @@ const assert = require('node:assert/strict');
 
 const engine = require('../server/engine.js');
 const heists = require('../server/heists.js');
+const heistTools = require('../server/heistTools.js');
 const leadership = require('../server/leadership.js');
 const heat = require('../server/heat.js');
 const membership = require('../server/membership.js');
 const economy = require('../server/economy.js');
+const inventory = require('../server/inventory.js');
 const worldStore = require('../server/worldStore.js');
 
 const w = engine.WorldState;
@@ -25,6 +27,16 @@ let nextId = 960001;
 
 function person(traitValueFor) {
   return engine.generateNPC({ traitValueFor });
+}
+
+// Every existing test here predates the real tool requirement
+// (task #40/#167) and targets a plain `'business'` organization with
+// no real cargo-handling property, so `heistTools.containerRequirementFor`
+// always asks for a vault tool. Equipping one is the fixture update
+// those tests need, not a relaxed gate.
+function equipVaultTool(entityId) {
+  heistTools.registerItems(w);
+  inventory.give(w, { entityId, itemName: 'angle_grinder' });
 }
 
 function flatTraits(value) {
@@ -206,6 +218,7 @@ test('attemptHeist: a maximal, uncapped crew against a wholly undefended target 
   }
   const target = organization(null, 'business');
   target.assets = 10000;
+  equipVaultTool(leader.id);
 
   let succeeded = null;
   for (let tick = 0; tick < 30 && !succeeded; tick += 1) {
@@ -233,6 +246,7 @@ test('attemptHeist: the worst real aptitude, solo, against a heavily guarded tar
   const org = organization(leader.id);
   const target = organization(null, 'business');
   target.assets = 10000;
+  equipVaultTool(leader.id);
   for (let i = 0; i < 4; i += 1) {
     const guard = person(flatTraits(50));
     economy.hireEntity(w, { entityId: guard.id, employerOrganizationId: target.id, wage: 50, position: 'guard', tick: 0 });
@@ -267,6 +281,7 @@ test('attemptHeist: detection raises real heat with the specific target, and rec
   const org = organization(leader.id);
   const target = organization(null, 'business');
   target.assets = 10000;
+  equipVaultTool(leader.id);
   for (let i = 0; i < 4; i += 1) {
     const guard = person(flatTraits(50));
     economy.hireEntity(w, { entityId: guard.id, employerOrganizationId: target.id, wage: 50, position: 'guard', tick: 0 });
@@ -328,3 +343,65 @@ test('attemptHeist (family path): refuses a non-head sponsor and a non-member cr
     /is not a real member/,
   );
 });
+
+// ---------------------------------------------------------------------
+// attemptHeist — the real tool requirement (task #40 / #167)
+// ---------------------------------------------------------------------
+
+test('attemptHeist: a crew with no real tool is blocked before any draw is consumed', () => {
+  const leader = person(flatTraits(100));
+  const org = organization(leader.id);
+  const target = organization(null, 'business');
+  target.assets = 5000;
+
+  const result = heists.attemptHeist(w, leader.id, {
+    organizationId: org.id, crewEntityIds: [leader.id], targetOrganizationId: target.id, tick: 0,
+  });
+  assert.equal(result.complied, true);
+  assert.equal(result.success, false);
+  assert.equal(result.loot, 0);
+  assert.deepEqual(result.blockedByTool, { kind: 'vault', tools: heistTools.VAULT_TOOLS });
+  assert.equal(target.assets, 5000, 'a blocked crew moved nothing');
+});
+
+test('attemptHeist: either real vault tool clears the gate — angle_grinder or cutting_torch', () => {
+  const grinder = person(flatTraits(50));
+  const torch = person(flatTraits(50));
+  for (const [entity, tool] of [[grinder, 'angle_grinder'], [torch, 'cutting_torch']]) {
+    const org = organization(entity.id);
+    const target = organization(null, 'business');
+    target.assets = 5000;
+    heistTools.registerItems(w);
+    inventory.give(w, { entityId: entity.id, itemName: tool });
+    const result = heists.attemptHeist(w, entity.id, {
+      organizationId: org.id, crewEntityIds: [entity.id], targetOrganizationId: target.id, tick: 0,
+    });
+    assert.equal(result.blockedByTool, undefined, `${tool} should have cleared the gate`);
+  }
+});
+
+test('attemptHeist: a real cargo-handling target (distribution-center/port-terminal/industrial-plant) asks for bolt_cutters, not a vault tool', () => {
+  const leader = person(flatTraits(100));
+  equipVaultTool(leader.id); // the wrong tool for a cargo target
+  const org = organization(leader.id);
+  const target = organization(null, 'business');
+  target.assets = 5000;
+  w.properties.push({
+    id: nextId += 1, city_id: 1, operating_organization_id: target.id,
+    landmark_category: 'distribution-center',
+  });
+
+  const result = heists.attemptHeist(w, leader.id, {
+    organizationId: org.id, crewEntityIds: [leader.id], targetOrganizationId: target.id, tick: 0,
+  });
+  assert.deepEqual(result.blockedByTool, { kind: 'cargo', tools: [heistTools.CARGO_TOOL] },
+    'an angle grinder is the wrong real tool for a trailer/container seal');
+
+  const inventory2 = require('../server/inventory.js');
+  inventory2.give(w, { entityId: leader.id, itemName: heistTools.CARGO_TOOL });
+  const retried = heists.attemptHeist(w, leader.id, {
+    organizationId: org.id, crewEntityIds: [leader.id], targetOrganizationId: target.id, tick: 1,
+  });
+  assert.equal(retried.blockedByTool, undefined, 'bolt_cutters clears the real cargo gate');
+});
+

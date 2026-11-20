@@ -206,6 +206,26 @@ function shiftPopulationBelief(worldState, options = {}) {
   return shifted;
 }
 
+// Everyone in ONE community moves on one named belief — the same
+// shape `shiftPopulationBelief` already has, scoped narrower. Task
+// #158's own real finding (Bentzen 2019, Economic Journal: a sudden,
+// local disaster raises local religiosity) is a COMMUNITY-grain
+// effect, not a world-wide one, so this is the real function that
+// finding needs rather than a world-wide call applied too broadly.
+function shiftCommunityBelief(worldState, options = {}) {
+  const {
+    communityId, beliefType, beliefName, delta, tick = worldState.tick ?? 0,
+  } = options;
+  const shifted = [];
+  for (const npc of worldState.npcs) {
+    if (npc.communityId !== communityId) continue;
+    shifted.push(shiftBelief(worldState, {
+      entityId: npc.id, beliefType, beliefName, delta, tick,
+    }));
+  }
+  return shifted;
+}
+
 // -- rollup -------------------------------------------------------------
 
 // The mean strength of a named belief across everyone who holds it,
@@ -245,6 +265,7 @@ module.exports = {
   adoptBelief,
   shiftBelief,
   shiftPopulationBelief,
+  shiftCommunityBelief,
   summariseBelief,
   reseedIds,
 };

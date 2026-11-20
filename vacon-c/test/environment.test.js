@@ -216,6 +216,43 @@ test('severe weather produces an ordinary condition, not a second mechanism', ()
   }
 });
 
+test('a severe weather crossing raises religiosity, only in the city that got it, only on real community members (task #158)', () => {
+  // Bentzen (2019): a sudden local disaster raises LOCAL religiosity.
+  // City 1 is arid (severe weather is common there); city 2 is
+  // temperate with its own tick loop seeded so it never crosses into a
+  // severe spell, and is the control.
+  const beliefs = require('../server/beliefs.js');
+  const w = world({
+    cities: [{ id: 1 }, { id: 2 }],
+    communities: [
+      { id: 10, city_id: 1 }, { id: 20, city_id: 1 }, { id: 30, city_id: 2 },
+    ],
+    npcs: [
+      { id: 1, communityId: 10 }, { id: 2, communityId: 10 },
+      { id: 3, communityId: 20 }, { id: 4, communityId: 30 },
+    ],
+  });
+  environment.generateEnvironmentState(w, { cityId: 1, climate: 'arid', tick: 0 });
+  environment.generateEnvironmentState(w, { cityId: 2, climate: 'temperate', tick: 0 });
+
+  for (let t = 1; t <= 400; t += 1) {
+    w.tick = t;
+    environment.runEnvironment(w, { tick: t, seed: 'faith' });
+  }
+
+  const severeHit = w.activeConditions.some((c) => c.conditionType === 'weather' && c.cityId === 1);
+  assert.ok(severeHit, 'city 1 ran 400 ticks arid and never hit a severe spell');
+
+  // Everybody in city 1 (communities 10 and 20) should have moved off
+  // neutral — the shift is scoped to the CITY's communities, not to one
+  // community picked arbitrarily.
+  for (const npcId of [1, 2, 3]) {
+    const strength = beliefs.beliefStrength(w, npcId, 'personal-faith');
+    assert.ok(strength !== null && strength > beliefs.NEUTRAL_STRENGTH,
+      `npc ${npcId} is in a city that hit severe weather and did not become more religious`);
+  }
+});
+
 test('what is running is recorded against the city, which is the durable half', () => {
   // `active_disasters` is a view of the live list, so the two cannot
   // drift — and a checkpoint carries it.

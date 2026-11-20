@@ -9237,3 +9237,189 @@ actually supports for most such groups.
 Mutation-verified: the wide `internalLoyalty` band narrowed from
 `[20, 90]` to `[40, 60]` directly in the file — caught (27/28), file
 confirmed restored byte-identical afterward.
+
+**A hundred-and-sixtieth, closing task #158 — real eschatology content
+per religious tradition, and a real, cited mechanism for crisis
+raising religiosity, built on the existing `beliefs.js` substrate
+rather than the firewalled `npc.religion` field.**
+
+**The mechanism first, because it was the half with a real citation
+behind the DIRECTION and no source for the MAGNITUDE.** Bentzen (2019,
+*Economic Journal*, World Values Survey/European Values Study, 96
+countries): a sudden LOCAL disaster raises local religiosity,
+strongest among lower-income/less-educated populations; her own
+companion finding is that predictable, gradual hardship (storms,
+hurricanes she also measured) shows no such effect — the distinction
+this engine's own "a crossing, not a condition" discipline (the
+seventh standing rule) already draws for an unrelated reason, and the
+two turned out to be the same shape. `beliefs.shiftCommunityBelief`
+is the real function this finding needed: `shiftPopulationBelief`
+already existed and moves the WHOLE WORLD, which would misapply a
+COMMUNITY-grain finding; the new function is the identical shape,
+scoped to one community's own NPCs. `environment.js`'s `runEnvironment`
+calls it exactly once per real community, inside the existing
+`if (severe)` block that already fires only on a weather CROSSING —
+never every tick a condition persists, the same discipline the
+seventh standing rule already holds one file over. `RELIGIOSITY_
+CRISIS_SHIFT = 3` is flagged interpretive (no source gives a number on
+this engine's own 0-100 belief-strength scale) and justified by
+analogy to this file's own `control.SHARED_UNDERTAKING = 2`, the same
+"one event" magnitude discipline the forty-eighth standing rule's
+`influence.js` already used.
+
+**`npc.religion` is read by nothing here, on purpose — `beliefs.js`'s
+`belief_type: 'religious'` is the real substrate for religiosity
+(how devout), which is a different axis from WHICH tradition a person
+belongs to.** `religionPacks.js`'s own §9 firewall is untouched: this
+mechanic never reads or writes `npc.religion`, so a city's religious
+TRADITION mix and its average DEVOUTNESS stay two separate, correctly
+un-conflated facts.
+
+**The content half: `server/eschatologyPacks.js`, a real, documented
+concept per tradition, reported through `demographics.compositionOf`'s
+`religion` block as `dominantEschatology` — the same posture
+`migrationPathwayPacks.js`'s `dominantPathway` and
+`africanEthnicGroupPacks.js`'s `dominantEthnicComposition` already
+have, never a decision input.** Ten real traditions named: Christian
+Second Coming/Parousia (Protestant, Catholic, Orthodox — the shared
+Nicene Creed article, with each branch's own doctrinal emphasis
+named separately rather than collapsed into one entry); Jewish
+Mashiach and the Messianic Age (Maimonides' Thirteen Principles);
+Islamic Yawm al-Qiyamah preceded by the Mahdi and the return of Isa
+(Qur'an/hadith, with Shia tradition's distinct hidden-Imam emphasis
+named rather than folded into the Sunni framing); Buddhist Maitreya;
+Hindu Kalki; LDS's Second Coming and Millennium (Doctrine and
+Covenants); Jehovah's Witnesses' Armageddon and Millennial Reign.
+
+**Two honest declines, not two invented entries, and one real
+distinction that is not a decline at all.** Sikh scripture (the Guru
+Granth Sahib) holds a cyclical creation/dissolution cosmology under
+Hukam but names no individual end-times redeemer comparable to the
+Abrahamic traditions' figures — reporting one would be inventing a
+doctrine this tradition does not teach, worse than the gap itself, the
+twenty-ninth standing rule's own distinction applied to doctrine
+instead of a number. `'other'` is `religionImport.js`'s own catch-all
+for traditions the Census does not break out individually, and naming
+one eschatology for it would misattribute whatever specific traditions
+are folded inside it. Bahá'í is NOT a decline: its real, documented
+teaching is that the end-times "Promised One" expected by the earlier
+traditions has ALREADY come, in Bahá'u'lláh (1817-1892) — a fulfilled,
+not future-facing, eschatology, reported as the real shape it actually
+has rather than forced into the same future-tense template as every
+other entry.
+
+**Both new real modules carry their own copy of the §9 forbidden-file
+scan**, same discipline `test/ethnicity.test.js` established and every
+per-NPC or per-area real-data module since has copied: `eschatology-
+packs.test.js` asserts only `demographics.js` reads `eschatologyPacks
+.js`. Mutation-verified three times: `shiftCommunityBelief`'s
+community filter disabled (caught, 15/17), the `environment.js`
+religiosity-shift block's community lookup replaced with an empty
+array (caught, 18/19), and `demographics.js`'s `dominantEschatology`
+line replaced with a bare `null` (caught, 10/11) — each confirmed
+restored byte-identical afterward. A fourth mutation (a stray
+`require('./eschatologyPacks.js')` planted in `crime.js`) confirmed
+the forbidden-file scan itself catches a real firewall violation
+(caught, 10/11), also reverted clean.
+
+**A hundred-and-sixty-first, closing task #40's own remaining real gap
+("safe-cracking" was the one piece of "witnesses, stakeouts, and
+safe-cracking/intimidation variance" never built) together with the
+new, directly-instructed follow-up asking for the same real gap by a
+different name: "they'll need certain type of electric tools and
+tools to open up certain containers, trailers, vaults, safes... when
+they're stealing cars, all the aspects of things you need to steal
+cars with."**
+
+**Checked before building, not assumed: "intimidation" from task #40
+already had a real answer.** `server/intimidation.js` and
+`test/stakeout-intimidation.test.js` already existed, built earlier in
+this same project under task #40's own phrase, for a real, different
+question — does a witness stay quiet afterward (`Fear Factor`/
+`Notoriety` vs. the witness's own `Resilience`). A first draft of this
+round built a SECOND "intimidation" mechanic inside `heists.js` (an
+alternate crew approach, forcing a confrontation instead of sneaking)
+before this was found — exactly the third standing rule's "two
+disagreeing answers to one question" shape, caught only because the
+full suite's own `stakeout-intimidation.test.js` broke on an unrelated
+field and reading why surfaced the duplicate. Removed before shipping,
+all of it mutation-tested and clean: `intimidationAptitudeOf`, the
+`approach` parameter, `INTIMIDATION_DETECTION_PENALTY`, and their own
+tests. `intimidation.js` remains the one real answer to "intimidation"
+for this task; `heists.js` adds none of its own.
+
+**What this round actually adds to `heists.js` is a real tool
+requirement, decided from a real property field, never an invented
+landmark.** `heists.js`'s own header already declined to invent a
+`bank`/`vault` landmark category; `server/heistTools.js` holds that
+same line. `containerRequirementFor` reads the real
+`properties.operating_organization_id`/`landmark_category` link
+`property.js` already maintains — a target operating a real
+`distribution-center`, `port-terminal` or `industrial-plant` (real
+cargo-handling landmark categories this file already has, tasks #67/
+#74) needs `bolt_cutters`; anything else needs `angle_grinder` or
+`cutting_torch`. All three are real, cited tools: ISO 17712 (freight
+container/cargo seal standard) names bolt and cable cutters as the
+real attack a high-security seal is tested against; UL 687 (the safe
+industry's own burglary-resistance standard) rates a safe "TR"
+(torch-resistant) against exactly a torch or a grinder, its own two
+real named attack methods. `attemptHeist` now refuses outright — before
+any draw is consumed, the same "refuse rather than half-apply"
+discipline `vehicles.js#restoreVehicleCondition` already holds — a
+crew holding neither real tool for this target.
+
+**Real, current vehicle-theft methods replace flavour text that
+research this round found was already obsolete.** `vehicles.js`'s own
+`VEHICLE_THEFT_TECHNIQUES` named hot-wiring and slim-jim lock
+manipulation — NICB's own 2014 analysis states hot-wiring has been
+obsolete since transponder immobilisers became standard in 1997, and
+the same electronic shift makes slim-jim manipulation equally
+obsolete against a modern lock. What NICB and current reporting (CBS
+News; Autoblog, 2023) document as the real, current methods are OBD-II
+port reprogramming (`key_programmer`) and a keyless-fob relay attack
+(`relay_attack_device`, NICB's own 2016 test of a purchased unit
+opening 54% of tested vehicles). Both are real, named, remnant-only
+items registered the same way `weapons.js#registerItems` already
+registers firearms — through `worldState.barterItems`, idempotent by
+name, never a producible Tier 1-2 salvage recipe.
+
+Mutation-verified: disabling the tool-holding check in `attemptHeist`
+(caught, 16/18). Fifteen existing `heists.test.js` calls to
+`attemptHeist`, plus two more in `test/stakeout-intimidation.test.js`
+written before this round, needed a fixture update, not a design
+change: every one targets a plain `'business'` organization (or one
+with no real property at all) with no real cargo-handling property, so
+all of them now need a real vault tool equipped on the sponsor — the
+ones that actually exercise `success`/`detected`/`staked` got one; the
+rest already pass without touching those fields, confirmed by reading
+what each one actually asserts rather than equipping one everywhere
+out of caution.
+
+**Task #168 closes the matching gap in `vehicles.js#stealVehicle`
+itself, not just the heist side.** `VEHICLE_THEFT_TECHNIQUES`'s own
+hot-wiring/slim-jim flavour text had never been checked against
+current reality: NICB's own 2014 analysis states hot-wiring has been
+obsolete since transponder immobilisers became standard in 1997, and
+the same shift makes slim-jim lock manipulation equally obsolete. A
+thief holding one of `heistTools.VEHICLE_BYPASS_TOOLS` (`key_
+programmer`, `relay_attack_device`) now uses that real, current method
+as the technique at this file's own unmodified chance; one with
+neither still attempts a real legacy technique, but pays a flagged
+`LEGACY_TECHNIQUE_PENALTY` (0.15, no real source gives a number for
+this on this engine's own 0..1 chance scale) — a real cost for using a
+method NICB itself documents as obsolete, rather than treating a 2024
+car and a 1970s one as equally vulnerable to the same flavour text.
+
+Mutation-verified twice: zeroing `LEGACY_TECHNIQUE_PENALTY` (caught,
+16/17) and disabling the `bypassTool` lookup so it always falls
+through to a legacy technique (caught, 15/17) — each confirmed
+restored byte-identical afterward. Five of the existing `vehicles
+.test.js` calls to `stealVehicle` needed a fixture update for the
+identical reason the heist tests did: three claimed an exact
+deterministic chance (0 or 1) that a real tool is now needed to keep
+true, and were given one; the fourth ("a high real aptitude... succeeds
+reliably") was given one to stay a clean test of aptitude rather than
+aptitude entangled with the new penalty. Two new tests close the real
+gap directly — a real tool used as the technique at the unpenalised
+chance, and a real legacy attempt shown to fail at least once in 60
+tries at aptitude 100, which `chance = 1` could never do.

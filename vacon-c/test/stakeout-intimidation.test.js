@@ -9,6 +9,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const heists = require('../server/heists.js');
+const heistTools = require('../server/heistTools.js');
+const inventory = require('../server/inventory.js');
 const intimidation = require('../server/intimidation.js');
 const economy = require('../server/economy.js');
 const worldStore = require('../server/worldStore.js');
@@ -16,6 +18,16 @@ const { INDIVIDUAL_DEFINITIONS } = require('../server/traitDefinitions.js');
 const { generateEntityTraits } = require('../server/entityTraits.js');
 
 let nextId = 800000;
+
+// Task #40/#167 added a real tool requirement to `attemptHeist` after
+// these tests were written — every target here has no real
+// cargo-handling property, so it always asks for a real vault tool.
+// Equip one so these predate-the-gate tests keep exercising what they
+// were written to exercise.
+function equipVaultTool(worldState, entityId) {
+  heistTools.registerItems(worldState);
+  inventory.give(worldState, { entityId, itemName: 'angle_grinder' });
+}
 
 function world() {
   const worldState = {
@@ -125,6 +137,7 @@ test('a recent stakeout lowers detectionChance by exactly STAKEOUT_DETECTION_RED
   const leader = person(w);
   const sponsor = org(w, leader.id);
   const target = org(w, person(w).id);
+  equipVaultTool(w, leader.id);
 
   const unstaked = heists.attemptHeist(w, leader.id, {
     organizationId: sponsor.id, crewEntityIds: [leader.id], targetOrganizationId: target.id, tick: 1,
@@ -149,6 +162,7 @@ test('mutation check: removing the stakeout reduction collapses detectionChance 
   const leader = person(w);
   const sponsor = org(w, leader.id);
   const target = org(w, person(w).id);
+  equipVaultTool(w, leader.id);
   heists.stakeOut(w, leader.id, target.id, { tick: 1 });
 
   const broken = heists.detectionChanceFor(

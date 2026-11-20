@@ -15,6 +15,7 @@ const engine = require('../server/engine.js');
 const vehicles = require('../server/vehicles.js');
 const salvage = require('../server/salvage.js');
 const inventory = require('../server/inventory.js');
+const heistTools = require('../server/heistTools.js');
 
 const w = engine.WorldState;
 
@@ -30,6 +31,15 @@ function mechanic(skill = 80) {
 
 function person() {
   return engine.generateNPC({ traitValueFor: () => 50 });
+}
+
+// Task #168: a thief with no real bypass tool now pays a real,
+// flagged penalty against a legacy technique. These existing tests
+// predate that and want the UNPENALISED chance their own comments
+// already describe, so equip the real, current tool.
+function equipBypassTool(entityId) {
+  heistTools.registerItems(w);
+  inventory.give(w, { entityId, itemName: 'key_programmer' });
 }
 
 function craftScooter(ownerId) {
@@ -95,6 +105,7 @@ test('stealVehicle: targets the NAMED victim\'s own holding, never an unrelated 
   const victim = mechanic();
   craftScooter(victim.id);
   const perfectThief = engine.generateNPC({ traitValueFor: () => 100 });
+  equipBypassTool(perfectThief.id);
 
   const result = vehicles.stealVehicle(w, perfectThief.id, victim.id, 'scooter', { tick: 0 });
   assert.equal(result.stolen, true);
@@ -120,11 +131,14 @@ test('stealVehicle: a real success (aptitude 100 -> chance exactly 1) transfers 
   const victim = mechanic();
   craftScooter(victim.id);
   // aptitude 100 -> chance = min(1, 0.5 + (100-50)/100) = 1, a real,
-  // deterministic hit -- `seededDraw(...) < 1` is always true.
+  // deterministic hit -- `seededDraw(...) < 1` is always true. Equipped
+  // with a real bypass tool (task #168) so this stays the unpenalised
+  // chance the comment above describes.
   const perfectThief = engine.generateNPC({ traitValueFor: () => 100 });
+  equipBypassTool(perfectThief.id);
   const result = vehicles.stealVehicle(w, perfectThief.id, victim.id, 'scooter', { tick: 0 });
   assert.equal(result.stolen, true);
-  assert.ok(vehicles.VEHICLE_THEFT_TECHNIQUES.includes(result.technique));
+  assert.equal(result.technique, 'key_programmer', 'a real bypass tool is used as the technique, not a legacy one');
   assert.equal(inventory.quantityOf(w, perfectThief.id, 'scooter'), 1);
   assert.equal(inventory.quantityOf(w, victim.id, 'scooter'), 0);
   const incident = w.crimeIncidents.find(
@@ -137,12 +151,50 @@ test('stealVehicle: a high real robbery aptitude against an undefended vehicle s
   const victim = mechanic();
   craftScooter(victim.id);
   const skilledThief = engine.generateNPC({ traitValueFor: () => 95 });
+  equipBypassTool(skilledThief.id);
   let stolen = false;
   for (let tick = 0; tick < 10 && !stolen; tick += 1) {
     const result = vehicles.stealVehicle(w, skilledThief.id, victim.id, 'scooter', { tick });
     stolen = result.stolen;
   }
   assert.ok(stolen, 'a real, highly skilled thief should succeed within 10 real tries');
+});
+
+// ---------------------------------------------------------------------
+// stealVehicle — the real tool requirement (task #168)
+// ---------------------------------------------------------------------
+
+test('stealVehicle: a real bypass tool (key_programmer/relay_attack_device) is used as the technique, and carries no real penalty', () => {
+  const victim = mechanic();
+  craftScooter(victim.id);
+  const thief = engine.generateNPC({ traitValueFor: () => 100 });
+  heistTools.registerItems(w);
+  inventory.give(w, { entityId: thief.id, itemName: 'relay_attack_device' });
+
+  const result = vehicles.stealVehicle(w, thief.id, victim.id, 'scooter', { tick: 0 });
+  assert.equal(result.technique, 'relay_attack_device');
+  assert.equal(result.stolen, true, 'a real tool at aptitude 100 must clear the unpenalised chance of 1');
+});
+
+test('stealVehicle: with neither real bypass tool, a legacy technique is attempted at a real, flagged penalty', () => {
+  // aptitude 100, no tool -> chance = min(1, 0.5 + 0.5 - 0.15) = 0.85,
+  // not 1 -- the real cost of a method NICB documents as obsolete. A
+  // fresh victim/scooter each try, since a success removes the real
+  // item a next try needs to hold.
+  const thief = engine.generateNPC({ traitValueFor: () => 100 });
+  let sawFailure = false;
+  let sawSuccess = false;
+  for (let tick = 0; tick < 60 && !sawFailure; tick += 1) {
+    const victim = mechanic();
+    craftScooter(victim.id);
+    const result = vehicles.stealVehicle(w, thief.id, victim.id, 'scooter', { tick });
+    assert.ok(vehicles.VEHICLE_THEFT_TECHNIQUES.includes(result.technique),
+      'with no real tool the technique must stay one of the real legacy ones');
+    if (result.stolen) sawSuccess = true; else sawFailure = true;
+  }
+  assert.ok(sawFailure,
+    'aptitude 100 with no real tool must fail at least once in 60 tries -- it is not chance 1 any more');
+  assert.ok(sawSuccess, 'aptitude 100 with no real tool still succeeds most of the time (chance 0.85)');
 });
 
 // ---------------------------------------------------------------------

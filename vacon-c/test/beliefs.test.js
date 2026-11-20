@@ -296,3 +296,44 @@ test('values_db is deliberately untouched, and says so', () => {
   assert.equal(/valuesDb|values_db/.test(code), false,
     'beliefs.js touches values_db — the note in its header is no longer true');
 });
+
+// -- community-scoped shift (task #158) ----------------------------------
+
+test('shiftCommunityBelief moves only the named community, not the world', () => {
+  // The same shape `shiftPopulationBelief` already has, scoped to one
+  // community rather than everyone — task #158's real finding (Bentzen
+  // 2019) is community-grain, so a world-wide call would be applying it
+  // too broadly.
+  const w = world({ npcs: 6 });
+  w.npcs[0].communityId = 10;
+  w.npcs[1].communityId = 10;
+  w.npcs[2].communityId = 10;
+  w.npcs[3].communityId = 20;
+  w.npcs[4].communityId = 20;
+  // npcs[5] carries no communityId at all — an NPC generated before
+  // community assignment existed should neither crash nor be swept in.
+
+  const shifted = beliefs.shiftCommunityBelief(w, {
+    communityId: 10, beliefType: 'religious', beliefName: 'personal-faith', delta: 3,
+  });
+
+  assert.equal(shifted.length, 3, 'shiftCommunityBelief did not scope to the named community');
+  for (const npc of [w.npcs[0], w.npcs[1], w.npcs[2]]) {
+    assert.equal(beliefs.beliefStrength(w, npc.id, 'personal-faith'), 53,
+      'a member of the shifted community did not move from neutral');
+  }
+  for (const npc of [w.npcs[3], w.npcs[4], w.npcs[5]]) {
+    assert.equal(beliefs.beliefStrength(w, npc.id, 'personal-faith'), null,
+      'a person outside the named community was moved by a community-scoped shift');
+  }
+});
+
+test('shiftCommunityBelief on an unoccupied community moves nobody and throws nothing', () => {
+  const w = world({ npcs: 2 });
+  w.npcs[0].communityId = 10;
+  w.npcs[1].communityId = 10;
+  const shifted = beliefs.shiftCommunityBelief(w, {
+    communityId: 999, beliefType: 'religious', beliefName: 'personal-faith', delta: 3,
+  });
+  assert.equal(shifted.length, 0);
+});

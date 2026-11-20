@@ -64,6 +64,7 @@
 const { nextAfter } = require('./nextAfter.js');
 const migrationPathwayPacks = require('./migrationPathwayPacks.js');
 const africanEthnicGroupPacks = require('./africanEthnicGroupPacks.js');
+const eschatologyPacks = require('./eschatologyPacks.js');
 
 //: Flagged interpretive. `npcs.education` is TEXT with no comment and
 //: no enumeration anywhere in the package — unlike almost every other
@@ -253,6 +254,16 @@ function compositionOf(worldState, residents) {
       distribution: religion,
       diversity: diversityOf(religion),
       dominantShare: dominantShareOf(religion),
+      // **Real, per-tradition eschatology content for the area's
+      // dominant religion, when one real pack drew it — reported
+      // only, same posture as `ethnicity.dominantPathway` just below.
+      // `eschatologyPacks.js`'s own header names the real, documented
+      // concept behind each entry and the two honest declines (Sikh,
+      // the `other` catch-all) rather than inventing a doctrine
+      // either tradition does not teach. Null for the invented
+      // vocabulary and for `unknown`/`unaffiliated`, same as every
+      // other dominant-value lookup here.
+      dominantEschatology: eschatologyPacks.eschatologyFor(dominantValueOf(religion)),
     },
     // **A real Sunni/Shia/unaffiliated split, measured here and read
     // nowhere else — `islamicSectPacks.js`'s own header, same firewall

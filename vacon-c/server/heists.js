@@ -79,6 +79,24 @@
 // the specific organization that caught them, the same narrow,
 // first-party event `espionage.js`'s own header already argues does
 // not reopen `heat.js`'s declared scope.
+//
+// ---------------------------------------------------------------------
+// Closing task #40's remaining real gap: a real tool requirement
+// ---------------------------------------------------------------------
+// "Witnesses, stakeouts, and safe-cracking/intimidation variance" had
+// shipped witnesses (`crime.js`), the stakeout above, and witness
+// intimidation (`server/intimidation.js`) — "safe-cracking" was the one
+// real piece still missing. **A crew now has to actually hold the real
+// tool `heistTools.containerRequirementFor` names for this target** —
+// `bolt_cutters` for a real cargo-handling target, `angle_grinder` or
+// `cutting_torch` for anything else — refused outright, before any
+// draw is consumed, the same "refuse rather than half-apply" discipline
+// `vehicles.js#restoreVehicleCondition` already holds. No second
+// "intimidation" mechanic is added here — `intimidation.js` already
+// answers that real word, over a different, complementary question
+// (does a witness stay quiet afterward), and a second one under the
+// same name would be exactly the "two disagreeing answers to one
+// question" this file's own project has a standing rule against.
 
 'use strict';
 
@@ -87,6 +105,7 @@ const membership = require('./membership.js');
 const crime = require('./crime.js');
 const economy = require('./economy.js');
 const heat = require('./heat.js');
+const heistTools = require('./heistTools.js');
 const { seededDraw } = require('./seeded.js');
 const { getLiveEntity } = require('./entityTraits.js');
 
@@ -240,6 +259,20 @@ function attemptHeist(worldState, sponsorEntityId, options = {}) {
   if (compliedCrew.length === 0) {
     return {
       complied: false, crew: [], refused: refusedCrew, success: null, detected: false, loot: 0,
+    };
+  }
+
+  // **A crew that showed up with no real tool cannot open this real
+  // target, full stop — refused before any draw is consumed, the same
+  // "refuse rather than half-apply" discipline
+  // `vehicles.js#restoreVehicleCondition` already holds.** See
+  // `heistTools.js`'s own header for why the tool is decided from a
+  // real property field rather than an invented vault landmark.
+  const toolRequirement = heistTools.containerRequirementFor(worldState, target.id);
+  if (!heistTools.holdsAny(worldState, compliedCrew, toolRequirement.tools)) {
+    return {
+      complied: true, crew: compliedCrew, refused: refusedCrew, success: false, detected: false,
+      loot: 0, blockedByTool: toolRequirement,
     };
   }
 

@@ -2151,6 +2151,50 @@ growth-into-a-gang probability is invented; that would need its own
 calibration round. See CLAUDE.md's hundred-and-fifty-ninth standing
 rule.
 
+## Real per-tradition eschatology content + crisis-religiosity mechanic
+`server/eschatologyPacks.js` reports a real, documented end-times
+concept per religious tradition (Christian Second Coming/Parousia,
+Jewish Mashiach and the Messianic Age, Islamic Yawm al-Qiyamah/Mahdi/
+Isa, Buddhist Maitreya, Hindu Kalki, LDS's Second Coming and
+Millennium, Jehovah's Witnesses' Armageddon) through
+`demographics.compositionOf`'s `religion.dominantEschatology` field --
+never a decision input, same posture as `dominantPathway`. Sikh and
+`other` are honest declines (no comparable doctrine, or an unnamed
+catch-all); Bahá'í is reported as a fulfilled, not future-facing,
+eschatology, since Bahá'í teaching holds its own "Promised One" has
+already come.
+
+Separately, `beliefs.shiftCommunityBelief` and a new
+`environment.js` wiring apply Bentzen's (2019, *Economic Journal*)
+real finding -- a sudden local disaster raises local religiosity,
+while predictable/gradual hardship does not -- on every severe
+weather CROSSING (never every tick a condition persists), scoped to
+the affected city's own real communities via the existing
+`belief_type: 'religious'` substrate. `npc.religion` is untouched by
+either half of this work. See CLAUDE.md's hundred-and-sixtieth
+standing rule.
+
+## Real heist/vehicle-theft tools (closes task #40)
+`server/heistTools.js` adds real, cited tools for defeating a real
+physical barrier: `bolt_cutters` (ISO 17712, the real cargo/trailer
+seal standard) for a target operating a real cargo-handling property
+(`distribution-center`/`port-terminal`/`industrial-plant`), or
+`angle_grinder`/`cutting_torch` (UL 687, the safe industry's own
+burglary-resistance standard) for anything else -- decided from the
+real `properties.operating_organization_id`/`landmark_category` link,
+never an invented vault landmark. `attemptHeist` now refuses outright,
+before any draw runs, a crew holding neither real tool. (Task #40's own
+"intimidation" word was already answered by `server/intimidation.js`,
+a real witness-suppression mechanic built earlier under the same task
+-- this round does not add a second one.) `vehicles.js`'s own
+hot-wiring/slim-jim flavour text is now joined by two real, current
+methods (NICB-documented): `key_programmer` (OBD-II port
+reprogramming) and `relay_attack_device` (a keyless-fob relay attack);
+neither tool held, a legacy technique is still attempted but at a real,
+flagged penalty, since NICB's own analysis documents both legacy
+methods as obsolete against a modern immobiliser. See CLAUDE.md's
+hundred-and-sixty-first standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

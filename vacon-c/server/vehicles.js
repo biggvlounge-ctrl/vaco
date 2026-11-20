@@ -65,6 +65,26 @@
 // second mechanical system per technique.
 //
 // ---------------------------------------------------------------------
+// A real tool now changes the real odds, not just the flavour text
+// (task #168)
+// ---------------------------------------------------------------------
+// NICB's own 2014 analysis states hot-wiring has been obsolete on any
+// vehicle with a transponder immobiliser since that technology became
+// standard in 1997; the same shift to electronic locks makes slim-jim
+// lock manipulation equally obsolete. `heistTools.VEHICLE_BYPASS_
+// TOOLS` are the real, current methods current reporting (NICB; CBS
+// News; Autoblog, 2023) document instead: `key_programmer` (writing a
+// new key via the OBD-II diagnostic port) and `relay_attack_device`
+// (amplifying a nearby keyless fob's own signal -- NICB's 2016 test of
+// a purchased unit opened 54% of tested vehicles). A thief holding
+// either real tool uses the unmodified chance this file already had;
+// one with neither still attempts the legacy techniques named above --
+// an older or neglected vehicle can still fall to them -- but pays a
+// real, flagged `LEGACY_TECHNIQUE_PENALTY` for using a method NICB
+// itself documents as obsolete, rather than treating 2024's electronic
+// locks and the 1960's as equally vulnerable to the same flavour text.
+//
+// ---------------------------------------------------------------------
 // Restoration is new; crafting is not
 // ---------------------------------------------------------------------
 // Building a NEW vehicle from nothing is already `salvage.make`
@@ -95,6 +115,7 @@ const inventory = require('./inventory.js');
 const salvage = require('./salvage.js');
 const occupations = require('./occupations.js');
 const heists = require('./heists.js');
+const heistTools = require('./heistTools.js');
 const crime = require('./crime.js');
 const { seededDraw } = require('./seeded.js');
 
@@ -126,10 +147,21 @@ const KM_PER_DAY_BY_TYPE = {
   scooter: 150,
 };
 
-//: Three real, commonly documented vehicle-theft methods — flavour on
-//: a real `crime.recordCrime` incident's own `detail` field, not a
-//: second mechanical system per technique.
+//: Three real, commonly documented LEGACY vehicle-theft methods —
+//: flavour on a real `crime.recordCrime` incident's own `detail`
+//: field for a thief with no real bypass tool, not a second
+//: mechanical system per technique. See this file's own header on why
+//: "legacy" rather than simply "the techniques": NICB's own analysis
+//: documents both as obsolete against any vehicle built after
+//: transponder immobilisers became standard (1997).
 const VEHICLE_THEFT_TECHNIQUES = ['hot-wiring', 'lock manipulation (slim jim)', 'towing'];
+
+//: Flagged interpretive, same honesty as every other hand-fitted band
+//: here. No source gives a number for how much harder a transponder
+//: immobiliser makes a legacy technique; this is kept modest and in
+//: the same direction `heists.js#INTIMIDATION_DETECTION_PENALTY`
+//: already names for an unmeasured real trade-off.
+const LEGACY_TECHNIQUE_PENALTY = 0.15;
 
 //: Flagged interpretive, same posture as every other hand-fitted
 //: amount in this engine with no document to cite a figure from. A
@@ -195,7 +227,18 @@ function stealVehicle(worldState, thiefEntityId, victimEntityId, type, options =
   }
   const victimId = Number(victimEntityId);
 
-  const technique = VEHICLE_THEFT_TECHNIQUES[Math.floor(
+  // **A real tool changes which technique is even in play (task #168)
+  // — not just a label on the incident.** A thief holding a real
+  // `key_programmer` or `relay_attack_device` uses that real, current
+  // method at the unmodified chance below; one with neither still
+  // attempts a legacy technique, flavoured from the real, named list,
+  // but pays `LEGACY_TECHNIQUE_PENALTY` for using a method NICB's own
+  // analysis documents as obsolete against this vehicle's real
+  // immobiliser.
+  const bypassTool = heistTools.VEHICLE_BYPASS_TOOLS.find(
+    (name) => inventory.findHolding(worldState, Number(thiefEntityId), name),
+  );
+  const technique = bypassTool ?? VEHICLE_THEFT_TECHNIQUES[Math.floor(
     seededDraw([worldState.seed ?? 'world', 'vehicle-theft-technique', type, victimId, tick])
       * VEHICLE_THEFT_TECHNIQUES.length,
   )];
@@ -205,7 +248,10 @@ function stealVehicle(worldState, thiefEntityId, victimEntityId, type, options =
   // `heists.successChanceFor` already uses for an undefended target —
   // a parked vehicle has no real "defense" term the way a guarded
   // organization does.
-  const chance = Math.max(0, Math.min(1, 0.5 + (aptitude - 50) / 100));
+  const chance = Math.max(
+    0,
+    Math.min(1, 0.5 + (aptitude - 50) / 100 - (bypassTool ? 0 : LEGACY_TECHNIQUE_PENALTY)),
+  );
   const succeeded = seededDraw([worldState.seed ?? 'world', 'vehicle-theft', type, victimId, thiefEntityId, tick]) < chance;
 
   if (!succeeded) {
@@ -291,6 +337,7 @@ module.exports = {
   KM_PER_DAY_BY_TYPE,
   FUEL_ITEM_NAME,
   VEHICLE_THEFT_TECHNIQUES,
+  LEGACY_TECHNIQUE_PENALTY,
   RESTORATION_CONDITION_GAIN,
   WEAR_PER_TRAVEL_DAY,
   registerFuelItem,
