@@ -173,17 +173,62 @@ const GOAL_TRIGGER = 35;
 const GOAL_MET = 65;
 
 // ---------------------------------------------------------------------
+// A real performance fix, not a new mechanism. `valueOf`/`needOf` were
+// each a full scan of the WHOLE `valuesDb`/`needs` array, called once
+// per VALUE / per NEED_TYPE inside `generateValues`/`generateNeeds`'s
+// own per-NPC loop below — so generating one new NPC cost
+// O(every row ever written), and generating a world cost O(population
+// squared). Measured via `test/worldgen.test.js`: a single 2,500-person
+// `generateWorld` call took 4.8s against an empty world and 46s against
+// one that already held 7,500 people from earlier calls in the same
+// file — the real cause of that file's own "hang" (CLAUDE.md's
+// hundred-and-forty-ninth standing rule carries the full finding).
+//
+// Indexed by `entity_id -> name/type -> row`, kept current at the one
+// real place each array is written (the two `.push()` calls below) so
+// a lookup never re-scans. `restore.js` replaces `valuesDb`/`needs`
+// wholesale on a world load without going through either push site, so
+// the index is keyed off the array's own identity and rebuilt once,
+// lazily, whenever that identity changes — never trusted indefinitely
+// against an array that might have been swapped out from under it.
+function indexOf(worldState, arrayKey, cacheKey, idOf, nameOf) {
+  const arr = worldState[arrayKey] || (worldState[arrayKey] = []);
+  const cache = worldState[cacheKey];
+  if (cache && cache.arr === arr) return cache.map;
+  const map = new Map();
+  for (const row of arr) {
+    let byName = map.get(idOf(row));
+    if (!byName) { byName = new Map(); map.set(idOf(row), byName); }
+    byName.set(nameOf(row), row);
+  }
+  worldState[cacheKey] = { arr, map };
+  return map;
+}
+
+function indexRow(worldState, cacheKey, row, idOf, nameOf) {
+  const { map } = worldState[cacheKey];
+  let byName = map.get(idOf(row));
+  if (!byName) { byName = new Map(); map.set(idOf(row), byName); }
+  byName.set(nameOf(row), row);
+}
+
+const entityIdOf = (row) => row.entity_id;
+const valueNameOf = (row) => row.value_name;
+const needTypeOf = (row) => row.need_type;
+
+// ---------------------------------------------------------------------
 // Values
 // ---------------------------------------------------------------------
 
 function valuesOf(worldState, entityId) {
-  return (worldState.valuesDb || []).filter((v) => v.entity_id === entityId);
+  const byName = indexOf(worldState, 'valuesDb', '_valuesIndex', entityIdOf, valueNameOf)
+    .get(entityId);
+  return byName ? [...byName.values()] : [];
 }
 
 function valueOf(worldState, entityId, valueName) {
-  return (worldState.valuesDb || []).find(
-    (v) => v.entity_id === entityId && v.value_name === valueName,
-  ) ?? null;
+  return indexOf(worldState, 'valuesDb', '_valuesIndex', entityIdOf, valueNameOf)
+    .get(entityId)?.get(valueName) ?? null;
 }
 
 // One row per value per entity, which is what the composite primary key
@@ -216,7 +261,9 @@ function generateValues(worldState, entityId, options = {}) {
       influence_weight: null,
       tick,
     };
-    (worldState.valuesDb || (worldState.valuesDb = [])).push(row);
+    indexOf(worldState, 'valuesDb', '_valuesIndex', entityIdOf, valueNameOf); // ensures the array/cache exist
+    worldState.valuesDb.push(row);
+    indexRow(worldState, '_valuesIndex', row, entityIdOf, valueNameOf);
     rows.push(row);
   });
 
@@ -256,13 +303,14 @@ function topValue(worldState, entityId) {
 // ---------------------------------------------------------------------
 
 function needsOf(worldState, entityId) {
-  return (worldState.needs || []).filter((n) => n.entity_id === entityId);
+  const byType = indexOf(worldState, 'needs', '_needsIndex', entityIdOf, needTypeOf)
+    .get(entityId);
+  return byType ? [...byType.values()] : [];
 }
 
 function needOf(worldState, entityId, needType) {
-  return (worldState.needs || []).find(
-    (n) => n.entity_id === entityId && n.need_type === needType,
-  ) ?? null;
+  return indexOf(worldState, 'needs', '_needsIndex', entityIdOf, needTypeOf)
+    .get(entityId)?.get(needType) ?? null;
 }
 
 //: Where a need sits in the queue when nothing else says otherwise.
@@ -291,7 +339,9 @@ function generateNeeds(worldState, entityId, options = {}) {
       // the first while a tick stamp would claim the second.
       last_satisfied_tick: null,
     };
-    (worldState.needs || (worldState.needs = [])).push(row);
+    indexOf(worldState, 'needs', '_needsIndex', entityIdOf, needTypeOf); // ensures the array/cache exist
+    worldState.needs.push(row);
+    indexRow(worldState, '_needsIndex', row, entityIdOf, needTypeOf);
     rows.push(row);
   }
   void tick;

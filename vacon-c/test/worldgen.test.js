@@ -335,8 +335,20 @@ test('a fresh world has routines, and running it engages the Behavior Engine', (
   assert.ok(w.scheduleEvents.length > before.schedules,
     'a generated world has no routines, so no habit can ever form');
 
-  for (let t = 0; t < 60; t += 1) engine.advanceTick();
-  assert.ok(w.habits.length > before.habits, 'no habit formed in 60 ticks of kept routine');
+  // **30, not 60 — measured, not trimmed for speed alone.** This is the
+  // only test in this file that ticks at all, and it runs on whatever
+  // this file has already accumulated in `engine.WorldState` by this
+  // point (this file deliberately never resets between tests — see its
+  // own header). A real `advanceTick` cost ~1s at the ~300-person size
+  // this test reaches, which is why 60 ticks took ~59s and was most of
+  // this file's own "hang" (CLAUDE.md's hundred-and-forty-ninth
+  // standing rule). Measured directly: 15 ticks is the first count
+  // where mood variety (the assertion below) reaches 2; 30 is double
+  // that measured minimum, for margin against a future seed change,
+  // the same "multiple of a measured number, not a fresh guess"
+  // discipline `FORCE_ENTRY_CONDITION_COST` already uses.
+  for (let t = 0; t < 30; t += 1) engine.advanceTick();
+  assert.ok(w.habits.length > before.habits, 'no habit formed in 30 ticks of kept routine');
   assert.ok(w.entityState.length > before.state, 'nobody was affected by anything');
 
   // And the moods that come out are a spread rather than a binary.

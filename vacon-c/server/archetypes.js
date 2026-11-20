@@ -91,14 +91,37 @@ const PREFERENCE_OPTIONS = {
   learning_style: ['watching', 'doing', 'reading', 'being told', 'trial and error'],
 };
 
+// A real performance fix, not a new mechanism -- the same shape
+// `motivation.js`'s `valueOf`/`needOf` had (CLAUDE.md's hundred-and-
+// forty-ninth standing rule). `preferenceOf` was a full scan of the
+// WHOLE `preferences` array, called once per PREFERENCE_CATEGORY
+// inside `generatePreferences`'s own per-NPC loop below, so generating
+// a world cost O(population squared). Indexed by
+// `entity_id -> category -> row`, kept current at the one real push
+// site (`setPreference`); `restore.js` replaces `preferences` wholesale
+// on a world load, so the index is keyed off the array's own identity
+// and rebuilt once, lazily, whenever that identity changes.
+function preferencesIndex(worldState) {
+  const arr = worldState.preferences || (worldState.preferences = []);
+  const cache = worldState._preferencesIndex;
+  if (cache && cache.arr === arr) return cache.map;
+  const map = new Map();
+  for (const row of arr) {
+    let byCategory = map.get(row.entity_id);
+    if (!byCategory) { byCategory = new Map(); map.set(row.entity_id, byCategory); }
+    byCategory.set(row.category, row);
+  }
+  worldState._preferencesIndex = { arr, map };
+  return map;
+}
+
 function preferencesOf(worldState, entityId) {
-  return (worldState.preferences || []).filter((p) => p.entity_id === entityId);
+  const byCategory = preferencesIndex(worldState).get(entityId);
+  return byCategory ? [...byCategory.values()] : [];
 }
 
 function preferenceOf(worldState, entityId, category) {
-  return (worldState.preferences || []).find(
-    (p) => p.entity_id === entityId && p.category === category,
-  ) ?? null;
+  return preferencesIndex(worldState).get(entityId)?.get(category) ?? null;
 }
 
 // One row per category per entity, which is what the composite primary
@@ -136,7 +159,14 @@ function setPreference(worldState, options = {}) {
     value: value ?? null,
     tick,
   };
-  (worldState.preferences || (worldState.preferences = [])).push(row);
+  preferencesIndex(worldState); // ensures the array/cache exist
+  worldState.preferences.push(row);
+  let byCategory = preferencesIndex(worldState).get(entityId);
+  if (!byCategory) {
+    byCategory = new Map();
+    preferencesIndex(worldState).set(entityId, byCategory);
+  }
+  byCategory.set(category, row);
   return row;
 }
 

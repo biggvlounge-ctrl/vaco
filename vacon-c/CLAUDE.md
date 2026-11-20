@@ -8499,3 +8499,85 @@ relationships/:entityAId/:entityBId` is that sibling — a real,
 honest 404 when nothing has ever been recorded between the two,
 never an invented empty relationship. Mutation-verified: removing the
 404 guard is caught by a real test.
+
+**A hundred-and-forty-ninth, and it is the sixteenth standing rule's
+"play the world" turned into a measurement of time rather than of
+behaviour — the same discipline, a different axis.** `test/worldgen
+.test.js` was confirmed to hang: isolated via `git stash`, the file
+hung on the clean, already-committed HEAD, unrelated to anything in
+flight. Bisected with `--test-name-pattern` across the file's 45
+tests: one test alone (`'a fresh world has routines, and running it
+engages the Behavior Engine'`) took 58.8 real seconds for 60 ticks on
+a world this file had already built up to roughly 300 people by that
+point — this file deliberately never resets `engine.WorldState`
+between tests (its own header says so), so every test ticks or
+generates against whatever every earlier test already built.
+
+**The real cause was not the ticks — it was generation, and it was
+quadratic.** Six of this file's own later tests each call
+`generateWorld` with 2,500 new people, on top of whatever the file
+had already accumulated. Measured directly: the identical 2,500-person
+call took 4.8 seconds against an empty world and **46 seconds**
+against one that already held 7,500 — cost scaling with the EXISTING
+population, not just the new one, which is what a quadratic shape
+looks like from the outside. `node --prof` named the real cause:
+`motivation.js`'s `valueOf`/`needOf` were each a full scan of the
+WHOLE `valuesDb`/`needs` array, called once per VALUE / per NEED_TYPE
+inside `generateValues`/`generateNeeds`'s own per-NPC loop — so
+generating one new NPC cost O(every row ever written). The same exact
+shape recurred three more times in the same pass, found by re-running
+the profiler after each fix and reading what rose to the top next:
+`archetypes.js`'s `preferenceOf` (same per-category scan inside
+`generatePreferences`), `beliefs.js`'s `findBelief` (scanned once per
+NPC inside `shiftPopulationBelief`'s own population loop), and
+`worldStore.js`'s `findRelationship` (the real single-pair getter the
+hundred-and-thirty-third standing rule's own new route wraps, scanned
+on every `getOrCreateRelationship` call generation makes for every
+touched pair).
+
+**The fix is the same shape four times: index by identity, update at
+the one real write site, never trust the cache past an array that got
+replaced.** Each of the four reads now goes through a
+`Map<entityId, Map<name, row>>` (or, for relationships, a single map
+keyed on the pair's own unordered key) built lazily and kept current
+at that module's one real `.push()` site — `restore.js` replaces all
+four backing arrays wholesale on a world load, never through those
+push sites, so each index is keyed off the array's own object
+identity and rebuilt from scratch, lazily, the one time that identity
+changes, rather than trusted indefinitely against an array that might
+have been swapped out from under it. Mutation-verified five times:
+each of the four lookups returning nothing, and (for `motivation.js`'s
+push site specifically) the incremental index update being skipped
+after a push — all five caught by real, pre-existing tests, confirmed
+by running the exact suite that test touches and reverting before
+moving to the next. Measured after: the same compounding 2,500-person
+call that took 46 seconds now takes under 5, and six such calls in a
+row (15,000 people total) finish in under 20 seconds combined, each
+one now growing roughly linearly with population rather than
+quadratically.
+
+**One number in the test itself still needed trimming, for a
+different, honest reason: not every test's assertion needs the
+original count to hold.** The 60-tick loop was never about ticking 60
+times — it was proving three things cross a real threshold (a
+schedule exists, a habit forms, mood variety reaches 2), and per-tick
+cost (a separate cost center from generation, driven by the economy/
+security/motivation/migration/organization/reemergence phases this
+pass did not touch) was not reduced by the four index fixes above.
+Measured directly: 15 ticks is the first count where mood variety
+reaches 2; 30, double that measured minimum for margin against a
+future seed change, is what the test now runs — the same "a multiple
+of an already-justified constant, not a fresh invented number"
+discipline `FORCE_ENTRY_CONDITION_COST` already used. The full file
+now runs in **107 seconds, all 45 tests passing**, down from a hang
+this session's own tooling killed at 280 seconds without ever
+completing.
+
+**Left named, not chased further, in the same file's own remaining
+profile**: `behavior.js`'s `seedRoutine`/`workplaceOf` and
+`inventory.js`'s `findHolding` carry the next-largest share of the
+file's remaining 107 seconds, by the same scan-per-NPC shape — not
+fixed this round because `scheduleEvents` has three real writers
+(two of them filter-based removals on death/sentencing, not a single
+push site), which needs its own careful design rather than the
+four-line pattern this round reused three times safely.

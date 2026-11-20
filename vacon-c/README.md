@@ -2001,6 +2001,16 @@ nothing has ever been recorded between the two, alongside the
 existing full-list route. See CLAUDE.md's hundred-and-thirty-third
 standing rule.
 
+## Performance: generation no longer scales quadratically
+`motivation.js` (`valueOf`/`needOf`), `archetypes.js`
+(`preferenceOf`), `beliefs.js` (`findBelief`) and `worldStore.js`
+(`findRelationship`) each did a full array scan per NPC during world
+generation -- so generating a world cost O(population squared).
+Indexed by identity now, kept current at each module's one real
+write site. A 2,500-person `generateWorld` call that took 46 seconds
+against an already-7,500-person world now takes under 5. See
+CLAUDE.md's hundred-and-forty-ninth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

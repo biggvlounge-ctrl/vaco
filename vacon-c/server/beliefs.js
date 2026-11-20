@@ -76,21 +76,40 @@ function assertType(beliefType) {
 
 // -- reading ------------------------------------------------------------
 
+// A real performance fix, not a new mechanism -- the same shape
+// `motivation.js`'s `valueOf`/`needOf` had (CLAUDE.md's hundred-and-
+// forty-ninth standing rule). `findBelief` was a full scan of the
+// WHOLE `beliefs` array, and `shiftPopulationBelief` below calls it
+// once per NPC in the world, so moving the whole population's view of
+// one belief cost O(population squared). Indexed by
+// `entity_id -> belief_name -> row`, kept current at the one real push
+// site (`adoptBelief`); `restore.js` replaces `beliefs` wholesale on a
+// world load, so the index is keyed off the array's own identity and
+// rebuilt once, lazily, whenever that identity changes.
+function beliefsIndex(worldState) {
+  const arr = worldState.beliefs || (worldState.beliefs = []);
+  const cache = worldState._beliefsIndex;
+  if (cache && cache.arr === arr) return cache.map;
+  const map = new Map();
+  for (const row of arr) {
+    let byName = map.get(row.entity_id);
+    if (!byName) { byName = new Map(); map.set(row.entity_id, byName); }
+    byName.set(row.belief_name, row);
+  }
+  worldState._beliefsIndex = { arr, map };
+  return map;
+}
+
 function getBeliefs(worldState, entityId, options = {}) {
   const { beliefType = null } = options;
-  // `|| []` for the same reason every other reader in this engine has
-  // it: a module that reads an array a caller has not declared throws
-  // on a world that is otherwise perfectly valid, and `statistics.js`
-  // now reaches `beliefs` from every area profile.
-  return (worldState.beliefs || []).filter(
-    (b) => b.entity_id === entityId && (beliefType === null || b.belief_type === beliefType),
-  );
+  const byName = beliefsIndex(worldState).get(entityId);
+  if (!byName) return [];
+  const all = [...byName.values()];
+  return beliefType === null ? all : all.filter((b) => b.belief_type === beliefType);
 }
 
 function findBelief(worldState, entityId, beliefName) {
-  return (worldState.beliefs || []).find(
-    (b) => b.entity_id === entityId && b.belief_name === beliefName,
-  ) || null;
+  return beliefsIndex(worldState).get(entityId)?.get(beliefName) ?? null;
 }
 
 // **Returns null for "has no view", not the neutral number.** A caller
@@ -139,7 +158,11 @@ function adoptBelief(worldState, options = {}) {
     strength: clampStrength(strength),
     tick,
   };
+  beliefsIndex(worldState); // ensures the array/cache exist
   worldState.beliefs.push(belief);
+  let byName = beliefsIndex(worldState).get(entityId);
+  if (!byName) { byName = new Map(); beliefsIndex(worldState).set(entityId, byName); }
+  byName.set(beliefName, belief);
   return belief;
 }
 

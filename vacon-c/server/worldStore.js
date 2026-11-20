@@ -78,11 +78,36 @@ function addHistoricalRecord(worldState, record) {
 // ---------------------------------------------------------------------------
 // Relationships
 // ---------------------------------------------------------------------------
+
+// A real performance fix, not a new mechanism. `findRelationship` was a
+// full scan of the WHOLE `relationships` array on every call, and
+// `getOrCreateRelationship` — the single real writer every relationship
+// in this engine passes through — called it on every single pair
+// touched during generation. So touching N pairs cost O(N * however
+// many relationships already existed), the same quadratic shape
+// `motivation.js`'s `valueOf`/`needOf` had (CLAUDE.md's hundred-and-
+// forty-ninth standing rule). Indexed by the pair's own unordered key
+// (order never matters here — `(A,B)` and `(B,A)` are the same row),
+// kept current at the one real push site below. `restore.js` replaces
+// `relationships` wholesale on a world load, so the index is keyed off
+// the array's own identity and rebuilt once, lazily, whenever that
+// identity changes.
+function pairKey(entityAId, entityBId) {
+  return entityAId < entityBId ? `${entityAId}:${entityBId}` : `${entityBId}:${entityAId}`;
+}
+
+function relationshipIndex(worldState) {
+  const arr = worldState.relationships || (worldState.relationships = []);
+  const cache = worldState._relationshipIndex;
+  if (cache && cache.arr === arr) return cache.map;
+  const map = new Map();
+  for (const row of arr) map.set(pairKey(row.entity_a_id, row.entity_b_id), row);
+  worldState._relationshipIndex = { arr, map };
+  return map;
+}
+
 function findRelationship(worldState, entityAId, entityBId) {
-  return worldState.relationships.find(
-    (r) => (r.entity_a_id === entityAId && r.entity_b_id === entityBId) ||
-           (r.entity_a_id === entityBId && r.entity_b_id === entityAId)
-  );
+  return relationshipIndex(worldState).get(pairKey(entityAId, entityBId));
 }
 
 function getOrCreateRelationship(worldState, entityAId, entityBId, relationshipType) {
@@ -109,7 +134,9 @@ function getOrCreateRelationship(worldState, entityAId, entityBId, relationshipT
     interaction_count: 0,
     relationship_age: 0,
   };
+  relationshipIndex(worldState); // ensures the array/cache exist
   worldState.relationships.push(rel);
+  relationshipIndex(worldState).set(pairKey(entityAId, entityBId), rel);
   return rel;
 }
 
