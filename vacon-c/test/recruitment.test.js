@@ -13,6 +13,7 @@ const recruitment = require('../server/recruitment.js');
 const crime = require('../server/crime.js');
 const membership = require('../server/membership.js');
 const economy = require('../server/economy.js');
+const occupations = require('../server/occupations.js');
 
 // Real shape from `test/crime.test.js`'s own "the danger map and the
 // displayed level are built from the same rate" — the known-working
@@ -149,6 +150,127 @@ test('who gets recruited is real and deterministic -- the highest real influence
 
 test('BASE_RECRUITMENT_RISK is a real multiple of crime.BASE_DEPRIVATION_RISK, not a bare invented number', () => {
   assert.equal(recruitment.BASE_RECRUITMENT_RISK, crime.BASE_DEPRIVATION_RISK * 10);
+});
+
+// ---------------------------------------------------------------------
+// Task #170: "some of the youth will join organizations as enforcers
+// because they're young and ambitious and strong."
+// ---------------------------------------------------------------------
+// `occupations.postFor('gang')` is the real `'enforcer'` post this
+// file reuses rather than inventing a second occupation vocabulary.
+// A minimal real fixture, same `dangerousWorld` recipe but with
+// exactly one real eligible candidate -- so who gets recruited is not
+// in question, and the only thing left to prove is what happens to
+// THEM. The 40-candidate fixture above is right for proving the
+// mechanism READS influence; it is the wrong fixture for proving what
+// happens once somebody real is actually picked.
+function minimalDangerousWorld() {
+  const w = {
+    tick: 400,
+    npcs: [{ id: 1, communityId: 1, status: 'active', home_property_id: null }],
+    communities: [{ id: 1, name: 'Hollow Row' }],
+    crimeIncidents: [],
+    organizations: [],
+    entityOrganizationMemberships: [],
+    employmentRecords: [],
+    entityTraits: [],
+    historicalRecords: [],
+    families: [],
+    familyMemberships: [],
+    nextEntityId: 1,
+  };
+  for (let i = 0; i < 3; i += 1) {
+    w.crimeIncidents.push({ id: i + 1, community_id: 1, category: 'theft', tick: 380 });
+  }
+  economy.reseedIds(w);
+  return w;
+}
+
+function makeIdleYouth(w, options = {}) {
+  const { id, communityId = 1, ageYears = 19 } = options;
+  const npc = {
+    id, communityId, status: 'active', home_property_id: null,
+    createdTick: w.tick - Math.round(ageYears * 365),
+    schoolEnrolled: false, enrolledUniversityId: null,
+  };
+  const existing = w.npcs.findIndex((n) => n.id === id);
+  if (existing >= 0) w.npcs[existing] = npc; else w.npcs.push(npc);
+  return npc;
+}
+
+test('a real idle-youth recruit is also hired into the gang\'s own real enforcer post', () => {
+  const w = minimalDangerousWorld();
+  const gang = organization(w);
+  gang.assets = 1000;
+  membership.joinOrganization(w, { entityId: 1, organizationId: gang.id });
+  makeIdleYouth(w, { id: 2 });
+
+  let result = null;
+  for (let tick = 400; tick < 400 + 8000 && !result; tick += 1) {
+    const recruited = recruitment.runChaosRecruitment(w, { tick });
+    if (recruited.length > 0) result = recruited[0];
+  }
+  assert.ok(result, 'no recruitment happened across 8000 real seeded draws');
+  assert.equal(result.entityId, 2, 'the only real eligible candidate was not the one recruited');
+
+  const job = economy.getEmployment(w, 2);
+  assert.ok(job, 'a real idle-youth recruit walked away with no real occupation at all');
+  assert.equal(job.employer_organization_id, gang.id);
+  assert.equal(job.position, occupations.postFor('gang'));
+  assert.equal(job.position, 'enforcer');
+});
+
+test('a recruit who is NOT a real idle youth is left with no occupation from this pass', () => {
+  const w = minimalDangerousWorld();
+  const gang = organization(w);
+  gang.assets = 1000;
+  membership.joinOrganization(w, { entityId: 1, organizationId: gang.id });
+  // npc 2 is the only other real candidate, with no `createdTick` --
+  // `crime.isIdleYouth` reads that as unknown-age, never idle.
+  w.npcs.push({ id: 2, communityId: 1, status: 'active', home_property_id: null });
+
+  let result = null;
+  for (let tick = 400; tick < 400 + 8000 && !result; tick += 1) {
+    const recruited = recruitment.runChaosRecruitment(w, { tick });
+    if (recruited.length > 0) result = recruited[0];
+  }
+  assert.ok(result, 'no recruitment happened across 8000 real seeded draws');
+  assert.equal(result.entityId, 2);
+  assert.equal(economy.getEmployment(w, result.entityId), null,
+    'a non-idle-youth recruit was hired by this pass -- that is runLabour\'s own separate job, not this one\'s');
+});
+
+test('a recruit who already holds a real job elsewhere is never read as a real idle youth, so this pass never touches their employment', () => {
+  // There is no separate "already employed" guard in `recruitment.js`
+  // for exactly this reason: `crime.isIdleYouth`'s own real definition
+  // (task #166) already excludes anyone holding active employment
+  // anywhere, so `wasIdleYouth` is provably false the moment a
+  // candidate has a real job -- a second, identical check in this
+  // file would be dead code. This asserts the invariant that fact
+  // rests on, rather than a behaviour this branch separately defends.
+  const w = minimalDangerousWorld();
+  const gang = organization(w);
+  const otherGang = organization(w, { type: 'gang' });
+  gang.assets = 1000;
+  membership.joinOrganization(w, { entityId: 1, organizationId: gang.id });
+
+  const idleId = 2;
+  makeIdleYouth(w, { id: idleId });
+  economy.hireEntity(w, {
+    entityId: idleId, employerOrganizationId: otherGang.id, wage: 5, position: 'officer', tick: 399,
+  });
+  assert.equal(crime.isIdleYouth(w, w.npcs.find((n) => n.id === idleId), 400), false,
+    'a real idle youth with an existing job still read as idle -- crime.isIdleYouth\'s own employment exclusion has changed');
+
+  let result = null;
+  for (let tick = 400; tick < 400 + 8000 && !result; tick += 1) {
+    const recruited = recruitment.runChaosRecruitment(w, { tick });
+    if (recruited.length > 0 && recruited[0].entityId === idleId) { result = recruited[0]; break; }
+  }
+  assert.ok(result, 'the already-employed candidate, already resident and eligible, was never recruited at all');
+  const job = economy.getEmployment(w, idleId);
+  assert.equal(job.employer_organization_id, otherGang.id, 'an already-employed recruit was re-hired by the gang that merely recruited them');
+  assert.equal(job.position, 'officer');
 });
 
 // ---------------------------------------------------------------------

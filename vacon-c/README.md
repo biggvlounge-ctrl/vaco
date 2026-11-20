@@ -2234,6 +2234,23 @@ into `tick.js`'s Security phase beside `recruitment.
 runChaosFamilyAbsorption`. See CLAUDE.md's hundred-and-sixty-third
 standing rule.
 
+## Youth join gangs as real enforcers (closes task #170)
+By direct instruction: "some of the youth will join organizations as
+enforcers because they're young and ambitious and strong." Real
+citations: Klein & Maxson (2006, age-graded gang roles -- younger
+members fill the riskiest "foot soldier" posts) and Pyrooz & Sweeten
+(2015, already cited for task #166, real youth gang membership peaking
+at age 14). `recruitment.runChaosRecruitment` now additionally hires a
+recruited real idle youth (task #166) into the organisation's own real
+`enforcer` post (`occupations.postFor`), through the identical real
+`economy.hireEntity` employment gate ordinary labour-market hiring
+already uses -- never a second hiring mechanism, and never a change to
+WHO gets recruited. Caught and fixed a real bug before shipping: the
+idle-youth check has to run BEFORE the membership join, since
+`isIdleYouth`'s own real definition excludes anyone already holding
+organisation membership. See CLAUDE.md's hundred-and-sixty-fourth
+standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

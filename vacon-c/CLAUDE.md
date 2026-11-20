@@ -9567,3 +9567,60 @@ Wired into `tick.js`'s Security phase, immediately beside
 `recruitment.runChaosFamilyAbsorption` — same phase, same real danger
 measure, for the identical reason that call is there rather than in a
 twelfth phase. 9 tests in `test/youth-programs.test.js`.
+
+**A hundred-and-sixty-fourth, task #170, and it is a one-line bug
+(checking a field after changing it) plus a real finding about this
+file's own new code that was worth keeping rather than hiding.** By
+direct instruction: "some of the youth will join organizations as
+enforcers because they're young and ambitious and strong."
+
+**The real literature.** Klein & Maxson (2006, *Street Gang Patterns
+and Policies*) describes an age-graded internal structure — younger
+members fill a gang's riskiest "foot soldier" roles rather than its
+established leadership. Pyrooz & Sweeten (2015), already cited in this
+file for task #166's own idle-youth weight, measures real youth gang
+membership itself peaking at age 14 — the youngest band `crime.
+isIdleYouth` (task #166) already covers. Together they are the real
+basis for hiring a recruited idle youth specifically into the real
+`enforcer` post (`occupations.postFor('gang')`), through the identical
+real employment gate `economy.runLabour`'s own ordinary hiring already
+uses (a real going wage, affordable against the employer's current
+wage bill) — never a second, parallel hiring mechanism.
+
+**The bug, caught by the first test written for it rather than
+shipped.** The first version read `crime.isIdleYouth(worldState, best,
+tick)` AFTER `membership.joinOrganization` had already run. `isIdleYouth`'s
+own real definition (task #166) requires holding no organisation
+membership at all — so the candidate who had just been handed a
+membership row the line before read as no-longer-idle the instant the
+check ran, and the whole branch was permanently dead. Fixed by reading
+`wasIdleYouth` before the join, the same "read the state before you
+change it" shape the sixth standing rule's own field-name lesson is a
+cousin of.
+
+**The finding, found trying to mutation-verify a SECOND gate that
+turned out not to exist.** The first version also carried its own
+`!economy.getEmployment(worldState, best.id)` guard, reasoned as "don't
+double-hire someone already employed." Mutation-testing it (forcing it
+to `true`) changed nothing — every test still passed. Reading why
+rather than assuming the mutation was simply weak: `crime.isIdleYouth`
+ALREADY excludes anyone holding active employment anywhere, as part of
+its own real definition — so by the time `wasIdleYouth` is true, the
+candidate is already provably unemployed, and a second identical check
+can never be the deciding factor. Removed as dead code rather than
+kept as defensive-looking cover; `test/recruitment.test.js`'s own
+replacement test asserts the INVARIANT this rests on directly
+(`crime.isIdleYouth` of an employed candidate is false) rather than a
+behaviour the removed line was never actually producing. This is the
+twentieth standing rule's shape one line over: a guard that cannot
+fail is not protecting anything, whether it is a check on output or a
+second check on an already-guaranteed input.
+
+This never changes WHO gets recruited (`recruitment.js`'s own existing
+highest-real-`influenceRatingOf` selection, task #13, is untouched) —
+only whether a real idle-youth recruit also walks away with the
+organisation's own defining role, which plain membership alone never
+assigns. 3 new tests in `test/recruitment.test.js`, both real gates
+mutation-verified (the idle-youth check: caught; the redundant
+employment check: confirmed genuinely redundant rather than silently
+dropped).

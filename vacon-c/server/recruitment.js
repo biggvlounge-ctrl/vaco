@@ -56,6 +56,8 @@ const influence = require('./influence.js');
 const worldStore = require('./worldStore.js');
 const mortality = require('./mortality.js');
 const characterCreation = require('./characterCreation.js');
+const economy = require('./economy.js');
+const occupations = require('./occupations.js');
 const { seededDraw } = require('./seeded.js');
 
 // No cycle to check here, unlike `justice.js`'s own `ensurePrisonGang`
@@ -148,7 +150,57 @@ function runChaosRecruitment(worldState, options = {}) {
         if (score > bestScore) { best = candidate; bestScore = score; }
       }
 
+      // Read BEFORE joining, deliberately. `crime.isIdleYouth`'s own
+      // real definition (task #166) requires holding no real
+      // organisation membership at all — the membership row this same
+      // candidate is about to receive two lines below would otherwise
+      // make them read as no-longer-idle the instant they are judged,
+      // which would make this entire branch permanently dead.
+      const wasIdleYouth = crime.isIdleYouth(worldState, best, tick);
+
       membership.joinOrganization(worldState, { entityId: best.id, organizationId: organization.id, tick });
+
+      // By direct instruction (task #170): "some of the youth will
+      // join organizations as enforcers because they're young and
+      // ambitious and strong." Real, age-graded gang-role literature
+      // (Klein & Maxson, 2006, *Street Gang Patterns and Policies*)
+      // describes younger members filling an organization's riskiest
+      // "foot soldier" roles rather than its established leadership,
+      // and Pyrooz & Sweeten (2015 — already cited in `crime.js` for
+      // the identical real finding) measure real youth gang membership
+      // itself peaking at age 14, the youngest band `crime.isIdleYouth`
+      // (task #166) covers. So a recruit who WAS a real idle youth is
+      // additionally hired into the real post this organization type
+      // already defines (`occupations.postFor`, `'enforcer'` for a
+      // gang) — through the identical real employment gate
+      // `economy.runLabour`'s own ordinary hiring pass already uses (a
+      // real going wage, affordable against the employer's current
+      // wage bill) — rather than left recruited with no real
+      // occupation at all, which plain membership never assigns. This
+      // never changes WHO is recruited above; an older recruit is
+      // simply left as `runLabour`'s own separate, general hiring
+      // pass would otherwise find them.
+      //
+      // No separate "already employed" guard here — `wasIdleYouth`
+      // already guarantees one: `crime.isIdleYouth`'s own real
+      // definition excludes anyone holding active employment
+      // anywhere, so a second identical check here would be dead
+      // code checking a condition this branch can never actually
+      // reach.
+      if (wasIdleYouth) {
+        const position = occupations.postFor(organization.type);
+        if (position) {
+          const wage = economy.goingWage(worldState, organization.id) ?? 0;
+          const committed = (worldState.employmentRecords || [])
+            .filter((r) => r.status === 'active' && r.employer_organization_id === organization.id)
+            .reduce((total, r) => total + (Number(r.wage) || 0), 0);
+          if ((Number(organization.assets) || 0) >= committed + wage) {
+            economy.hireEntity(worldState, {
+              entityId: best.id, employerOrganizationId: organization.id, wage, position, tick,
+            });
+          }
+        }
+      }
 
       // In-memory only, the same posture `worldState.prisonGangs`/
       // `worldState.streetAffiliates` already carry — no schema
