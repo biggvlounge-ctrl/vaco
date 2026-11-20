@@ -1786,6 +1786,30 @@ same honest "no entity id for the organization itself" treatment
 `runCollapseLooting`'s own incidents already have. See CLAUDE.md's
 hundred-and-twentieth standing rule.
 
+## Extortion (corrupt forces/gangs/tribes vs. arriving businesses)
+Reuses the identical real "who holds this ground when the state does
+not" pair `heat.js` already established, rather than a second
+territory model: `authority.writOf`'s real regime (a `governed` area
+never gets extorted -- the state's own `judge`→`imprison` chain
+already answers it completely) and `authority.holderOf`'s real
+strongest-territory-block faction. `server/extortion.js#runExtortion`
+finds every real business operating a real property in ground a
+faction holds (never the faction's own operated property), demands a
+real, small, bounded fraction of its real `assets`
+(`EXTORTION_DEMAND_FRACTION`), and reads the business leader's real
+`combat.'Composure Under Fire'` trait against the trait scale's own
+neutral centre (50 -- the identical cutoff
+`roguePolice.CORRUPTION_DEFECTION_THRESHOLD` already anchors to) to
+decide pay or refuse. Paying moves real money from the business to the
+faction, recorded as a real `theft` incident. Refusing does NOT call
+`salvage.stripProperty` -- that function refuses an operated business
+on purpose, exactly backwards for a retaliation that targets a
+business still very much operating -- so the property's own real
+`condition` is reduced directly by `salvage.STRIP_CONDITION_COST`'s
+own real magnitude, and real heat (`heat.raiseHeat`) rises between the
+defiant leader and the faction, recorded as a real `property`
+incident. See CLAUDE.md's hundred-and-twenty-second standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

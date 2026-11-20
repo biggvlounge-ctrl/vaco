@@ -84,6 +84,7 @@ const dominance = require('./dominance.js');
 const drugTrade = require('./drugTrade.js');
 const groupFights = require('./groupFights.js');
 const corruption = require('./corruption.js');
+const extortion = require('./extortion.js');
 const tribeMissions = require('./tribeMissions.js');
 const migration = require('./migration.js');
 const environment = require('./environment.js');
@@ -1324,6 +1325,22 @@ function runSecurityPhase(worldState) {
       note: `${incident.category} offence by entity ${incident.perpetrator_entity_id}`,
       tick: incident.tick,
       affected_entity_ids: [incident.perpetrator_entity_id],
+      global_effects: { crimeIncidentId: incident.id, crimeCategory: incident.category },
+    });
+  }
+
+  // **Extortion** (server/extortion.js) -- the identical real
+  // `authority.writOf`/`holderOf` "who holds this ground when the
+  // state does not" pair `heat.js` already uses, reused to let a
+  // faction demand from a real operating business wherever the state
+  // does not fully govern.
+  for (const incident of extortion.runExtortion(worldState, worldState.tick)) {
+    events.push({
+      type: 'crime', severity: incident.severity >= 60 ? 'high' : 'medium',
+      note: `${incident.category} offence by entity ${incident.perpetrator_entity_id}`,
+      tick: incident.tick,
+      affected_entity_ids: [incident.perpetrator_entity_id, incident.victim_entity_id]
+        .filter((id) => id !== null),
       global_effects: { crimeIncidentId: incident.id, crimeCategory: incident.category },
     });
   }

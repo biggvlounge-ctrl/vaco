@@ -7652,3 +7652,77 @@ file's seventeenth standing rule already states for a different
 mechanism), and zeroing the skim fraction are each caught by a real
 test in `test/corruption.test.js`.
 
+**A hundred-and-twenty-second, closing the next pending task: an
+extortion mechanic (corrupt forces/gangs/tribes vs. arriving
+businesses) — and a numbering note worth stating rather than quietly
+working around.** Checking which standing-rule number was actually
+free found that `README.md` and `VACANCY_INVENTORY.md` already cite a
+**hundred-and-twenty-first** standing rule for `server/bluff.js`
+(task #40's bluffing/intimidation mechanic, still `in_progress`) that
+this file itself never received — a real, pre-existing documentation
+gap belonging to that task, not this one. Left exactly as found
+rather than silently backfilled on this task's own turn; this entry
+takes the next genuinely open number, hundred-and-twenty-second.
+
+**The real "who holds this ground when the state does not" pair
+`heat.js` already established is reused directly, rather than a
+second territory model.** `authority.writOf`'s real regime (never
+`governed` — the state's own `judge`→`imprison` chain already answers
+a governed area completely, the identical reasoning `heat.js`'s own
+header gives for leaving government/police heat out of its scope) and
+`authority.holderOf`'s real strongest-territory-block faction are
+exactly the pair `describeAuthority` already calls `holderOf` only
+when `regime !== 'governed'` — checked directly in that function
+before writing this one, not assumed. `server/extortion.js
+#operatingBusinessesIn` finds every real business operating a real
+property in that ground, excluding the faction's own operated
+property by construction — a faction never extorts itself.
+
+**Pay or refuse reuses a real existing trait rather than inventing a
+"willingness to pay" dimension.** `combat.'Composure Under Fire'` —
+the same combat trait family `groupFights.js` already reuses for who
+stands and fights — against the trait scale's own neutral centre (50,
+the identical reused cutoff `roguePolice.CORRUPTION_DEFECTION_
+THRESHOLD` already anchors to) decides it. This is a one-shot draw per
+extortion attempt, never a value sampled repeatedly while rising, so
+the seventeenth standing rule's warning about a repeatedly-sampled
+escalation floor does not apply here the way it did to
+`resolveAggression`.
+
+**Refusal deliberately does NOT call `salvage.stripProperty`.** That
+function refuses an operated business on purpose — its own real,
+already-enforced "this is somebody's home or livelihood, not salvage"
+rule — which is exactly backwards for a refused extortion demand,
+which needs retaliatory damage to a business that is very much still
+operating. The property's own real `condition` is reduced directly
+instead, by `VANDALISM_CONDITION_COST` — set equal to
+`salvage.STRIP_CONDITION_COST` (10), the identical real magnitude this
+engine already uses for "a building took a real damage event," rather
+than a second invented number for the same kind of event. Refusal also
+raises real heat (`heat.raiseHeat`) between the business's leader and
+the faction, reusing that file's own mechanism directly, and is
+recorded as the closest real, already-enumerated crime category
+(`property`) rather than a ninth invented one — the same
+reuse-the-closest-real-category choice `corruption.js` already made
+twice in the entry just above this one. Paying moves a real,
+`crime.BASE_DEPRIVATION_RISK`-rated fraction of the business's own
+`assets` to the faction, recorded as `theft` — the closest real
+category to money taken from an operating business under coercion,
+never `fraud` (no false pretence here).
+
+**A real test-robustness lesson repeated, not re-learned.** The first
+version of three of these tests used a 3000-tick budget against
+`EXTORTION_RATE`'s real per-tick probability, which gives only an
+~83% chance of a single real draw landing — not a reliable guard,
+and not a mutation catch either, confirmed directly: a mutated,
+gate-removed version of the `governed`-regime check passed the
+`governed`-community test outright at that budget. Fixed the same way
+`corruption.test.js`'s own governed-area test already was — a larger
+population (ten real operating businesses) over a larger tick budget
+(5000), giving the mutation ~30 expected real draws to be caught on
+rather than one single draw's worth of luck. Mutation-verified three
+times: removing the `governed`-regime gate, removing the faction
+self-exclusion check, and forcing every demand to comply regardless of
+the business leader's real Composure — each caught by a real test in
+`test/extortion.test.js`.
+
