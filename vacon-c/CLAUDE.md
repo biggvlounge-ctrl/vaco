@@ -7585,3 +7585,70 @@ widening `medicAmong` to ignore the household it was scoped to, and
 widening `MEDICAL_POSITIONS` to count a real `orderly` (SOC 31-1133,
 a real, different, lower-skill occupation `nurse`'s own header already
 distinguishes itself from) are each caught by a real test.
+
+**A hundred-and-twentieth, closing the next pending task: pervasive
+corruption across institutions, plus looting/B&E during collapse —
+and it found a real crash this round's own fixture-only tests could
+not see.**
+
+**"Pervasive... across institutions" generalizes a real cut this
+engine already made three times, rather than inventing a fourth.**
+`roguePolice.js` (police), `justice.js`'s prison-break pass and
+`drugTrade.js`'s prison-smuggling pass (guards/wardens) all already
+read the identical real `leadership.'Corruption Risk'` trait against
+the identical real, measured `CORRUPTION_DEFECTION_THRESHOLD` — the
+trait scale's own neutral centre, not a fitted number. `server/
+corruption.js#runEmbezzlement` reuses both directly rather than a
+second corruption vocabulary, applied to every real, currently-active
+employment record at every real organization with real `assets` —
+pervasive in the literal sense, not scoped to one institution type.
+The skim itself (`EMBEZZLEMENT_SKIM_FRACTION`, flagged interpretive,
+deliberately small) reuses `crime.BASE_DEPRIVATION_RISK` for the
+per-tick rate rather than a second invented order of magnitude.
+
+**"Looting/B&E during collapse" needed no new break-in mechanic at
+all — the real trigger and the real mechanic already existed, just
+never connected.** `authority.writOf`/`regimeFor` already compute, every
+tick, whether a community has gone `lawless` — the real, measured
+"collapse" this engine already tracks. `salvage.stripProperty` already
+exists too, with its own real refusals (an occupied home, an operated
+business, a building already stripped to nothing) built in — before
+this round its only caller was a player's own `strip-building` verb.
+`runCollapseLooting` is the ambient version: in a real lawless
+community, a real resident breaks into a real, eligible, vacant
+building there through the identical function, recorded as a real
+`property` offence.
+
+**The real crash, found running the exact kind of long, real,
+generated-world test the sixteenth standing rule's own header already
+warned would be needed.** `justice.answerByGroup`'s real restitution
+path — `inventory.transfer(fromId: offender, toId: victim)` — has
+always asserted its sender and recipient are different living
+people, and nothing before this round had ever recorded a crime
+incident where they were not. `runEmbezzlement`'s first version named
+`victimId: org.leader_id` unconditionally, so a corrupt LEADER
+embezzling from their OWN organization recorded themselves as their
+own victim — invisible in every unit test built on a hand-made
+fixture, because none of them ran long enough, on a real enough
+world, for a leader to be the one who happened to qualify. It threw
+on the very first 200-tick generated-world test that exercises
+`runSecurityPhase` end to end (`test/authority.test.js`), stopping the
+tick entirely — not a wrong number, the world halted, the sixteenth
+standing rule's own "the tick threw and the world stopped" shape a
+second time. Fixed the same way `runCollapseLooting`'s own victimless
+incidents already were: `victimId` is null whenever the perpetrator
+and the organization's leader are the same real person, because the
+organization itself — not a specific individual — is the honest
+victim of self-dealing, and there is no entity id for an organization
+to name as one.
+
+Mutation-verified three times: removing the `Corruption Risk`
+eligibility gate, removing the `lawless`-regime gate (caught only
+after strengthening the governed-area test's own population and tick
+budget — a first version's 2 residents over 1000 ticks was not
+reliably enough real draws to catch it, the same "a probabilistic
+test has to be given enough trials to be a real guard" lesson this
+file's seventeenth standing rule already states for a different
+mechanism), and zeroing the skim fraction are each caught by a real
+test in `test/corruption.test.js`.
+

@@ -613,7 +613,7 @@ leader this round, an honest gap. Off, every existing world is
 byte-for-byte unaffected.
 
 ## Bluffing and its exposure
-See `CLAUDE.md`'s own fifty-second standing rule for the full design.
+See `CLAUDE.md`'s own hundred-and-twenty-first standing rule for the full design.
 `server/bluff.js` models the gap between what `weapons
 .isFunctioningFirearm` actually verifies and what somebody else
 believes. `POST /api/players/:id/action` gains three verbs:
@@ -1761,6 +1761,30 @@ unstaffed `HOSPITAL_RECOVERY_TICKS` default otherwise even when a
 real referral elsewhere is found, since travelling to a specialist
 buys real expertise but not real speed. See CLAUDE.md's
 hundred-and-nineteenth standing rule.
+
+## Pervasive corruption + looting/B&E during collapse
+Generalizes a real cut this engine already made three times --
+`roguePolice.js`, `justice.js`'s prison breaks, `drugTrade.js`'s prison
+smuggling all already read `leadership.'Corruption Risk'` against the
+real, measured `CORRUPTION_DEFECTION_THRESHOLD` -- rather than
+inventing a fourth. `server/corruption.js#runEmbezzlement` applies
+that same cut to every real, active employment record at every real
+organization with real `assets`, at a real, small, bounded skim
+(`EMBEZZLEMENT_SKIM_FRACTION`), recorded as a real `fraud` incident.
+`runCollapseLooting` needed no new break-in mechanic -- `authority
+.writOf`'s real `lawless` regime is the real "collapse" trigger, and
+`salvage.stripProperty` (previously reachable only through a player's
+own `strip-building` verb) is the real break-in, now also called
+ambiently for a real resident of a real lawless area against a real,
+eligible, vacant property there. **Found and fixed a real crash
+running the first 200-tick generated-world test that exercises this
+end to end**: a corrupt ORGANIZATION LEADER embezzling from their own
+org recorded themselves as their own victim, which `justice
+.answerByGroup`'s real restitution transfer refuses -- `victimId` is
+now null whenever perpetrator and leader are the same person, the
+same honest "no entity id for the organization itself" treatment
+`runCollapseLooting`'s own incidents already have. See CLAUDE.md's
+hundred-and-twentieth standing rule.
 
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a

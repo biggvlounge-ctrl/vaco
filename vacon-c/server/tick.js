@@ -83,6 +83,7 @@ const fraud = require('./fraud.js');
 const dominance = require('./dominance.js');
 const drugTrade = require('./drugTrade.js');
 const groupFights = require('./groupFights.js');
+const corruption = require('./corruption.js');
 const tribeMissions = require('./tribeMissions.js');
 const migration = require('./migration.js');
 const environment = require('./environment.js');
@@ -1298,6 +1299,32 @@ function runSecurityPhase(worldState) {
       tick: worldState.tick,
       affected_entity_ids: [entityId],
       global_effects: {},
+    });
+  }
+
+  // **Pervasive corruption across institutions, and looting/B&E
+  // during collapse** (server/corruption.js) -- the identical real
+  // `leadership.'Corruption Risk'` cut `roguePolice.js`/`justice.js`
+  // already use, generalized to every real employer, and the
+  // identical real `authority.writOf` lawless gate feeding a real,
+  // already-built break-in (`salvage.stripProperty`).
+  for (const incident of corruption.runEmbezzlement(worldState, worldState.tick)) {
+    events.push({
+      type: 'crime', severity: incident.severity >= 60 ? 'high' : 'medium',
+      note: `${incident.category} offence by entity ${incident.perpetrator_entity_id}`,
+      tick: incident.tick,
+      affected_entity_ids: [incident.perpetrator_entity_id, incident.victim_entity_id]
+        .filter((id) => id !== null),
+      global_effects: { crimeIncidentId: incident.id, crimeCategory: incident.category },
+    });
+  }
+  for (const incident of corruption.runCollapseLooting(worldState, worldState.tick)) {
+    events.push({
+      type: 'crime', severity: incident.severity >= 60 ? 'high' : 'medium',
+      note: `${incident.category} offence by entity ${incident.perpetrator_entity_id}`,
+      tick: incident.tick,
+      affected_entity_ids: [incident.perpetrator_entity_id],
+      global_effects: { crimeIncidentId: incident.id, crimeCategory: incident.category },
     });
   }
 
