@@ -9423,3 +9423,70 @@ aptitude entangled with the new penalty. Two new tests close the real
 gap directly — a real tool used as the technique at the unpenalised
 chance, and a real legacy attempt shown to fail at least once in 60
 tries at aptitude 100, which `chance = 1` could never do.
+
+**A hundred-and-sixty-second, closing task #166 — by direct
+instruction: "the kids and the youth having nothing to do during this
+chaos time causes a lot of conflict and a lot of mischievity because
+there's nothing to do. Some areas way worse than others."**
+
+**Real theory, not an invented "troubled youth" flag.** Cohen & Felson
+(1979, *American Sociological Review*) — routine activity theory:
+crime needs a motivated offender, a suitable target, and the ABSENCE
+of capable guardianship. Osgood, Wilson, O'Malley, Bachman & Johnston
+(1996, *American Sociological Review*) is the direct mechanism paper:
+unstructured socialising with peers, with no authority figure present,
+is empirically linked to delinquency. OJJDP's own NIBRS analysis
+(Snyder & Sickmund) finds juvenile violent crime peaks narrowly at
+3-4pm on school days — this round generalises that real after-school
+window to a collapse setting, where school/employment/organisational
+structure can be gone for entire populations rather than for a few
+afternoon hours.
+
+**`crime.isIdleYouth`, not a new population category.** Real idleness:
+within `IDLE_YOUTH_AGE_RANGE` (`[14, 29]` — this is this project's own
+direct instruction for the youth-clique archetype, task #165's "high
+school age to 20 something to 30," carried forward rather than
+re-guessed as a measured statistic), enrolled in neither K-12
+(`npc.schoolEnrolled`) nor a real university (`students.isEnrolled`),
+not actively employed, and holding no real organisation membership at
+all — including a real `'youth clique'` (task #165), since that
+archetype IS the unstructured peer group the real literature
+describes, not a counter-structure to it.
+
+**The one real mechanism this compounds into, the same shape
+`crimeHotspotPacks.js`'s own `hotspotWeight` already is.**
+`runDeprivationCrime`'s existing per-tick draw against
+`BASE_DEPRIVATION_RISK` now also multiplies by `IDLE_YOUTH_WEIGHT`
+(1.14) for a real idle-youth perpetrator — never a second, parallel
+crime mechanism, and deliberately NOT `keys.resolveAggression`, for
+the identical restraint `crimeHotspotPacks.js`'s own header already
+states: that mechanism's floor and rate cost the seventeenth standing
+rule's own four measured attempts to calibrate, and grafting an
+unmeasured real weight onto it would risk re-breaking that work.
+`IDLE_YOUTH_WEIGHT` itself is flagged interpretive but not ungrounded:
+Villa (2024, IFS/Warwick working paper, not yet peer-reviewed) found a
+real 14% increase in crime among 10-17-year-olds in London areas where
+youth clubs closed (2010-2019) — the closest real, cited magnitude for
+"losing structure raises youth crime" this round could find, named as
+a single working paper with the same honesty this registry already
+gives other single-study figures.
+
+**"Some areas way worse than others" falls out of the existing model,
+not a new variance term.** `hotspotWeight` already varies by community
+(LA/Chicago only; everywhere else is 1), `scarcity`/`pressure` already
+vary by city and by person, and `isIdleYouth` itself varies by real,
+already-generated school/employment/membership facts — compounding a
+real idle-youth multiplier into an already-variable mechanism produces
+real area-to-area variation for free, rather than inventing a second
+one.
+
+Mutation-verified twice: forcing `idleYouthWeight` to a constant `1`
+(caught, 34/35) and disabling the organisation-membership check inside
+`isIdleYouth` (caught, 34/35) — both confirmed restored
+byte-identical afterward. The statistical test measures a real 150-
+person idle cohort against a real 150-person ordinary-adult cohort
+over 4,000 ticks (not a single pair over many ticks — `BASE_
+DEPRIVATION_RISK` is too small for that to produce a measurable count
+in a practical test), and checks the measured ratio lands near the
+real 1.14 itself, not merely "idle offends more" — a wrong weight
+(1.0, or 3.0) would still pass the weaker check.

@@ -190,6 +190,62 @@ const GENERATED_CATEGORIES = CRIME_CATEGORIES.filter((c) => CATEGORIES[c].genera
 const BASE_DEPRIVATION_RISK = 0.0006;   // per tick, at full deprivation
 const SCARCITY_WEIGHT = 0.5;            // how much a shortage adds on top of poverty
 
+//: **Idle youth, by direct instruction: "kids and the youth having
+//: nothing to do during this chaos time causes a lot of conflict and
+//: a lot of mischievity because there's nothing to do. Some areas way
+//: worse than others."** Real theory: Cohen & Felson (1979, American
+//: Sociological Review) — routine activity theory, crime needs a
+//: motivated offender, a suitable target, and the ABSENCE of capable
+//: guardianship. Osgood, Wilson, O'Malley, Bachman & Johnston (1996,
+//: American Sociological Review) is the direct mechanism paper:
+//: unstructured socialising with peers, with no authority figure
+//: present, is empirically linked to delinquency. OJJDP's own NIBRS
+//: analysis (Snyder & Sickmund) finds juvenile violent crime peaks
+//: narrowly at 3-4pm on school days — the real after-school window
+//: this file's own `isIdleYouth` generalises to a COLLAPSE setting,
+//: where school/employment/organisational structure can be gone for
+//: entire populations rather than for a few afternoon hours. The age
+//: band itself is not a measured statistic — it is this project's own
+//: direct instruction for the youth-clique archetype (task #165:
+//: "high school age to 20 something to 30"), carried forward rather
+//: than re-guessed.
+const IDLE_YOUTH_AGE_RANGE = [14, 29];
+
+//: Flagged interpretive, but not ungrounded: Villa (2024, IFS/Warwick
+//: working paper, not yet peer-reviewed) found a real 14% INCREASE in
+//: crime among 10-17-year-olds in London areas where youth clubs
+//: closed (2010-2019) — the closest real, cited magnitude for "losing
+//: structure raises youth crime" this project could find. Named as a
+//: single working paper, the same honesty this registry already gives
+//: single-study figures elsewhere (e.g. Milwaukee's midnight-
+//: basketball evaluation).
+const IDLE_YOUTH_WEIGHT = 1.14;
+
+// Real idleness, not an invented "troubled youth" flag: within the
+// real age band, enrolled in neither K-12 (`npc.schoolEnrolled`) nor a
+// real university (`students.isEnrolled`), not actively employed
+// anywhere, and holding no real organisation membership at all —
+// including a real `'youth clique'` (task #165), since that archetype
+// is itself the unstructured peer group the real literature describes,
+// not a counter-structure to it.
+function isIdleYouth(worldState, npc, tick = worldState.tick ?? 0) {
+  const age = mortality.ageInYears(worldState, npc, tick);
+  if (age === null || age < IDLE_YOUTH_AGE_RANGE[0] || age > IDLE_YOUTH_AGE_RANGE[1]) return false;
+  if (npc.schoolEnrolled) return false;
+  // eslint-disable-next-line global-require
+  const students = require('./students.js');
+  if (students.isEnrolled(npc)) return false;
+  const employed = (worldState.employmentRecords || []).some(
+    (r) => r.status === 'active' && r.entity_id === npc.id,
+  );
+  if (employed) return false;
+  const inAnyOrg = (worldState.entityOrganizationMemberships || []).some(
+    (m) => m.entity_id === npc.id,
+  );
+  if (inAnyOrg) return false;
+  return true;
+}
+
 // Severity, 0..100, in the same currency as `events.severity` and
 // `historical_records.significance` so the three agree.
 const SEVERITY = {
@@ -671,7 +727,14 @@ function runDeprivationCrime(worldState, tick = worldState.tick ?? 0) {
     // this existed.
     const community = (worldState.communities || []).find((c) => c.id === npc.communityId);
     const hotspotWeight = community?.crimeHotspotWeight ?? 1;
-    if (seededDraw([npc.id, tick, 'crime:deprivation']) >= pressure * BASE_DEPRIVATION_RISK * hotspotWeight) continue;
+    // **Idle youth (task #166), the real, cited extension of the
+    // identical shape `hotspotWeight` already is**: a real multiplier
+    // on this one already-generated mechanism, never a second,
+    // disagreeing one. See `isIdleYouth`'s own header for the real
+    // citations and why `IDLE_YOUTH_WEIGHT` is what it is.
+    const idleYouthWeight = isIdleYouth(worldState, npc, tick) ? IDLE_YOUTH_WEIGHT : 1;
+    if (seededDraw([npc.id, tick, 'crime:deprivation'])
+      >= pressure * BASE_DEPRIVATION_RISK * hotspotWeight * idleYouthWeight) continue;
 
     const target = targetsByCommunity.get(npc.communityId);
     // Never the offender themselves — a world with one rich person in
@@ -975,6 +1038,9 @@ module.exports = {
   CRIME_CATEGORIES,
   GENERATED_CATEGORIES,
   BASE_DEPRIVATION_RISK,
+  IDLE_YOUTH_AGE_RANGE,
+  IDLE_YOUTH_WEIGHT,
+  isIdleYouth,
   FRICTION_CONTACT_FLOOR,
   FRICTION_STRAIN_FLOOR,
   FRICTION_RATE,

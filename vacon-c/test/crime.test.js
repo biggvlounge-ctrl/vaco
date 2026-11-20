@@ -727,3 +727,98 @@ test('the reference is above what the engine actually produces', () => {
     + 'populated area will read as maximally dangerous');
   assert.ok(crime.SHRINKAGE_EXPOSURE > 0);
 });
+
+// ---------------------------------------------------------------------
+// isIdleYouth (task #166)
+// ---------------------------------------------------------------------
+
+function youth(worldState, ageYears, overrides = {}) {
+  const npc = {
+    id: nextId++, status: 'active', communityId: null, home_property_id: null,
+    createdTick: worldState.tick - ageYears * 365, schoolEnrolled: false,
+    enrolledUniversityId: null, ...overrides,
+  };
+  worldState.npcs.push(npc);
+  return npc;
+}
+
+test('isIdleYouth is true for a real person inside the age band with no school, job or real membership', () => {
+  const w = world();
+  w.entityOrganizationMemberships = [];
+  const idle = youth(w, 19);
+  assert.equal(crime.isIdleYouth(w, idle), true);
+});
+
+test('isIdleYouth is false outside the real age band — the project\'s own youth-clique instruction, not a measured statistic', () => {
+  const w = world();
+  w.entityOrganizationMemberships = [];
+  const tooYoung = youth(w, 10);
+  const tooOld = youth(w, 40);
+  assert.equal(crime.isIdleYouth(w, tooYoung), false);
+  assert.equal(crime.isIdleYouth(w, tooOld), false);
+});
+
+test('isIdleYouth is false for a real K-12 enrollee, a real university student, a real employee, or a real org member', () => {
+  const w = world();
+  w.entityOrganizationMemberships = [];
+  const inSchool = youth(w, 16, { schoolEnrolled: true });
+  const inUni = youth(w, 20, { enrolledUniversityId: 500 });
+  const employed = youth(w, 22);
+  w.employmentRecords.push({ entity_id: employed.id, status: 'active', position: 'clerk' });
+  const member = youth(w, 18);
+  w.entityOrganizationMemberships.push({ entity_id: member.id, organization_id: 999 });
+
+  assert.equal(crime.isIdleYouth(w, inSchool), false);
+  assert.equal(crime.isIdleYouth(w, inUni), false);
+  assert.equal(crime.isIdleYouth(w, employed), false);
+  assert.equal(crime.isIdleYouth(w, member), false);
+});
+
+test('isIdleYouth is false for an entity with no real createdTick — unknown age is not idle by default', () => {
+  const w = world();
+  w.entityOrganizationMemberships = [];
+  const unknownAge = { id: nextId++, status: 'active', communityId: null, home_property_id: null };
+  w.npcs.push(unknownAge);
+  assert.equal(crime.isIdleYouth(w, unknownAge), false);
+});
+
+test('the real idle-youth offence ratio tracks IDLE_YOUTH_WEIGHT itself, measured over a real cohort', () => {
+  // Statistical, not a single deterministic draw -- the same "measure
+  // a population" discipline this engine's own trait-family tests use,
+  // because `BASE_DEPRIVATION_RISK` is small enough that one person
+  // over a practical number of ticks gives too few incidents to read
+  // a ratio from. A real cohort of otherwise-identical idle youths and
+  // ordinary adults, same community, maximal real deprivation pressure
+  // (net worth 0, poverty line 0).
+  const w = world();
+  const community = territory.generateCommunity(w, {});
+  const idleIds = new Set();
+  const adultIds = new Set();
+  for (let i = 0; i < 150; i += 1) {
+    const idle = youth(w, 19, { communityId: community.id });
+    economy.generateIndividualFinances(w, idle.id, { savings: 0, tick: w.tick });
+    idleIds.add(idle.id);
+    const adult = youth(w, 40, { communityId: community.id });
+    economy.generateIndividualFinances(w, adult.id, { savings: 0, tick: w.tick });
+    adultIds.add(adult.id);
+  }
+  w.entityOrganizationMemberships = [];
+
+  let idleCount = 0;
+  let adultCount = 0;
+  for (let t = 1; t <= 4000; t += 1) {
+    const before = w.crimeIncidents.length;
+    crime.runDeprivationCrime(w, t);
+    for (const c of w.crimeIncidents.slice(before)) {
+      if (idleIds.has(c.perpetrator_entity_id)) idleCount += 1;
+      else if (adultIds.has(c.perpetrator_entity_id)) adultCount += 1;
+    }
+  }
+  assert.ok(adultCount > 150, `the baseline count (${adultCount}) is too small to measure a ratio against`);
+  const ratio = idleCount / adultCount;
+  assert.ok(
+    Math.abs(ratio - crime.IDLE_YOUTH_WEIGHT) < 0.12,
+    `measured idle/adult ratio ${ratio.toFixed(3)} does not track the real `
+    + `IDLE_YOUTH_WEIGHT of ${crime.IDLE_YOUTH_WEIGHT}`,
+  );
+});

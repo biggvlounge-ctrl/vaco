@@ -2195,6 +2195,24 @@ flagged penalty, since NICB's own analysis documents both legacy
 methods as obsolete against a modern immobiliser. See CLAUDE.md's
 hundred-and-sixty-first standing rule.
 
+## Idle-youth mischief (closes task #166)
+`crime.isIdleYouth` identifies a real idle youth -- age 14-29 (this
+project's own direct instruction for the youth-clique archetype),
+enrolled in no real school, employed nowhere, and a member of no real
+organisation (including a real `'youth clique'`, since that archetype
+IS the unstructured peer group the real literature describes). Real
+citations: Cohen & Felson (1979, routine activity theory) and Osgood
+et al. (1996, unstructured peer socialising -> delinquency), both
+*American Sociological Review*. `runDeprivationCrime`'s existing
+per-tick draw now multiplies by a real, flagged `IDLE_YOUTH_WEIGHT`
+(1.14, anchored to Villa 2024's real measured 14% youth-crime increase
+when London youth clubs closed) for a real idle-youth perpetrator --
+the same compounding shape `crimeHotspotPacks.js`'s own `hotspotWeight`
+already uses, deliberately kept out of the separately-calibrated
+`keys.resolveAggression`. "Some areas way worse than others" falls out
+of the existing area-varying mechanism for free. See CLAUDE.md's
+hundred-and-sixty-second standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a
