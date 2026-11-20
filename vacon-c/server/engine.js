@@ -83,6 +83,7 @@ const mainCharacters = require('./mainCharacters.js');
 const missionTriggers = require('./missionTriggers.js');
 const contacts = require('./contacts.js');
 const bluff = require('./bluff.js');
+const gossip = require('./gossip.js');
 const territory = require('./territory.js');
 const missions = require('./missions.js');
 const property = require('./property.js');
@@ -1125,6 +1126,10 @@ function assessThreat(entityId, options = {}) {
   return bluff.assessThreat(WorldState, { entityId, targetId: options.targetId });
 }
 
+function askAround(askerId, options = {}) {
+  return gossip.askAround(WorldState, askerId, options.subjectEntityId);
+}
+
 function callBluff(challengerId, options = {}) {
   return bluff.callBluff(WorldState, {
     challengerId, targetId: options.targetId, tick: WorldState.tick,
@@ -1326,6 +1331,7 @@ const ACTION_VERBS = {
   intimidate: (...args) => intimidate(...args),
   assessThreat: (...args) => assessThreat(...args),
   callBluff: (...args) => callBluff(...args),
+  askAround: (...args) => askAround(...args),
   beginJourney: (...args) => beginJourney(...args),
   getActiveJourney: (...args) => getActiveJourney(...args),
   establishCamp: (...args) => establishCamp(...args),
@@ -2024,6 +2030,7 @@ module.exports = {
   intimidate,
   assessThreat,
   callBluff,
+  askAround,
   getInfluenceRating,
   getPersonalInfluence,
   getFamilyPoliticalInfluence,

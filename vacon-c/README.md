@@ -1904,6 +1904,20 @@ is in-memory only, the same documented posture
 `worldState.prisonGangs`/`city.healthBaseline` already carry. See
 CLAUDE.md's hundred-and-twenty-seventh standing rule.
 
+## Gossip / word-of-mouth "ask around" verb
+`espionage.js`'s own header already named word-of-mouth as real via
+`media.js`'s `word_of_mouth` channel; nothing had ever asked
+`worldStore.getKnowledge` on a player's behalf. `server/gossip.js
+#askAround` queries every real other resident of the asker's own
+community and returns the single most-confident real row among them
+— never a blend, never a fabricated placeholder — excluding both the
+asker's own knowledge and the subject's self-knowledge. Deliberately
+no invented "willingness to gossip" draw, the same reasoning
+`meetings.js`'s header already gives for not inventing a persuasion
+modifier on an ordinary conversation. `POST /api/players/:id/action`
+verb `ask-around` (modes `citizen`/`leader`). See CLAUDE.md's
+hundred-and-twenty-eighth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

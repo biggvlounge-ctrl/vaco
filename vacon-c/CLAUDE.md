@@ -8070,3 +8070,58 @@ forced to always return null, the governed-regime gate removed, the
 (fixed) idempotence gate removed, and `control.js`'s real `seize`
 write reverted to the old no-op — all four caught.
 
+**A hundred-and-twenty-eighth, closing the last of this "next five"
+set: a player-facing "ask around" verb — and the real mechanism it
+surfaces was already named, elsewhere, as already real.**
+
+`espionage.js`'s own header already said so directly: "word-of-mouth
+is already real... that channel is how ordinary facts already spread
+to everybody," distinguishing it from a sponsored spy's own composite
+listening score. `media.js`'s `word_of_mouth` channel and
+`worldStore.getKnowledge` (the real one-person "what does entity X
+know about subject Y" reader) were both already real; nothing had
+ever asked `getKnowledge` on a player's behalf, let alone aggregated
+it across more than one person.
+
+**`server/gossip.js#askAround` is that aggregation and nothing more.**
+It queries every real OTHER resident of the asker's own community
+(`npc.communityId`, the identical field `crime.dangerByCommunity`/
+`migration.workByCommunity` already filter on) and returns the single
+most-confident real row among them — never a blend, never a
+fabricated "nobody knows anything specific, but..." placeholder. The
+asker's own knowledge and the subject's own self-knowledge are both
+excluded — asking around means asking OTHERS.
+
+**No invented "willingness to gossip" draw, on purpose.** The obvious
+build gates this on a social trait the way `espionage.js`'s own
+spy-listening score does. `meetings.js`'s own header already argues
+against inventing a persuasion modifier for an ordinary conversation —
+"it invents no modifier, and that is the whole design" — and asking a
+neighbour something they already know is the same ordinary kind of
+interaction, not a contested, risk-bearing act. The honest fact
+already does or does not exist in the world; surfacing it
+deterministically is not a fabrication either way, and a probability
+nobody measured would be. Wired into `engine.js` (`askAround`,
+dispatched alongside `assessThreat`/`callBluff`) and `actions.js`
+(verb `ask-around`, modes `citizen`/`leader`).
+
+**A non-robust mutation test, caught the same way the hundred-and-
+twenty-seventh rule's idempotence test was, and for the same root
+cause: a loop order that was never actually what the test thought it
+was testing.** The first "highest confidence wins, not row order"
+test created a weak-rumor resident and a strong-rumor resident in that
+order, then called `knows()` for the strong rumor FIRST and the weak
+one SECOND — trying to make "last knowledge recorded wins" diverge
+from "highest confidence wins." It does not: `askAround` iterates
+`residentsToAsk`'s result in `worldState.npcs` ARRAY order (creation
+order), never knowledge-recording order, so mutating the comparison to
+an unconditional `best = row` still processed the strong-rumor
+resident last (because they were CREATED last) and produced the
+identical, correct-looking answer. The mutation went uncaught (11/11
+still passing). Fixed by creating the strong-rumor resident FIRST and
+the weak-rumor resident SECOND, so "last resident processed" and
+"highest confidence" point at different rows — re-verified the
+mutation then failed as expected (10/11). Mutation-verified twice in
+total: the confidence comparison and `residentsToAsk`'s community
+filter — both caught.
+

@@ -311,6 +311,14 @@ const ACTIONS = {
     run: (verbs, actorId, body) => verbs.callBluff(actorId, { targetId: Number(body.targetId) }),
   },
 
+  'ask-around': {
+    summary: 'Ask around your own neighbourhood for whatever anybody there really knows about someone -- the most confident real rumor among your neighbours, or nothing at all if nobody does.',
+    modes: ['citizen', 'leader'],
+    requires: ['subjectEntityId'],
+    verbs: ['askAround'],
+    run: (verbs, actorId, body) => verbs.askAround(actorId, { subjectEntityId: Number(body.subjectEntityId) }),
+  },
+
   'find-contact': {
     summary: 'Find a real friend, classmate, associate or family member matching what you need -- or, failing that, meet somebody new who fits.',
     modes: ['citizen', 'leader'],
