@@ -614,3 +614,23 @@ test('a property in a dangerous community decays faster than the identical one w
   }
   assert.equal(unmeasuredShop.condition, quietShop.condition);
 });
+
+// ---------------------------------------------------------------------
+// isCondemned -- "vacant/abandoned/CONDEMNED property takeover"
+// ---------------------------------------------------------------------
+
+test('a property at or below the real condemned floor is condemned', () => {
+  assert.equal(property.isCondemned({ condition: property.CONDEMNED_CONDITION_FLOOR }), true);
+  assert.equal(property.isCondemned({ condition: property.CONDEMNED_CONDITION_FLOOR - 1 }), true);
+  assert.equal(property.isCondemned({ condition: 0 }), true);
+});
+
+test('a property above the real condemned floor is not condemned', () => {
+  assert.equal(property.isCondemned({ condition: property.CONDEMNED_CONDITION_FLOOR + 1 }), false);
+  assert.equal(property.isCondemned({ condition: 80 }), false);
+});
+
+test('isCondemned never throws on a missing property or a missing real condition', () => {
+  assert.equal(property.isCondemned(null), false);
+  assert.equal(property.isCondemned({}), false);
+});

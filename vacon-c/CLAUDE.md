@@ -7946,3 +7946,74 @@ organization outgrows its real structure), and forcing
 organization would otherwise read as fully, trivially covered) — each
 caught by a real test in `test/subgovernment.test.js`.
 
+**A hundred-and-twenty-sixth, closing a "next five" set to the next
+round: vacant/abandoned/condemned property takeover + impoverished-
+area NPC migration — and a real regression caught by this project's
+own real-world integration test before it could ship.**
+
+**Vacant/abandoned takeover needed no new mechanic — checked directly
+first.** `control.js#compositionFor` already handles it: "at least one
+person, always: something held by nobody still has to be walked into."
+`viableTargetsFor`/`attempt` already offer every property, held or
+not, as a real target. Nothing to add.
+
+**"Condemned" is the one real state `condition` never named on its
+own.** `property.isCondemned`/`CONDEMNED_CONDITION_FLOOR` close it,
+anchored to the identical real magnitude this round's own earlier
+work already established (`salvage.STRIP_CONDITION_COST`/`extortion
+.VANDALISM_CONDITION_COST`, both 10) rather than a fresh guess — a
+building at or below one more real damage event's worth of condition.
+`migration.vacanciesByCommunity` excludes a condemned property from
+the real destination pool, the identical real exclusion shape it
+already uses for the hero apartment-complex category two lines above.
+
+**"Impoverished-area NPC migration" found a real, already-computed
+fact nothing read — `areaStats.statsFor`'s own `povertyRate` — and the
+first way of wiring it in broke a real, working mechanism, caught only
+because this project's own real-world integration test is run as part
+of this work rather than skipped.** The first version added
+`povertyRate` to `desirability` as an equal third term alongside
+`danger`/`work`. `test/migration.test.js`'s own real 300-tick
+generated-world test (`'a running world moves people, at most
+occasionally'`) went from 5 real migration events to 0. The cause:
+`PULL_MARGIN`'s own header already documents it sitting "above the
+99th percentile" of an already razor-thin edge distribution,
+deliberately left uncalibrated — "both of these were picked from what
+a number sounds like, and both are measurably wrong. Neither has been
+changed yet, on purpose" — specifically because the seventeenth
+standing rule's trap (a snapshot percentile does not survive repeated
+sampling) makes recalibrating it its own dedicated modelling decision,
+not incidental to an unrelated feature. Diluting `danger`/`work` from
+a combined weight of 1.0 to 2/3 shrank the real spread between
+communities below what that margin needs to ever fire.
+
+**The fix routes poverty through `pushFor` instead, never touching
+`desirability` at all.** A resident of a community whose real poverty
+rate exceeds a real floor (`POVERTY_PUSH_FLOOR`, 0.5 — "more than half
+this community's own residents are below the real poverty line") is
+pushed (`economic`/`area_poverty`) even when their OWN individual need
+has not crossed `PUSH_FLOOR` — reusing the real `economic` migration
+type `income`/`food` already use, and `PUSH_BY_NEED.food`'s own real
+weight rather than a fourth invented number. `povertyByCommunity`
+computes the real world poverty LINE once per pass
+(`areaStats.povertyLine`) and reads each community's rate against it —
+the identical real reuse `areaStats.statsForAll` already established,
+found necessary only after a first version recomputed the line once
+PER COMMUNITY, per tick, which is the whole world's population read
+again for every community every tick and the reason the same
+integration test's run time spiked to 85+ seconds before this fix.
+
+**A second real bug found by the identical real-world test, unrelated
+to the formula**: `economy.getLatestFinances` assumes
+`worldState.individualFinances` exists, and `test/migration.test.js`'s
+own shared `world()` fixture never included it, because nothing in
+this file had ever needed it before. Fixed in the fixture, the same
+missing-array shape every other real fixture in this codebase already
+avoids by including it.
+
+Mutation-verified three times: forcing `isCondemned` to always return
+false, removing `vacanciesByCommunity`'s condemned exclusion, and
+removing `pushFor`'s `POVERTY_PUSH_FLOOR` gate — each caught by a real
+test in `test/property.test.js`/`test/migration.test.js`, including
+the real 300-tick generated-world test staying green throughout.
+

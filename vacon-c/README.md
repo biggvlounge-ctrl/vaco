@@ -1869,6 +1869,26 @@ have no real conflict column to drag against, stated plainly rather
 than inventing one. See CLAUDE.md's hundred-and-twenty-fifth standing
 rule.
 
+## Vacant/abandoned/condemned property takeover + impoverished-area migration
+`control.js#compositionFor`/`attempt` already handle vacant/abandoned
+takeover with no changes needed — "at least one person, always:
+something held by nobody still has to be walked into." The real gaps:
+`property.isCondemned`/`CONDEMNED_CONDITION_FLOOR` name the one state
+`condition` never named on its own (anchored to `salvage.
+STRIP_CONDITION_COST`/`extortion.VANDALISM_CONDITION_COST`'s real 10),
+and `migration.vacanciesByCommunity` now excludes one from the real
+destination pool. "Impoverished-area NPC migration" reuses
+`areaStats.statsFor`'s own real, already-computed `povertyRate` as a
+NEW push channel in `pushFor` (`economic`/`area_poverty`) rather than
+a third term on `desirability`'s own destination-comparison formula —
+a real 300-tick generated-world measurement found that diluting
+`desirability` drove migration to zero, because `PULL_MARGIN` already
+sits at the 99th percentile of an already razor-thin edge
+distribution, deliberately left uncalibrated pending its own dedicated
+round (see that constant's own header). Poverty pushes residents
+instead, leaving the fragile margin untouched. See CLAUDE.md's
+hundred-and-twenty-sixth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

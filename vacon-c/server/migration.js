@@ -50,6 +50,7 @@ const crime = require('./crime.js');
 const countryPacks = require('./countryPacks.js');
 const regionalTemperamentPacks = require('./regionalTemperamentPacks.js');
 const motivation = require('./motivation.js');
+const propertyModule = require('./property.js');
 const { seededDraw } = require('./seeded.js');
 
 let nextMigrationId = 1;
@@ -295,12 +296,46 @@ function regionOfCity(worldState, cityId) {
 // Why somebody would leave
 // ---------------------------------------------------------------------
 
+//: How high a real community poverty rate has to be before the AREA
+//: itself — not any one person's own need — is a reason to leave.
+//: Flagged interpretive, no document sets one; 0.5 reads as "more
+//: than half this community's own residents are below the real
+//: poverty line", which is the plain-language meaning of "impoverished
+//: area" rather than a fitted number.
+const POVERTY_PUSH_FLOOR = 0.5;
+//: Reused, not invented fresh: the identical real weight `PUSH_BY_NEED
+//: .food` already carries. An area-level statistic is a real but less
+//: individually certain signal than a person's own unmet need, so it
+//: is not given `housing`/`safety`'s full weight of 1 — but it is a
+//: real economic condition exactly like `food`, so it takes that
+//: existing weight rather than a fourth number invented to sit between
+//: the ones already here.
+const POVERTY_PUSH_WEIGHT = PUSH_BY_NEED.food.weight;
+
 // How hard this person is being pushed out, 0..1, and what kind of move
-// it would be. Null when they have no needs recorded — unknown is not
-// contentment.
-function pushFor(worldState, entityId) {
+// it would be. Null when they have no needs recorded and no real area
+// poverty push applies — unknown is not contentment.
+//
+// **The real area-level channel, by direct instruction: "impoverished-
+// area NPC migration."** `options.povertyRate` is the person's own
+// community's real `areaStats.statsFor(...).povertyRate` — passed in
+// by the caller (`runMigration` computes it once for the whole pass,
+// the same real reuse `areaStats.statsForAll` already established,
+// never recomputed per person) rather than read here, because reading
+// it per call would recompute the real world-wide poverty LINE once
+// per person, per tick. A resident of a genuinely impoverished area is
+// pushed even when their OWN individual need has not crossed
+// `PUSH_FLOOR` — the area itself, not just the person, can be the
+// reason to leave. Recorded as `economic`, the identical real
+// migration type `income`/`food` already use — poverty is an economic
+// condition, never a type invented to say so a second way.
+//
+// **Deliberately independent of `desirability`'s own destination-
+// comparison formula** — see `WORK_WEIGHT`'s own header for the real,
+// measured reason a third term was NOT added there instead.
+function pushFor(worldState, entityId, options = {}) {
+  const { povertyRate = null } = options;
   const rows = motivation.needsOf(worldState, entityId);
-  if (rows.length === 0) return null;
 
   let worst = null;
   for (const row of rows) {
@@ -313,6 +348,15 @@ function pushFor(worldState, entityId) {
       worst = { pressure: Math.max(0, Math.min(1, pressure)), type: push.type, need: row.need_type };
     }
   }
+
+  if (povertyRate !== null && povertyRate > POVERTY_PUSH_FLOOR) {
+    const pressure = Math.max(0, Math.min(1,
+      ((povertyRate - POVERTY_PUSH_FLOOR) / (1 - POVERTY_PUSH_FLOOR)) * POVERTY_PUSH_WEIGHT));
+    if (!worst || pressure > worst.pressure) {
+      worst = { pressure, type: 'economic', need: 'area_poverty' };
+    }
+  }
+
   return worst;
 }
 
@@ -343,6 +387,26 @@ function willingness(worldState, entityId) {
 //: `forced` (housing, safety) and `economic` (income, food) — are about
 //: equally common, and weighting one over the other would be choosing
 //: which kind of hardship matters more with nothing to base it on.
+//:
+//: **Deliberately NOT a third, diluted term for area poverty rate.**
+//: The first version of this round's own "impoverished-area NPC
+//: migration" work added `povertyRate` here as an equal third term —
+//: and a real, generated-world, 300-tick measurement (the identical
+//: real integration test `test/migration.test.js` already runs) found
+//: it drove migration to ZERO (5 real moves on the baseline, 0 after).
+//: `PULL_MARGIN` just below sits at the 99th percentile of an already
+//: razor-thin edge distribution (see that constant's own header —
+//: "communities... are not fifteen points of desirability apart... 0.05%
+//: of decisions clear it"), left deliberately uncalibrated pending its
+//: own dedicated round under the seventeenth standing rule's own
+//: warning against exactly this: "a snapshot percentile does not
+//: survive repeated sampling... choosing these two numbers... is not
+//: this commit." Diluting `danger`/`work` from a combined weight of
+//: 1.0 to 2/3 shrank the real spread between communities below what
+//: that already-fragile margin needs to ever fire — not a poverty-rate
+//: bug, a margin-calibration one this round has no business touching
+//: incidentally. Poverty is read as a real PUSH signal instead, in
+//: `pushFor` below, which never touches this margin at all.
 const WORK_WEIGHT = 0.5;
 
 // How good a community is to live in, 0..1. Higher is better.
@@ -366,6 +430,29 @@ function desirability(worldState, communityId, shared) {
   const work = shared.work.get(communityId) ?? 0;
   return Math.max(0, Math.min(1,
     (1 - danger) * (1 - WORK_WEIGHT) + work * WORK_WEIGHT));
+}
+
+// Real community-level poverty rate, by id — `areaStats.statsFor`'s
+// own already-computed `povertyRate`, never a second poverty
+// calculation invented here. Absent from the map (rather than a
+// default) for a community `statsFor` itself could not measure, the
+// identical "absent, not zero" shape `workByCommunity` already uses
+// for an empty community.
+function povertyByCommunity(worldState) {
+  // The real line, computed exactly ONCE for every community in this
+  // pass — the identical real reuse `areaStats.statsForAll` already
+  // established for the same reason: `povertyLine` maps every real
+  // NPC's net worth, and recomputing it once per community (this
+  // file's own first version) is the whole world's population read
+  // again for every single community, every single migration tick.
+  const line = areaStats.povertyLine(worldState);
+  const share = new Map();
+  for (const community of worldState.communities || []) {
+    const rate = areaStats.statsFor(worldState, community.id, { line }).povertyRate;
+    if (rate === null) continue;
+    share.set(community.id, rate);
+  }
+  return share;
 }
 
 // Jobs per resident in each community, capped at 1. A community where
@@ -416,6 +503,14 @@ function vacanciesByCommunity(worldState) {
     // category), so it is excluded rather than silently misused.
     if (property.landmark_category) continue;
     if (taken.has(property.id)) continue;
+    // By direct instruction: "vacant/abandoned/CONDEMNED property
+    // takeover." A condemned building (`propertyModule.isCondemned`,
+    // real condition at or below a real floor) is empty the same way
+    // a merely vacant one is, but moving a migrating family INTO it
+    // would be the opposite of what "condemned" means — excluded from
+    // the destination pool for the identical reason the hero
+    // apartment-complex category already is two lines above.
+    if (propertyModule.isCondemned(property)) continue;
     const list = vacant.get(property.community_id) ?? [];
     list.push(property.id);
     vacant.set(property.community_id, list);
@@ -617,6 +712,7 @@ function runMigration(worldState, options = {}) {
     danger: crime.dangerByCommunity(worldState),
     vacancies: vacanciesByCommunity(worldState),
     work: workByCommunity(worldState),
+    poverty: povertyByCommunity(worldState),
   };
 
   // When each person last moved, built once for the pass.
@@ -627,7 +723,8 @@ function runMigration(worldState, options = {}) {
   }
 
   (worldState.npcs || []).forEach((npc, index) => {
-    const push = pushFor(worldState, npc.id);
+    const povertyRate = npc.communityId == null ? null : (shared.poverty.get(npc.communityId) ?? null);
+    const push = pushFor(worldState, npc.id, { povertyRate });
     if (!push || push.pressure <= 0) return;
 
     // Still settling in from the last move — see SETTLING_TICKS.
@@ -731,8 +828,11 @@ module.exports = {
   pushFor,
   willingness,
   WORK_WEIGHT,
+  POVERTY_PUSH_FLOOR,
+  POVERTY_PUSH_WEIGHT,
   desirability,
   workByCommunity,
+  povertyByCommunity,
   vacanciesByCommunity,
   destinationFor,
   record,

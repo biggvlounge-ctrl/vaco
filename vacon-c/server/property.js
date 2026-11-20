@@ -262,6 +262,25 @@ function currentValue(property) {
   return Math.round(Number(property.value) * stage * condition);
 }
 
+// By direct instruction: "vacant/abandoned/condemned property
+// takeover." `condition` already runs 0-100 and already decays
+// without upkeep (`advancePropertyLifecycle`); "condemned" is the one
+// real state this continuous measure never named — a building too far
+// gone to be lived in, not merely run-down. `CONDEMNED_CONDITION_FLOOR`
+// is flagged interpretive (no document sets one) and anchored to a
+// real magnitude already established this round rather than guessed
+// fresh: `salvage.STRIP_CONDITION_COST`/`extortion.VANDALISM_
+// CONDITION_COST` are both 10, the real damage one strip or one
+// vandalism event already does, so a building at or below that is one
+// real event away from zero — a meaningfully different state from
+// merely "needs repair".
+const CONDEMNED_CONDITION_FLOOR = 10;
+
+function isCondemned(property) {
+  if (!property) return false;
+  return Number(property.condition ?? 100) <= CONDEMNED_CONDITION_FLOOR;
+}
+
 // ---------------------------------------------------------------------------
 // Ownership
 // ---------------------------------------------------------------------------
@@ -572,6 +591,8 @@ function reseedIds(worldState) {
 }
 
 module.exports = {
+  CONDEMNED_CONDITION_FLOOR,
+  isCondemned,
   CONDITION_DECAY_PER_TICK,
   OCCUPANT_UPKEEP_PER_TICK,
   OWNER_UPKEEP_PER_TICK,

@@ -51,6 +51,11 @@ function world(extra = {}) {
     npcs: [], communities: [], cities: [], properties: [], regions: [],
     migrationEvents: [], needs: [], entityTraits: [], organizations: [],
     families: [], crimeIncidents: [], employmentRecords: [], households: [],
+    // Real, already-required by `economy.getLatestFinances` (every
+    // other real fixture in this codebase already includes it) —
+    // `migration.js#povertyByCommunity` now reads it indirectly
+    // through `areaStats.statsFor`'s own real `povertyRate`.
+    individualFinances: [], deceased: [],
     ...extra,
   };
   migration.reseedIds(w);
@@ -138,6 +143,50 @@ test('somebody with no needs recorded is not read as content', () => {
   assert.equal(migration.pushFor(w, person(w, 1)), null);
 });
 
+// -- "impoverished-area NPC migration" -------------------------------------
+
+test('a real area poverty rate above the real floor pushes, even with no individual need recorded', () => {
+  const w = world();
+  community(w, 1);
+  const id = person(w, 1);
+  const push = migration.pushFor(w, id, { povertyRate: migration.POVERTY_PUSH_FLOOR + 0.3 });
+  assert.ok(push);
+  assert.equal(push.type, 'economic');
+  assert.equal(push.need, 'area_poverty');
+  assert.ok(push.pressure > 0);
+});
+
+test('a real area poverty rate at or below the real floor never pushes on its own', () => {
+  const w = world();
+  community(w, 1);
+  const id = person(w, 1);
+  assert.equal(migration.pushFor(w, id, { povertyRate: migration.POVERTY_PUSH_FLOOR }), null);
+  assert.equal(migration.pushFor(w, id, { povertyRate: 0 }), null);
+});
+
+test('omitting povertyRate entirely reproduces the exact pre-existing pushFor behaviour', () => {
+  const w = world();
+  community(w, 1);
+  const id = person(w, 1);
+  assert.equal(migration.pushFor(w, id), migration.pushFor(w, id, { povertyRate: null }));
+});
+
+test('povertyByCommunity reads the real areaStats.statsFor povertyRate, computed once for the pass', () => {
+  const w = world();
+  community(w, 1);
+  const economy = require('../server/economy.js');
+  economy.reseedIds(w);
+  for (let i = 0; i < 10; i += 1) {
+    const id = person(w, 1);
+    // A real, spread net worth so the world median (and the real
+    // poverty line under it) is genuinely measurable.
+    economy.generateIndividualFinances(w, id, { savings: i * 1000, tick: w.tick });
+  }
+  const share = migration.povertyByCommunity(w);
+  assert.ok(share.has(1));
+  assert.ok(share.get(1) > 0, 'ten residents spread from 0 to 9000 net worth must show some real poverty rate');
+});
+
 // -- pull answers push ----------------------------------------------------
 
 test('a destination with no vacancy is not a destination', () => {
@@ -151,6 +200,31 @@ test('a destination with no vacancy is not a destination', () => {
   };
   assert.equal(migration.desirability(w, 2, shared), null,
     'a community with nowhere to live scored as somewhere to move to');
+});
+
+// -- "vacant/abandoned/CONDEMNED property takeover" ------------------------
+
+test('a condemned property is never offered as a real migration destination', () => {
+  const w = world();
+  community(w, 1);
+  const property = require('../server/property.js');
+  const condemnedHome = home(w, 1);
+  w.properties.find((p) => p.id === condemnedHome).condition = property.CONDEMNED_CONDITION_FLOOR;
+
+  const vacancies = migration.vacanciesByCommunity(w);
+  assert.deepEqual(vacancies.get(1) ?? [], [],
+    'a condemned property must never be a real destination a family could be moved into');
+});
+
+test('a merely run-down (not condemned) property stays a real destination', () => {
+  const w = world();
+  community(w, 1);
+  const property = require('../server/property.js');
+  const roughHome = home(w, 1);
+  w.properties.find((p) => p.id === roughHome).condition = property.CONDEMNED_CONDITION_FLOOR + 1;
+
+  const vacancies = migration.vacanciesByCommunity(w);
+  assert.deepEqual(vacancies.get(1), [roughHome]);
 });
 
 test('work is half the score, so an income move goes somewhere with jobs', () => {
