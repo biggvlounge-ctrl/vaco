@@ -8959,3 +8959,63 @@ rule's own finding — forcing it in would repeat the exact mistake that
 rule already named for `landCoverClass`/`dominantPathway`. Left for
 its own round with its own integration decision rather than rushed
 into this one.
+
+**A hundred-and-fifty-fifth, closing task #157 by direct instruction:
+"make sure the Muslims are characterized correctly in the penitentiary
+system. They are huge in the penitentiary system" — and a correction
+to what the same message actually described about Philadelphia.**
+
+**The Muslim prison-population figure is real, disproportionate, and
+reported at two real grains kept separate rather than blended.**
+Checked first, and the premise needed correcting before building:
+BJS itself does not publish inmate religious affiliation at all (Pew's
+own note on the gap, confirmed) — so there is no BJS-tier figure the
+way `raceShare` already has one. Two real, different-grain sources
+exist instead: the federal Bureau of Prisons' own undated table
+(Muslim 5.44%, Nation of Islam counted as its own separate real
+category at 2.17% — never summed into the Muslim figure, the same real
+distinction `orgArchetypes.js`'s `'nation of islam mosque'` archetype
+already holds), and Muslim Advocates' 2019 FOIA of 34 states + D.C.
+(Muslim ≈9% of state prisoners vs. ≈1% of the general population — a
+different real population, not interchangeable with the federal
+figure). `server/prisonPacks.js`'s existing `'state-or-federal-prison'`
+entry gains a `religionShare` field at `confidence:
+'secondary-estimate'`, the same tier this registry already uses for
+thinner-than-Census-tier findings — both real figures converge on
+disproportion, neither is BJS-tier, and neither is presented as if it
+were.
+
+**The Philadelphia half of the same message named the wrong real
+organization, and checking it directly — rather than building what
+was literally asked for — found the real one.** The Black Guerrilla
+Family is real, but it is founded at San Quentin, California (1966,
+George Jackson) and documented as an avowed Marxist-Leninist-Maoist
+revolutionary organization — not religious, not Philadelphia-origin.
+Carrying it under either label would misstate both real facts about
+it. The real organization this round's research found that actually
+matches a Philadelphia religion/crime overlap is the Philadelphia
+Black Mafia: founder Samuel Christian took the name Suleiman Bey under
+the Nation of Islam, and multiple members are documented as having
+risen to rank in the NOI's own Fruit of Islam paramilitary wing at
+Temple 12 (Jeremiah Shabazz, later Shamsud-din Ali — himself a former
+Black Mafia leader). `namedGangPacks.js` gains a sixth city,
+`'philadelphia'`, carrying this one real entry with a new
+`religiousAffiliationNote` field — cited at the confidence of its
+primary source (Sean Patrick Griffin's *Black Brothers, Inc.*), not
+borrowed from the thinner Wikipedia-mirror tier most other material
+about it sits at, and explicitly NOT claiming anything about Nation of
+Islam mosques generally — this is a fact about one specific
+organization's own internal security wing, the same narrow-scope
+discipline the twenty-ninth standing rule's Antifa section already
+holds for not generalizing a specific finding into a broader claim.
+
+Mutation-verified twice: the federal/NOI figures swapped (caught,
+7/8 — the first version of this test used a weak `notEqual` check
+that a first mutation attempt slipped past, corrected to assert the
+exact real cited values before re-verifying); and the Philadelphia
+entry's own religious-affiliation citation replaced with a generic
+placeholder (caught on the second attempt, 19/20 — the first mutation
+attempt accidentally edited an identical phrase inside this file's own
+header COMMENT rather than the real data field, which is itself a
+small case of "citation is not presence" aimed at a mutation test's
+own aim rather than at the code).

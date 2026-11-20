@@ -186,8 +186,19 @@ test('a bad named-gang pack is refused at generation, not half-applied', () => {
 test('this module validates against its own real CITIES list, not a private copy elsewhere', () => {
   assert.deepEqual(
     namedGangPacks.CITIES,
-    ['los-angeles', 'new-york', 'chicago', 'st-louis', 'miami'],
+    ['los-angeles', 'new-york', 'chicago', 'st-louis', 'miami', 'philadelphia'],
   );
+});
+
+test('Philadelphia carries the real Black Mafia / Nation of Islam overlap, and explicitly not the Black Guerrilla Family', () => {
+  assert.deepEqual(namedGangPacks.validatePack(namedGangPacks.PHILADELPHIA_PACK), []);
+  const names = namedGangPacks.PHILADELPHIA_PACK.gangs.map((g) => g.name);
+  assert.ok(names.includes('Black Mafia (Philadelphia)'));
+  assert.ok(!names.some((n) => /guerrilla/i.test(n)),
+    'BGF is real but San Quentin-origin and Marxist-political, not Philadelphia-origin and not religious -- it must not appear here');
+  const entry = namedGangPacks.PHILADELPHIA_PACK.gangs[0];
+  assert.ok(typeof entry.religiousAffiliationNote === 'string'
+    && /nation of islam/i.test(entry.religiousAffiliationNote));
 });
 
 test('Chicago, St. Louis and Miami packs are each valid', () => {

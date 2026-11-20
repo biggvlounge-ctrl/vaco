@@ -184,6 +184,47 @@ const FACILITY_DEMOGRAPHICS = {
       + 'comparison, so these five shares (0.889 combined) do not sum to 1 — a real, reported '
       + 'gap, not a rounding error.',
     femaleShare: { asOf: 2023, value: 0.073, note: '91,100 of 1,254,200 combined state+federal' },
+    // **Real, disproportionate, and reported at two different real
+    // grains that stay separate rather than being blended into one
+    // number neither source published** — task #157, by direct
+    // instruction ("make sure the Muslims are characterized correctly
+    // in the penitentiary system... they are huge in the penitentiary
+    // system"). Checked first: BJS itself does NOT publish inmate
+    // religious affiliation (confirmed via Pew's own note on the
+    // gap), so there is no BJS-tier figure to cite here the way
+    // raceShare above has one.
+    religionShare: {
+      federal: {
+        source: 'Federal Bureau of Prisons, inmate religious-affiliation '
+          + 'statistics (undated published table)',
+        muslim: 0.0544,
+        // BOP counts Nation of Islam as its own real, separate
+        // category from Muslim generally — kept as two distinct real
+        // figures, never summed, the same real distinction
+        // `orgArchetypes.js`'s `'nation of islam mosque'` archetype
+        // already holds (CLAUDE.md's hundred-and-fifty-second standing
+        // rule).
+        nationOfIslam: 0.0217,
+      },
+      state: {
+        asOf: 2019,
+        source: 'Muslim Advocates — FOIA\'d records from 34 states + D.C.',
+        muslim: 0.09,
+        generalPopulationComparisonShare: 0.01,
+        note: 'A different real grain from the federal BOP figure above '
+          + '(state prison systems, not the federal system) — kept '
+          + 'separate on purpose rather than averaged into one figure '
+          + 'neither source actually published.',
+      },
+      confidence: 'secondary-estimate',
+      note: 'Both real figures agree Muslims are a disproportionately '
+        + 'large share of the incarcerated population relative to the '
+        + 'general U.S. population (commonly attributed in the '
+        + 'literature partly to conversion during incarceration) — '
+        + 'reported at secondary-estimate tier, same as this '
+        + 'registry\'s other non-BJS-tier findings, never presented as '
+        + 'neutral census data.',
+    },
   },
   'local-jail': {
     asOf: 2021,

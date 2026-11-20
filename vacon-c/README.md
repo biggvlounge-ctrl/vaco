@@ -2082,6 +2082,20 @@ custody. The new function names the real citations (Pyrooz & Decker
 No real individual is ever named. See CLAUDE.md's hundred-and-
 fifty-fourth standing rule.
 
+## Muslim prison-population figures + the real Philadelphia Black Mafia/NOI overlap
+`prisonPacks.js`'s `'state-or-federal-prison'` entry gains a
+`religionShare` field: a real federal BOP figure (Muslim 5.44%,
+Nation of Islam a separate real 2.17%) and a real state-level figure
+(Muslim Advocates 2019 FOIA, ~9% of state prisoners vs. ~1% of the
+general population), kept at two separate real grains rather than
+blended, `confidence: 'secondary-estimate'` since BJS itself does not
+publish this figure at all. `namedGangPacks.js` gains a sixth city,
+Philadelphia, carrying the real Black Mafia -- its founder's and
+several members' real documented rank in the Nation of Islam's Fruit
+of Islam wing -- correcting the Black Guerrilla Family mix-up (BGF is
+real but San Quentin-origin and Marxist-political, not Philadelphia,
+not religious). See CLAUDE.md's hundred-and-fifty-fifth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

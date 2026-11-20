@@ -3,8 +3,9 @@
 // **Real, named, documented street gangs — an organizational fact,
 // not an individual one — for the real cities this registry's own
 // sources actually cover at this detail: Los Angeles, New York,
-// Chicago, St. Louis and Miami (CLAUDE.md's hundred-and-fifty-first
-// and hundred-and-fifty-third standing rules).**
+// Chicago, St. Louis, Miami, and Philadelphia (CLAUDE.md's
+// hundred-and-fifty-first, hundred-and-fifty-third and
+// hundred-and-fifty-fifth standing rules).**
 //
 // ---------------------------------------------------------------------
 // Scope decision made directly with the user
@@ -106,7 +107,7 @@ const SOURCES = ['fbi-ngic-doj-academic', 'sample'];
 //: the two registries are not guaranteed to cover the same cities
 //: forever, and a cross-reference would be the eighteenth standing
 //: rule's own trap (two modules trusting one undeclared constant).
-const CITIES = ['los-angeles', 'new-york', 'chicago', 'st-louis', 'miami'];
+const CITIES = ['los-angeles', 'new-york', 'chicago', 'st-louis', 'miami', 'philadelphia'];
 
 // **`'current-activity-only'`, added for Chicago/St. Louis/Miami
 // (CLAUDE.md's hundred-and-fifty-third standing rule).** Different
@@ -462,6 +463,60 @@ const MIAMI_PACK = {
     + 'on.',
 };
 
+// ---------------------------------------------------------------------
+// Philadelphia — task #157's real religion/crime overlap, and a
+// correction to what was actually asked for (CLAUDE.md's hundred-and-
+// fifty-fifth standing rule)
+// ---------------------------------------------------------------------
+// The request named "the Black Guerrilla Family in Philadelphia" in
+// the same breath as "the Muslims in Philadelphia" being involved in
+// crime, and asked that both be characterized correctly. Checked
+// directly: the Black Guerrilla Family is real, but it is founded at
+// San Quentin, California (1966, George Jackson) and is documented as
+// an avowed Marxist-Leninist-Maoist revolutionary organization, not a
+// religious one and not a Philadelphia-origin one — carrying it here
+// under "Philadelphia" or under a religious frame would misstate both
+// real facts about it. The real organization this round's research
+// found that actually matches what was described — Philadelphia,
+// organized crime, and a real, documented Nation of Islam
+// connection — is the Philadelphia Black Mafia.
+const PHILADELPHIA_PACK = {
+  region: 'us-philadelphia',
+  source: 'fbi-ngic-doj-academic',
+  city: 'philadelphia',
+  gangs: [
+    {
+      name: 'Black Mafia (Philadelphia)',
+      originCity: 'Philadelphia',
+      originEra: 'late 1960s',
+      confidence: 'well-sourced',
+      note: 'Primary credible source: Sean Patrick Griffin, Black '
+        + 'Brothers, Inc. (academic/journalistic study) — most other '
+        + 'material found online is Wikipedia-mirror tier, so this '
+        + 'entry is cited at the book\'s own confidence, not a higher '
+        + 'one borrowed from its repeated online summaries. Effectively '
+        + 'defunct by the late 1980s; reported regional splinters are '
+        + 'not independently confirmed by this round\'s research and '
+        + 'are not carried as current fact.',
+      // The real NOI connection, named as an organizational fact about
+      // this gang — never as a claim about the Nation of Islam itself
+      // being a criminal organization, and never conflated with the
+      // separate real NOI archetype (`orgArchetypes.js`'s `'nation of
+      // islam mosque'`, CLAUDE.md's hundred-and-fifty-second standing
+      // rule), which carries no such note.
+      religiousAffiliationNote: 'Founder Samuel Christian took the name '
+        + 'Suleiman Bey under the Nation of Islam, and multiple members '
+        + 'are documented as having risen to rank in the NOI\'s Fruit '
+        + 'of Islam paramilitary wing at Temple 12, headed in turn by '
+        + 'Jeremiah Shabazz and later Shamsud-din Ali (himself a former '
+        + 'Black Mafia leader) — a real, documented overlap between one '
+        + 'specific criminal organization and one specific real '
+        + 'mosque\'s own internal security wing, not a claim about NOI '
+        + 'mosques generally.',
+    },
+  ],
+};
+
 module.exports = {
   CITIES,
   CONFIDENCE_LEVELS,
@@ -474,4 +529,5 @@ module.exports = {
   CHICAGO_PACK,
   ST_LOUIS_PACK,
   MIAMI_PACK,
+  PHILADELPHIA_PACK,
 };

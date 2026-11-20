@@ -54,6 +54,31 @@ test('the state-or-federal entry\'s own under-100% share is reported, not silent
   assert.match(entry.raceShareNote, /do not sum to 1/);
 });
 
+test('the state-or-federal entry carries a real, two-grain religious composition, never blended into one number', () => {
+  const entry = prisonPacks.describeFacilityDemographics('state-or-federal-prison');
+  assert.ok(entry.religionShare, 'task #157: Muslims must be characterized in the penitentiary system');
+  const { federal, state, confidence } = entry.religionShare;
+  assert.equal(confidence, 'secondary-estimate');
+  assert.equal(federal.muslim, 0.0544);
+  // Nation of Islam is BOP's own separate real category -- its own
+  // real, different cited figure, never summed into or confused with
+  // the general Muslim figure.
+  assert.equal(federal.nationOfIslam, 0.0217);
+  assert.notEqual(federal.muslim, federal.nationOfIslam);
+  assert.ok(state.muslim > federal.muslim,
+    'the state figure (Muslim Advocates, 34 states + D.C.) is a real, different, higher grain -- not interchangeable with the federal BOP figure');
+  assert.ok(state.generalPopulationComparisonShare < state.muslim,
+    'the real finding is disproportion -- Muslims are a larger share of the incarcerated population than of the general one');
+});
+
+test('neither facility-type entry other than state-or-federal carries a fabricated religionShare', () => {
+  for (const type of ['local-jail', 'juvenile-residential']) {
+    const entry = prisonPacks.describeFacilityDemographics(type);
+    assert.equal(entry.religionShare, undefined,
+      `${type} has no real religion-composition source behind it this round -- nothing should be invented to fill the gap`);
+  }
+});
+
 test('facilityType names line up with landmarks.js\'s own default', () => {
   const landmarks = require('../server/landmarks.js');
   const property = { id: 1, city_id: 1, landmark_category: 'historic-site' };
