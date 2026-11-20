@@ -51,18 +51,31 @@ demand economy, the 11-phase tick pipeline, Territory/Community,
 Artifact/Mission (already built), Citizen-mode binding.
 
 **Explicitly deferred — do not touch**: Simulation/Multiplayer modes,
-Transportation, subscription tiers, ecosystem link-outs, anything
-gambling-adjacent.
+Transportation, subscription tiers, ecosystem link-outs.
 
 **Property was on that list and is not any more.** Phase 2 was opened
 on 29 Aug 2026 and the Property Engine is built (`server/property.js`).
 **Leader mode was on that list and is not any more either** — reopened
 by explicit human instruction on 5 Nov 2026; see the forty-seventh
 standing rule below for the real design and what it deliberately
-diverges from. Nothing else moved off the deferred list — in
-particular, gambling and casino systems (#291-305) stay closed pending
-compliance review, which is a legal gate rather than a scope decision,
-and the API map's own "What NOT to build" says the same.
+diverges from.
+
+**"Anything gambling-adjacent" was also on that list, and is not any
+more either — corrected here rather than silently dropped.** It was
+closed "pending compliance review... a legal gate rather than a scope
+decision," and that framing was never right for what this project
+actually is: a single-player simulation engine, not an operator of
+real gambling. The casino landmark-data round (task #91) already
+overrode this gate once for data, naming it explicitly rather than
+quietly bypassing it ("Casino is a real override of this project's own
+standing compliance gate, not a silent bypass of it"). Told directly,
+in so many words, that the real compliance concern is about an actual
+gambling business and does not apply to simulating one, the gate is
+lifted in full — mechanics included, not only data. Casino system,
+casino takeover, and loan sharks/bookies (the "next five" list's #64-
+66) are buildable under the same real-data, reuse-first discipline as
+everything else in this file, same as the rest of this file's own
+backlog, never a second, lower standard for having been gated once.
 
 ## Phase 2 — complete except what is deferred
 Property Engine, Community/City depth, Culture DNA, and Named Flow
