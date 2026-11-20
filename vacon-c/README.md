@@ -2263,6 +2263,21 @@ already proven by `test/tick-security.test.js`'s own boundary draw).
 No new code for either -- both requests were already real. See
 CLAUDE.md's hundred-and-sixty-fifth standing rule.
 
+## Real combat leagues, out of the chaos (closes task #171)
+By direct instruction: "this is where sports leagues will come from.
+It's from the fighting and the chaos." Closes the one real gap this
+project's own foundation table named by name -- "league structure is
+still false." `server/leagues.js` is the deliberate `combat`
+counterpart to `competition.js`'s own deliberately-non-combat
+settlement games: a league forms once a community's real danger
+crosses `recruitment.BASE_RECRUITMENT_RISK`'s own chaos rate (reused
+verbatim), fields a real round-robin season over a roster capped at
+`meetings.MAXIMUM_ATTENDANCE` (reused), plays one real fixture every
+`competition.GAME_INTERVAL` ticks (reused), and crowns a real
+highest-win champion from a real, computed-never-stored table when a
+season runs out of fixtures. See CLAUDE.md's hundred-and-sixty-sixth
+standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

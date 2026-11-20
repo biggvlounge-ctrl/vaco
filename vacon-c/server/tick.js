@@ -75,6 +75,7 @@ const traitDrift = require('./traitDrift.js');
 const motivation = require('./motivation.js');
 const archetypes = require('./archetypes.js');
 const competition = require('./competition.js');
+const leagues = require('./leagues.js');
 const justice = require('./justice.js');
 const recruitment = require('./recruitment.js');
 const youthPrograms = require('./youthPrograms.js');
@@ -1740,6 +1741,14 @@ function advanceTick(worldState, options = {}) {
   // a match they did not live to see. Before trait drift, which is what
   // turns the habit of turning up into being good at it.
   candidateEvents.push(...competition.runCompetition(worldState, { tick: worldState.tick }));
+
+  // Task #171, by direct instruction: "this is where sports leagues
+  // will come from. It's from the fighting and the chaos." The
+  // deliberate `combat` counterpart `competition.js`'s own header
+  // names but does not build — see `leagues.js`'s own header for why
+  // this reuses `recruitment.js`'s real chaos-driven rate rather than
+  // running unconditionally in every community.
+  candidateEvents.push(...leagues.runLeagues(worldState, { tick: worldState.tick }));
 
   // What the tribes can now do — `TRIBE_GROWTH_MISSION_UNLOCK_SYSTEM.md`.
   //

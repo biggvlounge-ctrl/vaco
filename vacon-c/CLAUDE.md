@@ -9668,3 +9668,62 @@ manufacture itself is real and era-gated
 back" is already a real, reachable, measured event in this engine
 rather than a flat always-on state. No new mechanic — the request was
 already answered before it was asked.
+
+**A hundred-and-sixty-sixth, task #171, and it closes the one real gap
+this file's own foundation table has named by name since the project's
+own naming correction: "League structure is still false — no season,
+table, fixture list, standings or tournament exists anywhere in
+`server/`."** By direct instruction: "this is where sports leagues
+will come from. It's from the fighting and the chaos."
+
+**Not a second resolver, and not `competition.js`'s own shape copied
+blindly.** `contest.js` is the real, tested, deterministic resolver;
+`competition.js` already calls it for ordinary settlement games and
+deliberately excludes `combat` — "it holds games, not fights," that
+file's own words. `server/leagues.js` is the deliberate counterpart
+that header names but does not build, and it earns the word "league"
+rather than being a second occasion wearing the name: a real season
+(a seeded round-robin fixture list over a real roster), a real table
+(`standingsFor`, computed from the real match log every time — never
+a second, stored win/loss counter, standing rule 3), and a real
+tournament structure (a season that runs out of fixtures crowns the
+real highest-win member and redraws, rather than playing forever).
+
+**Every constant is reused, not invented.** The formation rate is
+`recruitment.BASE_RECRUITMENT_RISK`, the identical real chaos-driven
+rate that file already established for "once chaos starts to erupt" —
+"leagues... from the fighting and the chaos" is the same real shape
+one event type over, so this reuses that constant verbatim rather than
+defining a second one at the same value under a new name. The roster
+cap is `meetings.MAXIMUM_ATTENDANCE` — the real "crowd, not a
+leadership" bound this engine already drew once for a meeting, reused
+for a second kind of real gathering rather than invented fresh. The
+match cadence is `competition.GAME_INTERVAL` — "how often a settlement
+visibly has a social life" is the identical question for a league
+match day. The one real eligibility filter is `contest.rateEntity`'s
+own refusal (an unrated entity cannot be given a number), never a
+second, invented one.
+
+**The write-back is `competition.recordResult`'s own shape, plus the
+one real thing combat has that a game of darts does not.** Habit
+reinforcement, rivalry, respect and a memory each — the identical
+real pattern that file already established — plus `resolveContest`'s
+own real loser-outcome tier (`defeated`/`fled`/`submitted`, task #137)
+folded into the memory instead of a flat "lost", since that tier only
+has real meaning for `combat`.
+
+8 tests in `test/leagues.test.js`. The real formation gate (`roster.
+length < MIN_ROSTER`, the hard floor `contest.resolveContest` itself
+enforces) is mutation-verified — caught. The real danger-score early
+`continue` mutation-tested the same way the hundred-and-sixty-fifth
+rule's own finding already explains for `recruitment.js`/`youthPrograms
+.js`: forcing it did not change behaviour, because a zero danger score
+already yields a zero chance through the rate multiplication itself —
+a real optimisation, not a second load-bearing gate, confirmed rather
+than assumed.
+
+Wired into `tick.js`'s same cross-cutting slot as `competition.
+runCompetition`, immediately after it — a league reads a settled
+population and a community that has already had its ordinary social
+life for the tick, the identical ordering reason that call is already
+there.
