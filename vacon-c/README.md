@@ -2055,6 +2055,22 @@ congregation size/membership data for churches/mosques/synagogues
 generally, and Catholic-specific parish-size figures -- the first,
 most explicit half of the same request.
 
+## Named gang packs extended to Chicago, St. Louis, Miami
+`namedGangPacks.js` now covers five real cities instead of two: Los
+Angeles, New York, Chicago (Vice Lords/Gangster Disciples/Black
+Disciples/Mickey Cobras, each with its own checked confidence tier),
+St. Louis (Cochran Crips/55 Boyz -- real DOJ-documented gangs,
+replacing the unverifiable "62 Hoover Crips" claim), and Miami (Zoe
+Pound/Zoe Mafia Family; Cuban-American organized crime is carried as
+historical context only, never as a named "gang" entry, since law
+enforcement does not track it as a structured organization). A new
+`'current-activity-only'` confidence tier covers gangs with a real,
+documented current existence but no confirmed founding era. Two real
+gaps -- a structured Haitian/Caribbean gang presence in NYC, and a
+Houston "Hoover Criminals" chapter -- were checked and declared
+unbuilt rather than fabricated. See CLAUDE.md's hundred-and-fifty-third
+standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

@@ -184,5 +184,70 @@ test('a bad named-gang pack is refused at generation, not half-applied', () => {
 });
 
 test('this module validates against its own real CITIES list, not a private copy elsewhere', () => {
-  assert.deepEqual(namedGangPacks.CITIES, ['los-angeles', 'new-york']);
+  assert.deepEqual(
+    namedGangPacks.CITIES,
+    ['los-angeles', 'new-york', 'chicago', 'st-louis', 'miami'],
+  );
+});
+
+test('Chicago, St. Louis and Miami packs are each valid', () => {
+  assert.deepEqual(namedGangPacks.validatePack(namedGangPacks.CHICAGO_PACK), []);
+  assert.deepEqual(namedGangPacks.validatePack(namedGangPacks.ST_LOUIS_PACK), []);
+  assert.deepEqual(namedGangPacks.validatePack(namedGangPacks.MIAMI_PACK), []);
+});
+
+test('St. Louis replaces the unverifiable "62 Hoover Crips" claim with two real, DOJ-documented gangs', () => {
+  const names = namedGangPacks.ST_LOUIS_PACK.gangs.map((g) => g.name);
+  assert.ok(names.includes('Cochran Crips'));
+  assert.ok(names.includes('55 Boyz'));
+  assert.ok(!names.some((n) => /hoover|62|six.?deuce|six.?o/i.test(n)),
+    'this pack must not carry the gang this round\'s research could not verify');
+  for (const g of namedGangPacks.ST_LOUIS_PACK.gangs) {
+    assert.equal(g.confidence, 'current-activity-only',
+      'no founding era was confirmed for either St. Louis entry -- the honest tier, not a guess');
+  }
+});
+
+test('Miami carries Zoe Pound and its real documented offshoot, and Cuban organized crime as context only, never as a named gang entry', () => {
+  const names = namedGangPacks.MIAMI_PACK.gangs.map((g) => g.name);
+  assert.ok(names.includes('Zoe Pound'));
+  assert.ok(names.includes('Zoe Mafia Family (ZMF)'));
+  assert.ok(!names.some((n) => /cuban/i.test(n)),
+    'Cuban organized crime is not law-enforcement-tracked as a structured org -- it must not appear as a roster entry');
+  assert.ok(typeof namedGangPacks.MIAMI_PACK.historicalContext === 'string'
+    && namedGangPacks.MIAMI_PACK.historicalContext.length > 0);
+});
+
+test('Chicago carries the real Vice Lords/Gangster Disciples/Black Disciples/Mickey Cobras roster, with no invented territory map', () => {
+  const names = namedGangPacks.CHICAGO_PACK.gangs.map((g) => g.name);
+  assert.deepEqual(names, ['Vice Lords', 'Gangster Disciples', 'Black Disciples', 'Mickey Cobras']);
+  assert.ok(typeof namedGangPacks.CHICAGO_PACK.territoryNote === 'string'
+    && /no live, official/i.test(namedGangPacks.CHICAGO_PACK.territoryNote));
+  assert.ok(typeof namedGangPacks.CHICAGO_PACK.culturalContext === 'string'
+    && namedGangPacks.CHICAGO_PACK.culturalContext.length > 0);
+});
+
+test('a world generated with the Chicago pack carries the real gang onto its factions, same mechanism as Los Angeles/New York', () => {
+  const w = engine.WorldState;
+  try {
+    const before = w.organizations.length;
+    worldgen.generateWorld({
+      seed: 'named-gang-chicago',
+      namedGangPack: namedGangPacks.CHICAGO_PACK,
+      factionsPerCity: 2,
+      communitiesPerCity: 1,
+      populationPerCommunity: 10,
+    });
+    const added = w.organizations.slice(before);
+    const gangs = added.filter((o) => o.type === 'gang');
+    assert.equal(gangs.length, 2);
+    const names = gangs.map((g) => g.name);
+    assert.ok(names.includes('Vice Lords'));
+    assert.ok(names.includes('Gangster Disciples'));
+    for (const gang of gangs) {
+      assert.ok(gang.realGangOrigin, `${gang.name} should carry its real provenance`);
+    }
+  } finally {
+    cleanup();
+  }
 });

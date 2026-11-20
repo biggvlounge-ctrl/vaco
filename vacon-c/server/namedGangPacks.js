@@ -1,9 +1,10 @@
 // server/namedGangPacks.js
 //
 // **Real, named, documented street gangs — an organizational fact,
-// not an individual one — for the two real cities this registry's
-// own sources actually cover at this detail: Los Angeles and New
-// York.**
+// not an individual one — for the real cities this registry's own
+// sources actually cover at this detail: Los Angeles, New York,
+// Chicago, St. Louis and Miami (CLAUDE.md's hundred-and-fifty-first
+// and hundred-and-fifty-third standing rules).**
 //
 // ---------------------------------------------------------------------
 // Scope decision made directly with the user
@@ -26,20 +27,26 @@
 // supports naming one, which it does for exactly two cities.
 //
 // ---------------------------------------------------------------------
-// Why only two cities — the same shape as `crimeHotspotPacks.js`
+// Why these cities and no others — the same shape as `crimeHotspotPacks.js`
 // ---------------------------------------------------------------------
 // FBI NGIC's National Gang Report series (most recently confirmed
 // edition: 2015, NCJ 311089) names gang families and trends but not
 // a per-city named roster at this grain. The real, citable, NAMED
 // detail — a specific gang's real city of origin, real era, and real
 // documented presence — exists at useful depth for Los Angeles
-// (Crips, Bloods, 18th Street, MS-13 — all independently documented
-// in DOJ/FBI materials and academic/journalistic histories) and New
-// York (the Almighty Latin King and Queen Nation, Trinitarios, United
-// Blood Nation, Ñetas — Rikers Island origins and NYPD/academic
-// documentation). A pack covers ONE of these two real cities, same
-// as `crimeHotspotPacks.js`'s own LA/Chicago choice — a world
-// generated for any other city gets no pack and is unaffected.
+// (Crips, Bloods, 18th Street, MS-13), New York (the Almighty Latin
+// King and Queen Nation, Trinitarios, United Blood Nation, Ñetas),
+// Chicago (Vice Lords, Gangster Disciples, Black Disciples, Mickey
+// Cobras), St. Louis (Cochran Crips, 55 Boyz) and Miami (Zoe Pound,
+// Zoe Mafia Family). Checked and explicitly NOT built this round for
+// lack of a citable source at this grain: a Haitian/Caribbean/African
+// gang presence in New York specifically (real federal cases exist
+// for Haiti-based groups like 400 Mawozo, but none confirm a
+// structured NYC street presence), and a Houston "Hoover Criminals"
+// chapter (real elsewhere, unconfirmed in Houston beyond one 2017
+// incident). A pack covers ONE of these real cities, same as
+// `crimeHotspotPacks.js`'s own LA/Chicago choice — a world generated
+// for any other city gets no pack and is unaffected.
 //
 // ---------------------------------------------------------------------
 // Disagreement is carried, never smoothed over
@@ -99,9 +106,20 @@ const SOURCES = ['fbi-ngic-doj-academic', 'sample'];
 //: the two registries are not guaranteed to cover the same cities
 //: forever, and a cross-reference would be the eighteenth standing
 //: rule's own trap (two modules trusting one undeclared constant).
-const CITIES = ['los-angeles', 'new-york'];
+const CITIES = ['los-angeles', 'new-york', 'chicago', 'st-louis', 'miami'];
 
-const CONFIDENCE_LEVELS = ['well-sourced', 'disputed-era', 'disputed-founding'];
+// **`'current-activity-only'`, added for Chicago/St. Louis/Miami
+// (CLAUDE.md's hundred-and-fifty-third standing rule).** Different
+// from `'disputed-founding'`: that tier means multiple real sources
+// name CANDIDATE founding dates that disagree. This tier means no
+// source found during this round's research names ANY founding date
+// at all — only a real, current, DOJ/court-documented existence and
+// prosecution record. Declaring the gap honestly (standing rule
+// twenty-five's own "a declared gap beats a fabricated number") beats
+// inventing an era to satisfy the schema.
+const CONFIDENCE_LEVELS = [
+  'well-sourced', 'disputed-era', 'disputed-founding', 'current-activity-only',
+];
 
 function validatePack(pack) {
   const problems = [];
@@ -277,6 +295,173 @@ const NEW_YORK_PACK = {
     + 'disagreement, not resolved to one number.',
 };
 
+// ---------------------------------------------------------------------
+// Three more real cities (CLAUDE.md's hundred-and-fifty-third standing
+// rule) -- by direct instruction to extend this beyond LA/NY, checked
+// city by city rather than assumed. Two real findings changed what got
+// built here from what was asked for by name:
+//
+// - **No live, official gang-territory map exists for Chicago either**
+//   (CPD does not release one -- the thirty-third standing rule's own
+//   finding, re-confirmed). `territoryNote` says so on the pack rather
+//   than inventing turf boundaries.
+// - **St. Louis's "62"/"Six-Deuce"/"Six-O" (Hoover Crips) could not be
+//   verified by any source stronger than an informal community map.**
+//   Two OTHER St. Louis gangs genuinely are DOJ/EDMO-documented --
+//   Cochran Crips and 55 Boyz -- and this pack carries those instead
+//   of fabricating a "62" founding/presence this round's research
+//   could not confirm.
+// ---------------------------------------------------------------------
+const CHICAGO_PACK = {
+  region: 'us-chicago',
+  source: 'fbi-ngic-doj-academic',
+  city: 'chicago',
+  gangs: [
+    {
+      name: 'Vice Lords',
+      originCity: 'Chicago (14th Street Clovers, organized while '
+        + 'incarcerated at the St. Charles Reformatory for Boys)',
+      originEra: 'late 1950s',
+      confidence: 'well-sourced',
+      note: 'Multiple convergent historical accounts. Real documented '
+        + 'branches exist (Conservative Vice Lords, Traveling Vice '
+        + 'Lords) -- carried as a note, not as separate roster entries, '
+        + 'since this pack names organizations, not internal factions.',
+    },
+    {
+      name: 'Gangster Disciples',
+      originCity: 'Chicago (Englewood/South Side)',
+      originEra: 'disputed -- real sources place founding anywhere from '
+        + '1963 to 1969',
+      confidence: 'disputed-founding',
+      note: 'Real, historically documented founders: Larry Hoover and '
+        + 'David Barksdale (named here as a historical/citation fact '
+        + 'about the organization, same as Noble Drew Ali for MSTA -- '
+        + 'neither is modeled as a simulated NPC; see the generic '
+        + 'incarcerated-leader archetype for the structural role '
+        + 'instead). The 1969 "Lords, Stones and Disciples" (LSD) peace '
+        + 'alliance with the Vice Lords and Black P Stones is a real, '
+        + 'named, citable historical event.',
+    },
+    {
+      name: 'Black Disciples',
+      originCity: 'Chicago (South Side)',
+      originEra: 'split from the Gangster Disciples after David '
+        + "Barksdale's death in 1991 (his killing is itself documented "
+        + 'as carried out by Gangster Disciples)',
+      confidence: 'well-sourced',
+      note: 'The split and the 1991 killing are independently '
+        + 'documented facts about the organizations, not about any '
+        + 'individual modeled here.',
+    },
+    {
+      name: 'Mickey Cobras',
+      originCity: 'Chicago',
+      originEra: 'disputed and weakly sourced -- one account places '
+        + 'origin in 1954 as the "Egyptian Cobras" under James Cogwell; '
+        + 'another holds the "Mickey Cobra Nation" name dates to a 1966 '
+        + 'renaming after Henry "Mickey" Cogwell (d. 1977)',
+      confidence: 'disputed-founding',
+      note: 'The weakest-sourced entry in this pack -- most available '
+        + 'material is Wikipedia-mirror tier rather than a primary DOJ/'
+        + 'academic source. Carried at low-moderate confidence rather '
+        + 'than omitted, same as this registry\'s other thin-but-real '
+        + 'findings (e.g. `countryPacks.js`\'s secondary-estimate tier).',
+    },
+  ],
+  territoryNote: 'No live, official city gang-territory dataset exists '
+    + 'for Chicago -- CPD has stated it does not release gang-boundary '
+    + 'data (the thirty-third standing rule\'s own finding, '
+    + 're-confirmed this round). No turf/boundary claim is carried '
+    + 'here.',
+  culturalContext: 'Forrest Stuart\'s Ballad of the Bullet (Princeton '
+    + 'University Press, 2020) is real, peer-reviewed ethnographic work '
+    + 'documenting Chicago drill music as a real territorial signal -- '
+    + 'hearing a rival set\'s drill track in a neighborhood indicates '
+    + 'whose turf it is. Corroborated by later peer-reviewed/academic '
+    + 'work (a 2025 AoIR conference paper on driller reputation '
+    + 'management; a Northwestern University thesis coding drill '
+    + 'lyrics\' place-references). Carried as a citation about a real '
+    + 'phenomenon, never naming or modeling any real recording artist.',
+};
+
+const ST_LOUIS_PACK = {
+  region: 'us-st-louis',
+  source: 'fbi-ngic-doj-academic',
+  city: 'st-louis',
+  gangs: [
+    {
+      name: 'Cochran Crips',
+      originCity: 'St. Louis',
+      originEra: 'not confirmed by the research behind this pack -- real '
+        + 'DOJ press releases (Eastern District of Missouri) document '
+        + 'current activity and federal prosecutions, not a founding '
+        + 'date, and none is invented here to fill the gap',
+      confidence: 'current-activity-only',
+      note: 'Real and DOJ-documented at the prosecution level. The '
+        + 'commonly-repeated "62"/"Six-Deuce"/"Six-O" Hoover Crips claim '
+        + 'for St. Louis could not be verified by this round\'s research '
+        + 'beyond an informal, non-official community map, and is '
+        + 'deliberately NOT carried here -- this entry replaces it with '
+        + 'what is actually citable.',
+    },
+    {
+      name: '55 Boyz',
+      originCity: 'St. Louis',
+      originEra: 'not confirmed by the research behind this pack -- same '
+        + 'real DOJ/EDMO prosecution-record basis as Cochran Crips, no '
+        + 'founding date fabricated',
+      confidence: 'current-activity-only',
+      note: 'Real and DOJ-documented (Eastern District of Missouri).',
+    },
+  ],
+  territoryNote: 'No official city-released gang-territory dataset was '
+    + 'found for St. Louis either -- same posture as Chicago and Los '
+    + 'Angeles/New York before it.',
+};
+
+const MIAMI_PACK = {
+  region: 'us-miami',
+  source: 'fbi-ngic-doj-academic',
+  city: 'miami',
+  gangs: [
+    {
+      name: 'Zoe Pound',
+      originCity: 'Miami',
+      originEra: '1990, founded by Haitian immigrants, originally '
+        + 'self-defense-oriented',
+      confidence: 'well-sourced',
+      note: 'No DOJ indictment naming "Zoe Pound" as an entity was '
+        + 'found in this round\'s research -- its real documented '
+        + 'offshoot (see next entry) carries the federal prosecution '
+        + 'record instead.',
+    },
+    {
+      name: 'Zoe Mafia Family (ZMF)',
+      originCity: 'Miami',
+      originEra: 'not confirmed by the research behind this pack -- '
+        + 'real federal racketeering/firearms convictions (USAO-SDFL) '
+        + 'establish current documented existence, not a founding date',
+      confidence: 'current-activity-only',
+      note: 'Real, documented offshoot of Zoe Pound with real federal '
+        + 'racketeering and firearms convictions.',
+    },
+  ],
+  historicalContext: 'Cuban-American organized crime in Miami (the '
+    + '"Cocaine Cowboys" era -- the 1979 Dadeland Mall shootout; Willy '
+    + 'Falcon and Sal Magluta\'s real multi-decade cocaine network; '
+    + 'T.J. English\'s The Corporation/The Last Kilo) is real and '
+    + 'well-documented history, but law enforcement itself does not '
+    + 'track it as a structured organization the way Zoe Pound or La '
+    + 'Cosa Nostra are tracked -- "Cuban mafia" is journalistic '
+    + 'shorthand, not a real org chart. Carried here as historical '
+    + 'context only, deliberately NOT as a named "gang" entry, since '
+    + 'building one would assert a structure this round\'s research '
+    + 'found no real source documenting. Colombian cartels are reported '
+    + 'to have partially displaced Cuban-American dominance from ~1975 '
+    + 'on.',
+};
+
 module.exports = {
   CITIES,
   CONFIDENCE_LEVELS,
@@ -286,4 +471,7 @@ module.exports = {
   gangFor,
   LOS_ANGELES_PACK,
   NEW_YORK_PACK,
+  CHICAGO_PACK,
+  ST_LOUIS_PACK,
+  MIAMI_PACK,
 };

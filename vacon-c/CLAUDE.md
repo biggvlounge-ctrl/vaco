@@ -8799,3 +8799,92 @@ congregation size can be derived at all, same shape the twenty-first
 standing rule's own "the consumer gets built and nobody re-reads the
 file that was waiting for it" names, pointed at here before it has the
 chance to recur.
+
+**A hundred-and-fifty-third, extending `namedGangPacks.js` beyond its
+original two cities, by direct instruction** ("do all the gang
+research so we can duplicate it all over the country... do the same
+thing with Chicago"). Research-first, same discipline as every other
+round: checked city by city rather than assumed, and two cities named
+in the request turned out not to have a citable source at this grain.
+
+**Chicago (Vice Lords, Gangster Disciples, Black Disciples, Mickey
+Cobras) is real and built**, each entry carrying its own real,
+independently-checked confidence tier rather than one blanket claim —
+Vice Lords and the Black Disciples/Gangster Disciples split are
+well-sourced; Gangster Disciples' own founding year is genuinely
+disputed across real sources (1963-1969); Mickey Cobras is the
+weakest-sourced entry (mostly wiki-mirror tier) and is flagged as such
+rather than presented at the same confidence as the other three. No
+live, official Chicago gang-territory dataset exists either — CPD does
+not release one, the thirty-third standing rule's own finding,
+re-confirmed rather than re-assumed. The real, peer-reviewed academic
+documentation connecting Chicago drill music to gang-affiliated
+territory (Forrest Stuart's *Ballad of the Bullet*, Princeton UP 2020,
+corroborated by later academic work) is carried as `culturalContext` —
+a real, citable phenomenon, with no real recording artist ever named
+or modeled as the basis for a simulated NPC, the same line held
+everywhere else in this file.
+
+**St. Louis's commonly-repeated "62"/"Six-Deuce"/"Six-O" Hoover Crips
+claim could not be verified by this round's research beyond an
+informal, non-official community map — declared, not built.** Two
+OTHER St. Louis gangs genuinely are DOJ/EDMO-documented at the
+prosecution level — Cochran Crips and 55 Boyz — and this pack carries
+those instead, each tagged a new `'current-activity-only'` confidence
+tier (added to `CONFIDENCE_LEVELS`): different from `'disputed-
+founding'`, which means multiple real candidate dates disagree: here
+no source names ANY founding date at all, only real current activity
+and prosecution. The twenty-fifth standing rule's "a declared gap
+beats a fabricated number," applied to a schema field (`originEra`)
+rather than to a whole entry.
+
+**Miami carries Zoe Pound and its real documented offshoot (Zoe
+Mafia Family, real federal racketeering/firearms convictions,
+USAO-SDFL) — and explicitly does NOT carry Cuban-American organized
+crime as a named gang entry.** The research behind this round found
+real, well-documented history (the 1979 Dadeland Mall shootout, Willy
+Falcon/Sal Magluta's real network, T.J. English's books) but also
+found that law enforcement itself does not track it as a structured
+organization the way Zoe Pound or La Cosa Nostra are — "Cuban mafia"
+is real journalistic shorthand, not a real org chart. Building a named
+"gang" entry for it would assert a structure this round's research
+found no source documenting, so it is carried as a new
+`historicalContext` pack field (citation only, read by nothing) rather
+than as a roster entry — the same discipline `traffickingContext`
+already holds for a real-but-unquantified fact.
+
+**Two real gaps declared rather than built, exactly where the request
+named them.** A structured Haitian/Caribbean/African gang presence in
+New York specifically: real federal cases exist for Haiti-based groups
+(400 Mawozo's leader has a real DOJ conviction/35-year sentence) but
+none of them confirm a structured NYC STREET presence, which is a
+different claim. A Houston "Hoover Criminals" chapter: real elsewhere
+(a real 2017 shooting of two Houston officers is DOJ/press-documented)
+but the specific claimed Houston-chapter history could not be verified
+beyond blog-tier sourcing. Neither is fabricated to fill the gap the
+request named.
+
+Mutation-verified: a planted St. Louis entry (renaming "Cochran Crips"
+back to the unverifiable "62 Hoover Crips") is caught by name
+(`test/named-gang-packs.test.js`'s own new test asserting the file
+must NOT carry that string), confirmed caught, file confirmed restored
+byte-identical afterward. `CITIES` grew from `['los-angeles',
+'new-york']` to five; the test asserting that exact list was the one
+test that needed updating for the extension, and was.
+
+**Still not built from this round's six findings, each its own future
+task rather than folded in here**: Italian-American organized crime
+(La Cosa Nostra, confirmed still real and active as of October 2025
+FBI statements) and real cartel-subset splits (CJNG, Sinaloa's
+Chapitos/Mayiza civil war, Gulf Cartel's Metros/Escorpiones) — these
+are national-scale organizations, not city-faction-naming facts, and
+belong in their own reference-data module rather than forced into
+`namedGangPacks.js`'s per-city-faction shape. The generic
+incarcerated-organizational-leader archetype, real gang-intervention
+program data (GRYD), the real Muslim/Islamic prison-population figure,
+the Philadelphia Black Mafia/Nation of Islam overlap (the real fit for
+what was asked about BGF — BGF itself is real but Marxist-political,
+San Quentin-origin, not Philadelphia, not religious), per-tradition
+eschatology content, and the Scientology/Mormon/Masonic/fraternity/
+Boule/Skull and Bones/voodoo/Ifá archetypes are all researched (real
+sources checked) but not yet built as of this entry.
