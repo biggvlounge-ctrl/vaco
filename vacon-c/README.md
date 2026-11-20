@@ -2032,6 +2032,29 @@ figures) is carried as a flagged caveat. A world with no pack
 generates exactly as before. See CLAUDE.md's hundred-and-fifty-first
 standing rule.
 
+## Nation of Islam / Moorish Science Temple of America archetypes, at a flagged lower confidence tier
+`orgArchetypes.js` gains `'nation of islam mosque'` and
+`'moorish science temple'`, kept distinct from each other and from
+`'religious order'` -- the user's own distinction ("They're not the
+same as Muslims or Nation of Islam. They're different
+organizations."). Both carry `confidence: 'secondary-estimate'`,
+explicitly lower than Census-tier (the ninety-fifth standing rule's
+own correct decline of Census-tier NOI/MSTA data still holds -- this
+is a narrower, flagged secondary-source claim, not a reversal of that
+finding). NOI carries a real membership/mosque-count range (ADL/
+Mamiya/USC CRCC); MSTA carries only per-era historical figures, since
+the organization's real 1929 faction split means no current unified
+number exists to cite. Both reuse the real `preacher` occupation
+(fixing a stale comment on `'religious order'` that wrongly claimed
+no clergy occupation existed) rather than inventing a second
+mechanical role; `occupations.clergyTitleFor(traditionKey)` supplies
+the real display title per tradition (imam, rabbi, priest, pastor,
+minister) separately from the mechanic. See CLAUDE.md's
+hundred-and-fifty-second standing rule. Still unbuilt: real
+congregation size/membership data for churches/mosques/synagogues
+generally, and Catholic-specific parish-size figures -- the first,
+most explicit half of the same request.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

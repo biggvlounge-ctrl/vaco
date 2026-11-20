@@ -8708,3 +8708,94 @@ the real-name substitution itself, `gangFor`'s real position-cycling,
 and the pack's own city whitelist — each caught, `server/worldgen.js`
 and `server/namedGangPacks.js` confirmed byte-identical to their own
 pre-mutation backups afterward.
+
+**A hundred-and-fifty-second, and it is a correction to the
+ninety-fifth standing rule's own decline, raised directly rather than
+overridden silently** — "like you did schools, can you do size of
+churches and membership of churches, mosques, synagogues... we need
+to include imams and the Nation of Islam... Moorish Science Temple of
+America. They're not the same as Muslims or Nation of Islam."
+
+**The ninety-fifth rule's reasoning was correct and is unchanged: Pew
+and the U.S. Religion Census genuinely have no NOI/MSTA breakout at
+CENSUS-TIER confidence, and building either as though it were a real,
+current, tradition-level survey would misrepresent thin data as
+neutral census data.** What changed is the ask, not the data: this
+round is a real, distinctly LOWER-confidence secondary-source claim —
+ADL's own organizational profile, religion scholar Lawrence Mamiya's
+academic estimate, and USC's Center for Religion and Civic Culture for
+NOI; Noble Drew Ali's 1913 Newark NJ founding and the real,
+documented 1929 Kirkman Bey/C. Mealy El/Givens El post-founder
+faction split for MSTA — flagged `confidence: 'secondary-estimate'`
+throughout, the identical tier `countryPacks.js` already uses for its
+own thinner military-expenditure figures, and never presented as
+Census-tier. Raised via a direct question rather than built quietly
+either way, and the explicit answer was "build at flagged
+lower-confidence tier" — this is that tier, named as such on every
+field it touches rather than smoothed into looking like the rest of
+the registry's primary-source data.
+
+**`orgArchetypes.js` gains two real, distinct archetypes —
+`'nation of islam mosque'` and `'moorish science temple'` — kept
+separate from each other and from `'religious order'`, because
+conflating any two of the three would misstate a real, citable
+organizational distinction the user raised directly ("They're not the
+same as Muslims or Nation of Islam. They're different
+organizations").** NOI carries a real current range
+(`membershipEstimateRange: [10000, 50000]`, midpoint 32,500;
+`mosqueCountEstimateRange: [120, 130]`) because ADL/Mamiya/USC CRCC
+converge on one. MSTA carries none, on purpose — the organization's
+own 1929 split is the real, citable fact, and no single current
+"membership" number exists to cite without blending incompatible
+factions into a figure nobody published; `historicalMembershipByEra`
+instead carries four real per-era snapshots (1920s peak ~30,000/17
+temples through the 1990s largest faction's reported 130 temples),
+named by era rather than averaged into one misleading "current"
+figure — the ninety-fifth rule's own "a declared gap beats a
+fabricated number" applied one level further in, to a gap inside a
+real organization's own history rather than to the organization's
+existence.
+
+**`occupations.js`'s stale-comment bug, found and fixed in the same
+pass — "citation is not presence" turned on this project's own prior
+comment rather than on new research.** `'religious order'`'s header
+claimed "occupations.js has no priest/clergy role," and a direct read
+of `occupations.js` found that claim false: `preacher` (tier 3,
+`employers: ['religion']`) and `DEFINING_POST.religion = 'preacher'`
+were both already real, while `teacher`'s own `employers` is
+`['school']` only — so the archetype's `posts: ['teacher']` named a
+real occupation that does not recognize a religious organization at
+all. Fixed to `posts: ['preacher']`, which both new archetypes also
+use rather than inventing a second mechanical occupation per
+tradition — a title is not a mechanic, which is the reason
+`CLERGY_TITLES`/`clergyTitleFor(traditionKey)` exists as a separate,
+display-only lookup (`muslim` → imam, `jewish` → rabbi, `catholic`/
+`orthodox` → priest, `protestant` → pastor, `nation-of-islam` →
+minister) rather than five near-identical occupation codes that would
+duplicate `preacher`'s own skill/tier/employer fields five times over.
+MSTA's own entry gets no `clergyTitle` and `clergyTitleFor` returns
+`null` for it — the same "no confirmed title, so no guess" posture the
+organization's own membership figures already take.
+
+Mutation-verified twice: `clergyTitleFor`'s own lookup (hard-coded a
+fallback of `'imam'` for every unmapped tradition — caught, 19/20);
+and the NOI archetype's own `confidence` field (changed to
+`'census-tier'` — caught, 19/20). Both files confirmed restored to
+their exact pre-mutation diff afterward. `test/org-archetypes.test.js`
+grew from 17 to 20 tests; the pre-existing "every post an archetype
+asks for is a real occupation" test (line 94, iterating
+`Object.entries(ARCHETYPES)` generically) already covers both new
+archetypes' `posts` with no change needed.
+
+**Still entirely unbuilt, named here rather than left implicit: the
+first and most explicit half of the same request — real congregation
+SIZE/membership data for churches, mosques and synagogues generally
+(the "like you did schools" comparison), and the Catholic-specific
+parish-size figures (CARA/Georgetown) asked for in the same breath.**
+`world-layer/imports/religionImport.js` was checked and confirmed to
+carry `adherents`/`population` only, no `congregations` (count) field
+— the real gap a future round needs to close before a real average
+congregation size can be derived at all, same shape the twenty-first
+standing rule's own "the consumer gets built and nobody re-reads the
+file that was waiting for it" names, pointed at here before it has the
+chance to recur.

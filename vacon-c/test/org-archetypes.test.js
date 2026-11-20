@@ -305,3 +305,74 @@ test('neither new archetype\'s own file reads race or ethnicity to decide anythi
   assert.ok(!/\brace\b/.test(source), 'orgArchetypes.js reads race outside its own comments');
   assert.ok(!/ethnicity/i.test(source), 'orgArchetypes.js reads ethnicity outside its own comments');
 });
+
+test('nation of islam mosque and moorish science temple are real, distinct from religious order and from each other', () => {
+  // Both are flagged at a lower confidence tier than `'religious
+  // order'` on purpose — the ninety-fifth standing rule correctly
+  // declined this data at CENSUS-TIER confidence (Pew / U.S. Religion
+  // Census have no NOI/MSTA breakout), and this round's real secondary
+  // sources (ADL, Mamiya, USC CRCC for NOI; Noble Drew Ali / 1913 /
+  // the 1929 faction split for MSTA) are a narrower, explicitly
+  // lower-confidence claim, never presented as neutral census data.
+  const noi = orgArchetypes.definitionOf('nation of islam mosque');
+  const mst = orgArchetypes.definitionOf('moorish science temple');
+  const order = orgArchetypes.definitionOf('religious order');
+  assert.equal(noi.type, 'religion');
+  assert.equal(mst.type, 'religion');
+  assert.equal(noi.confidence, 'secondary-estimate');
+  assert.equal(mst.confidence, 'secondary-estimate');
+  assert.equal(order.confidence, undefined, '`religious order` makes no secondary-source claim at all');
+  // Distinct organizations, not the same body under two names: NOI
+  // carries a real current membership/mosque-count range, MSTA
+  // carries only historical per-era figures because the organization
+  // itself has been factionally split since 1929.
+  assert.ok(Array.isArray(noi.membershipEstimateRange));
+  assert.equal(noi.membershipEstimateRange.length, 2);
+  assert.equal(noi.clergyTitle, 'minister');
+  assert.equal(mst.membershipEstimateRange, undefined,
+    'MSTA has no current unified figure to cite — that is the real finding, not a gap');
+  assert.equal(mst.clergyTitle, undefined,
+    'no real current MSTA title was confirmed by the research behind this round');
+  assert.ok(mst.historicalMembershipByEra['1920s-peak'].estimate > 0);
+});
+
+test('nation of islam mosque and moorish science temple each generate a real organization', () => {
+  const noiOrg = orgArchetypes.found(engine.WorldState, {
+    archetype: 'nation of islam mosque',
+    name: 'Fixture Mosque',
+    seed: 'noi-test',
+    generateOrganization: engine.generateOrganization,
+  });
+  assert.equal(noiOrg.type, 'religion');
+  assert.equal(noiOrg.archetype, 'nation of islam mosque');
+
+  const mstOrg = orgArchetypes.found(engine.WorldState, {
+    archetype: 'moorish science temple',
+    name: 'Fixture Temple',
+    seed: 'mst-test',
+    generateOrganization: engine.generateOrganization,
+  });
+  assert.equal(mstOrg.type, 'religion');
+  assert.equal(mstOrg.archetype, 'moorish science temple');
+
+  // Both use the same real `preacher` occupation `'religious order'`
+  // now correctly uses, not a second, invented post — `describeArchetypes`
+  // own `unbacked` list is the measured proof nothing here asks for an
+  // occupation the taxonomy cannot supply.
+  assert.deepEqual(orgArchetypes.describeArchetypes(engine.WorldState).unbacked, []);
+});
+
+test('occupations.clergyTitleFor maps real per-tradition titles, and declines to guess one for traditions this round found no confirmed title for', () => {
+  assert.equal(occupations.clergyTitleFor('muslim'), 'imam');
+  assert.equal(occupations.clergyTitleFor('jewish'), 'rabbi');
+  assert.equal(occupations.clergyTitleFor('catholic'), 'priest');
+  assert.equal(occupations.clergyTitleFor('protestant'), 'pastor');
+  assert.equal(occupations.clergyTitleFor('orthodox'), 'priest');
+  assert.equal(occupations.clergyTitleFor('nation-of-islam'), 'minister');
+  // Moorish Science Temple's post-1929 faction split left no single
+  // current title confirmed by the research behind this round — null,
+  // not a guess, same as any other tradition this map does not name.
+  assert.equal(occupations.clergyTitleFor('moorish-science-temple'), null);
+  assert.equal(occupations.clergyTitleFor('buddhist'), null);
+  assert.equal(occupations.clergyTitleFor(undefined), null);
+});

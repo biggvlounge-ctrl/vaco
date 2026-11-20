@@ -640,6 +640,36 @@ const DEFINING_POST = {
   //: `business`, `corporation`, `club` → null, on purpose.
 };
 
+// ---------------------------------------------------------------------
+// Real clergy titles — by direct instruction ("we need to include
+// imams"). The mechanical occupation stays the one real `preacher`
+// (tier 3, `employers: ['religion']`) for every tradition — a title is
+// what the real world calls this post, not a second occupation with
+// identical skill/tier/employer fields. Real and generic; no title
+// here is specific to any one named congregation.
+const CLERGY_TITLES = {
+  muslim: 'imam',
+  jewish: 'rabbi',
+  catholic: 'priest',
+  protestant: 'pastor',
+  orthodox: 'priest',
+  // Nation of Islam's own real internal usage is "Minister" (its
+  // mosques are themselves literally named "Mosque," e.g. "Muhammad
+  // Mosque No. 2") — a different real title from mainstream Islam's
+  // "imam," named here rather than conflated with it.
+  'nation-of-islam': 'minister',
+};
+
+// Null, not a guessed title, for any tradition not named above —
+// including the Moorish Science Temple of America on purpose: its
+// post-1929 fragmentation into separate real factions (Kirkman Bey, C.
+// Mealy El, Givens El) left no single current title confirmed by the
+// research behind this round, and a guessed one would misstate that
+// real uncertainty as settled fact.
+function clergyTitleFor(traditionKey) {
+  return CLERGY_TITLES[traditionKey] ?? null;
+}
+
 // The infrastructure the schema defines has no operator column at all,
 // so the link from a water plant to the person who runs it has to be
 // stated somewhere. §25's own subject list is what names them:
@@ -961,6 +991,8 @@ module.exports = {
   OCCUPATION_NAMES,
   DEFINING_POST,
   INFRASTRUCTURE_POST,
+  CLERGY_TITLES,
+  clergyTitleFor,
   postFor,
   postForInfrastructure,
   TIER_MINIMUM_LEVEL,

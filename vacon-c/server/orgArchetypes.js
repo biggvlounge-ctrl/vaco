@@ -381,13 +381,106 @@ const ARCHETYPES = {
       resources: [15, 45],
       territory: [0, 10],
     },
-    // `teacher` is this file's own closest real occupation to
-    // "someone who leads a congregation" (`occupations.js` has no
-    // `priest`/`clergy` role) — named here rather than invented, the
-    // same honesty `aid organization`'s own posts already apply
-    // choosing `physician`/`orderly` over a role this engine does not
-    // have.
-    posts: ['teacher'],
+    // **Corrected, not invented — `occupations.js` already has the
+    // real role this comment once said did not exist.** `preacher`
+    // (tier 3, `employers: ['religion']`) and `DEFINING_POST.religion
+    // = 'preacher'` are both real and already there; `teacher`'s own
+    // `employers` list is `['school']` only, so the original `posts:
+    // ['teacher']` here named a real occupation that does not
+    // recognize this archetype's organization type at all — found by
+    // checking `occupations.js` directly rather than trusting this
+    // file's own prior claim about it ("citation is not presence,"
+    // aimed at this file's own comment this time).
+    posts: ['preacher'],
+  },
+
+  // **Nation of Islam mosque — real, at an explicitly lower confidence
+  // tier than `'religious order'`, by direct instruction after the
+  // ninety-fifth standing rule's own decline was raised and
+  // reconsidered.** That rule correctly declined NOI/MSTA at
+  // CENSUS-TIER confidence — Pew and the U.S. Religion Census treat
+  // Muslim as one undifferentiated tradition and have no entry for
+  // either organization. This is a narrower, different claim: a real
+  // but ROUGH secondary-source estimate (ADL's own profile; religion
+  // scholar Lawrence Mamiya's academic estimate; USC's Center for
+  // Religion and Civic Culture), the same confidence tier
+  // `countryPacks.js` already flags `'secondary-estimate'` for
+  // military-expenditure figures — never claimed as neutral census
+  // data, and `membershipEstimate`/`mosqueCountEstimate` below carry
+  // the real range rather than a fabricated point figure.
+  'nation of islam mosque': {
+    type: 'religion',
+    reach: 'community',
+    note: 'A real, named religious organization distinct from mainstream '
+      + 'Islam and from the Moorish Science Temple of America — NOI does '
+      + 'not participate in standard census-style congregation surveys, '
+      + 'so every figure here is a secondary estimate, named as such.',
+    traits: {
+      internalLoyalty: [65, 90],
+      diplomacy: [30, 60],
+      resources: [15, 45],
+      territory: [0, 10],
+    },
+    posts: ['preacher'],
+    clergyTitle: 'minister',
+    confidence: 'secondary-estimate',
+    // ADL: "between 10,000 and 50,000," and separately "estimated at
+    // less than 50,000." Lawrence Mamiya (religion scholar) and USC
+    // CRCC converge on roughly 30,000-35,000 as the most commonly
+    // cited scholarly midpoint. Carried as a range, never a point
+    // estimate.
+    membershipEstimateRange: [10000, 50000],
+    membershipEstimateMidpoint: 32500,
+    // ADL: "at least 130 local chapters." Mamiya, separately: ~130
+    // mosques. A third source: "mosques and study groups in over 120
+    // American cities." Converges around 120-130.
+    mosqueCountEstimateRange: [120, 130],
+  },
+
+  // **Moorish Science Temple of America — real, and the fragmentation
+  // itself is the headline fact rather than a number to resolve.**
+  // Founded 1913 by Noble Drew Ali in Newark, NJ; explicitly NOT the
+  // same organization as the Nation of Islam or mainstream Islam —
+  // its own theology (Moorish/Washitaw-Asiatic identity, the "Circle
+  // Seven Koran") is distinct from both. Split into multiple rival
+  // factions after Ali's 1929 death (Kirkman Bey, C. Mealy El, Givens
+  // El lineages, all reported still active), which is why there is no
+  // current unified membership or temple count to cite — the
+  // fragmentation is itself the real, citable fact, not a gap in the
+  // research.
+  'moorish science temple': {
+    type: 'religion',
+    reach: 'community',
+    note: 'A real, historically significant religious movement, distinct '
+      + 'from the Nation of Islam and from mainstream Islam. No current '
+      + 'unified membership or temple count exists because the '
+      + 'organization itself has been factionally split since 1929 — '
+      + 'historical figures only, named by era rather than blended into '
+      + 'one misleading "current" number.',
+    traits: {
+      internalLoyalty: [55, 85],
+      diplomacy: [30, 60],
+      resources: [10, 35],
+      territory: [0, 10],
+    },
+    posts: ['preacher'],
+    // No real current title confirmed by the research behind this
+    // round — `occupations.clergyTitleFor` returns null for this
+    // tradition on purpose rather than guessing one.
+    confidence: 'secondary-estimate',
+    // 1920s peak (1925-29): ~30,000 across 17 temples (one
+    // contemporary Chicago Tribune estimate ran as high as 35,000; a
+    // lower secondary estimate says 15,000 across the same 17). 1930s:
+    // ~30,000, roughly a third in Chicago. 1950s: ~10,000 across ~15
+    // temples. 1990s: the largest surviving faction reported 130
+    // temples as of 1996. No current (post-2000) unified figure — the
+    // honest declaration, not an oversight.
+    historicalMembershipByEra: {
+      '1920s-peak': { estimate: 30000, templeCount: 17 },
+      '1930s': { estimate: 30000, templeCount: null },
+      '1950s': { estimate: 10000, templeCount: 15 },
+      '1990s-largest-faction': { estimate: null, templeCount: 130 },
+    },
   },
 
   // **Genuinely new again, by direct instruction: "certain racial
