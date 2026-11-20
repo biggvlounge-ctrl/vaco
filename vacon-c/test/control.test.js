@@ -398,10 +398,12 @@ test('taking an organization installs the tribe’s head as its leader', () => {
   assert.equal(w.organizations[0].leader_id, w.families[0].head_npc_id);
 });
 
-test('where the schema has no control column, the attempt says so', () => {
-  // Rather than inventing one. `territory_blocks.faction_id` references
-  // `factions(organization_id)` specifically, so a FAMILY taking a
-  // block has nowhere to be written.
+test('a real family win at community scale is now really recorded, in worldState.familyTerritory', () => {
+  // `territory_blocks.faction_id` still references `factions
+  // (organization_id)` specifically, so a family's real win still
+  // cannot be written there -- but task #49 closed the real gap this
+  // test used to document: the world no longer forgets a family that
+  // actually won a real community-scale takeover.
   const w = world();
   w.communities.push({ id: 400, city_id: 1 });
   member(w, { years: 30 });
@@ -413,8 +415,10 @@ test('where the schema has no control column, the attempt says so', () => {
     });
   }
   assert.ok(result.succeeded);
-  assert.equal(result.seized.recorded, null);
-  assert.match(result.seized.declared, /territory_blocks/);
+  assert.equal(result.seized.recorded, true);
+  assert.equal(result.seized.communityId, 400);
+  assert.equal(result.seized.familyId, 900);
+  assert.equal(w.familyTerritory[400].familyId, 900);
 });
 
 test('the draw is seeded on the occasion and repeats exactly', () => {

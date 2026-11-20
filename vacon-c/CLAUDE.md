@@ -8017,3 +8017,56 @@ removing `pushFor`'s `POVERTY_PUSH_FLOOR` gate — each caught by a real
 test in `test/property.test.js`/`test/migration.test.js`, including
 the real 300-tick generated-world test staying green throughout.
 
+**A hundred-and-twenty-seventh, continuing the same "next five" set:
+family/tribe territorial dominance + city-wide escalation — and both
+files this closed had already, honestly, named the exact gap in their
+own words.**
+
+`control.js#SCALES.community.seize` was a declared no-op: `seize: ()
+=> ({recorded: null, declared: 'territory_blocks.faction_id references
+factions, not families'})`. `dominance.js`'s own header separately
+named the identical gap from the other side — "Families (tribes) are
+the one real input this cannot cover the identical way... A family's
+own real route to holding ground is control.js's takeover key." Two
+files, each honestly admitting the same missing write, neither
+building it until this task.
+
+**The fix is in `control.js` itself, not a workaround in the new
+module.** `seize` now really writes `worldState.familyTerritory[target
+.id] = { familyId: tribeId, sinceTick: tick }` and returns `{recorded:
+true, communityId, familyId}` — the real takeover key families already
+had access to (per the nineteenth standing rule's own composition
+work) simply had nowhere real to record a win. `server/
+familyDominance.js` is the reader: `dominantFamilyOf` (the real family
+with the most real resident members in a community, mirroring
+`membership.organizationPresence`'s shape), `familyHolderOf` (reads
+the new field), `attemptFamilyDominance` (gated on `authority.writOf`
+— a governed community is never attempted — and on idempotence via
+`familyHolderOf`, before calling the real, unmodified
+`control.attempt` at `scale: 'community'`), `scanForFamilyPowerVacuums`
+(mirrors `dominance.js#scanForPowerVacuums`'s own shape), and
+`cityFamilyDominanceOf` — "city-wide escalation" built literally as a
+real majority-of-a-city's-communities rollup, `CITY_WIDE_MAJORITY =
+0.5`.
+
+**`worldState.familyTerritory` is in-memory only, the identical
+documented posture `worldState.prisonGangs`/`city.healthBaseline`
+already carry** — real, but no schema column exists and a Postgres
+restore will not bring it back. Not a silent gap: the same declared
+limitation this file already keeps for both of those.
+
+**A non-robust mutation test was caught and fixed before shipping,
+the same shape the family-dominance idempotence check needed twice.**
+The first version of "a community a family already holds is never
+attempted again" built NO real family roster at all, so
+`attemptFamilyDominance` returned null through the unrelated `if
+(!dominant) return null;` check whether or not the idempotence gate
+existed — removing the gate changed nothing observable, so the
+mutation went uncaught. Fixed by adding a real `familyRoster` to the
+fixture, so the idempotence gate is the only thing standing between
+the test and a real, non-null attempt; re-verified the mutation was
+then caught. Mutation-verified four times in total: `dominantFamilyOf`
+forced to always return null, the governed-regime gate removed, the
+(fixed) idempotence gate removed, and `control.js`'s real `seize`
+write reverted to the old no-op — all four caught.
+

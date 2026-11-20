@@ -1889,6 +1889,21 @@ round (see that constant's own header). Poverty pushes residents
 instead, leaving the fragile margin untouched. See CLAUDE.md's
 hundred-and-twenty-sixth standing rule.
 
+## Family/tribe territorial dominance + city-wide escalation
+`control.js#SCALES.community.seize` was a declared no-op naming the
+exact gap it closed in its own comment; it now really writes
+`worldState.familyTerritory[communityId] = {familyId, sinceTick}`.
+`server/familyDominance.js` reads it: `dominantFamilyOf` (the real
+family with the most real resident members in a community),
+`familyHolderOf`, `attemptFamilyDominance` (gated on a governed
+regime via `authority.writOf` and on idempotence, before calling the
+real, unmodified `control.attempt`), `scanForFamilyPowerVacuums`, and
+`cityFamilyDominanceOf` — a real majority-of-a-city's-communities
+rollup, the literal "city-wide escalation." `worldState.familyTerritory`
+is in-memory only, the same documented posture
+`worldState.prisonGangs`/`city.healthBaseline` already carry. See
+CLAUDE.md's hundred-and-twenty-seventh standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

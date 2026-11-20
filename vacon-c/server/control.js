@@ -386,8 +386,7 @@ const SCALES = {
 
   // A block. `territory_blocks.faction_id` is the schema's own record
   // of who holds ground, and its FK is to `factions(organization_id)`
-  // specifically — so a FAMILY taking a block cannot be written there,
-  // which the entry says rather than working around.
+  // specifically — so a FAMILY taking a block cannot be written there.
   community: {
     find: (worldState, id) => (worldState.communities || []).find((c) => c.id === id) ?? null,
     // Everybody who lives there. A neighbourhood is held by its
@@ -395,14 +394,23 @@ const SCALES = {
     // building on it, and that is the right shape.
     holders: (worldState, target) => residentsOfCommunity(worldState, target.id),
     specialists: () => [],
-    //: `territory_blocks.faction_id REFERENCES factions(organization_id)`.
-    //: A tribe is a family, not a faction, so this records nothing and
-    //: says why. A faction taking a block is `resolveTerritoryControl`
-    //: and already exists.
-    seize: () => ({
-      recorded: null,
-      declared: 'territory_blocks.faction_id references factions, not families',
-    }),
+    //: `territory_blocks.faction_id REFERENCES factions(organization_id)`
+    //: still cannot record a family — but "records nothing" was itself
+    //: the real gap task #49 ("family/tribe territorial dominance")
+    //: closed: a family could WIN this real, probabilistic takeover
+    //: (real composition, real materiel, a real success draw) and the
+    //: world then forgot it ever happened. `worldState.familyTerritory`
+    //: is the same real, in-memory-only posture `worldState.
+    //: prisonGangs` already carries for the identical reason — no
+    //: schema column exists for a family holding a community, adding
+    //: one is real, separate schema work, and a world restored from
+    //: Postgres loses it the same documented, stated way `prisonGangs`
+    //: does. `server/familyDominance.js` is the real reader.
+    seize: (worldState, target, tribeId, tick) => {
+      worldState.familyTerritory = worldState.familyTerritory || {};
+      worldState.familyTerritory[target.id] = { familyId: tribeId, sinceTick: tick };
+      return { recorded: true, communityId: target.id, familyId: tribeId };
+    },
   },
 
   // A city.
