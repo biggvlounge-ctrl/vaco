@@ -47,7 +47,7 @@
 
 'use strict';
 
-const { hashSeed, seededUnit } = require('./seeded.js');
+const { hashSeed, seededUnit, seededDraw } = require('./seeded.js');
 
 const { getLiveEntity } = require('./entityTraits.js');
 
@@ -197,6 +197,48 @@ function winProbability(ratingA, ratingB) {
 }
 
 // ---------------------------------------------------------------------------
+// The loser's own outcome — real, by direct instruction: "NPCs can
+// run, tap out, choose not to fight once they feel a punch... everybody
+// punches different, kicks different power, runs different speed." A
+// combat bout was strictly binary (win/lose) with no way for the loser
+// to have done anything other than stand there and be beaten.
+//
+// **Reuses the exact real inputs `rateEntity('combat')` already reads
+// and the exact real sigmoid `winProbability` already is — no third
+// invented curve or threshold.** `combat['Composure Under Fire']` is
+// combat's own real measure of holding together under pressure;
+// `physical['Pain Tolerance']` is the request's own "once they feel a
+// punch." Their mean, run through `winProbability` against 50 — the
+// trait scale's own neutral centre, the twelfth standing rule's
+// "centre on the average person" applied here — gives the chance an
+// ORDINARY loser keeps fighting to the end. A loser who keeps fighting
+// is the identical, unchanged `resolveContest` result this function
+// always produced; this only ever adds a second real outcome for the
+// loser who does not.
+//
+// **Fled vs. submitted is a real trait comparison, not a second
+// invented probability.** `physical.Agility` carries the fight-vs-flee
+// choice already: a loser whose own Agility exceeds their own
+// Composure Under Fire runs, because that is the one thing they are
+// relatively better at; otherwise they stay and submit.
+function resolveLoserOutcome(worldState, { loserId, seed }) {
+  const live = getLiveEntity(worldState, loserId);
+  const composure = Number(live?.traits?.combat?.['Composure Under Fire']);
+  const painTolerance = Number(live?.traits?.physical?.['Pain Tolerance']);
+  const agility = Number(live?.traits?.physical?.Agility);
+  if (!Number.isFinite(composure) || !Number.isFinite(painTolerance)) {
+    // Neither trait generated for this entity -- an unrated resolve
+    // cannot be given a number any more than an unrated combat skill
+    // can (rateEntity's own refusal, same reasoning).
+    return 'defeated';
+  }
+  const resolve = (composure + painTolerance) / 2;
+  const keepsFighting = seededDraw([seed, 'contest-resolve', loserId]) < winProbability(resolve, 50);
+  if (keepsFighting) return 'defeated';
+  return Number.isFinite(agility) && agility > composure ? 'fled' : 'submitted';
+}
+
+// ---------------------------------------------------------------------------
 // resolveContest()
 // ---------------------------------------------------------------------------
 // options:
@@ -232,6 +274,20 @@ function resolveContest(worldState, options = {}) {
   const draw = seededUnit(seed);
   const { winner, favourite, probability } = pickWinner(rated, draw);
 
+  // Real for `combat` only — nobody flees a card game or a footrace,
+  // and `resolveLoserOutcome` reads traits (`Composure Under Fire`,
+  // `Pain Tolerance`) that only `combat`'s own discipline weights
+  // give meaning to. Every participant other than the winner gets a
+  // real outcome; `pickWinner` generalises past two entrants, so a
+  // three-way bout can have two losers with two different outcomes.
+  const loserOutcomes = discipline === 'combat'
+    ? Object.fromEntries(
+      participantIds
+        .filter((id) => id !== winner.entityId)
+        .map((loserId) => [loserId, resolveLoserOutcome(worldState, { loserId, seed })]),
+    )
+    : null;
+
   return {
     contestId,
     discipline,
@@ -246,6 +302,9 @@ function resolveContest(worldState, options = {}) {
     upset: winner.entityId !== favourite.entityId,
     ratings: rated.map((r) => ({ entityId: r.entityId, rating: r.rating })),
     contributions: Object.fromEntries(rated.map((r) => [r.entityId, r.contributions])),
+    // `null` for every non-combat discipline -- a declared absence,
+    // never an empty object a caller could mistake for "nobody fled."
+    loserOutcomes,
   };
 }
 

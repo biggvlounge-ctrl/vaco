@@ -1464,6 +1464,13 @@ function resolveContest(options) {
   const entrantIds = result.ratings.map((r) => r.entityId);
   for (const entityId of entrantIds) {
     const won = entityId === result.winnerId;
+    // **The loser's own real outcome, by direct instruction — "NPCs
+    // can run, tap out, choose not to fight."** `result.loserOutcomes`
+    // is real for every combat contest (contest.js's own
+    // `resolveLoserOutcome`); `'defeated'` is the unchanged original
+    // behaviour, so a world where nobody ever flees or submits is
+    // byte-identical to before this existed.
+    const outcome = won ? null : result.loserOutcomes?.[entityId] ?? 'defeated';
     behavior.applyStress(WorldState, entityId, won ? SHOWDOWN_STRESS_WIN : SHOWDOWN_STRESS_LOSS);
     applyKeyModifierTo(
       WorldState, entityId, 'personality', 'Confidence',
@@ -1479,7 +1486,10 @@ function resolveContest(options) {
       entityId,
       memoryType: won ? 'positive' : 'negative',
       category: 'conflict',
-      description: won ? 'won a real fight' : 'lost a real fight',
+      description: won ? 'won a real fight'
+        : outcome === 'fled' ? 'fled a real fight'
+          : outcome === 'submitted' ? 'submitted in a real fight'
+            : 'lost a real fight',
       importance: 60,
       emotionLevel: won ? 55 : 75,
       relatedEntityIds: entrantIds.filter((id) => id !== entityId),

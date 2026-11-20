@@ -2011,6 +2011,17 @@ write site. A 2,500-person `generateWorld` call that took 46 seconds
 against an already-7,500-person world now takes under 5. See
 CLAUDE.md's hundred-and-forty-ninth standing rule.
 
+## Real flee/submit outcome in combat
+`contest.resolveContest`'s combat discipline was strictly binary
+(win/lose). `loserOutcomes` is now real for combat (`null` for
+sport/teamSport/precision/wits): `'defeated'`, `'fled'`, or
+`'submitted'`, from the loser's own real `Composure Under Fire` and
+`Pain Tolerance` traits run through the existing win-probability
+sigmoid, with Agility vs. Composure deciding fled vs. submitted.
+`engine.resolveContest`'s real stress/confidence/memory/event
+consequences now report what actually happened. See CLAUDE.md's
+hundred-and-fiftieth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

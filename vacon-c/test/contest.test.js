@@ -470,3 +470,145 @@ test('a house game resolves and re-verifies like any other contest', () => {
   });
   assert.equal(again.winnerId, result.winnerId, 'the same game played out differently');
 });
+
+// ---------------------------------------------------------------------------
+// The loser's real outcome -- flee, submit, or fight to the end
+// ---------------------------------------------------------------------------
+// By direct instruction: "NPCs can run, tap out, choose not to fight
+// once they feel a punch." A combat bout was strictly binary; it had
+// no way for the loser to have done anything but stand there.
+
+test('loserOutcomes is real for combat and null for every other discipline', () => {
+  const strong = fighter({
+    combat: { 'Melee Skill': 95, 'Weapon Mastery': 90, 'Tactical Awareness': 85, 'Composure Under Fire': 90 },
+    physical: { Strength: 90, Endurance: 90, Agility: 50, Reflexes: 80, 'Pain Tolerance': 80 },
+  });
+  const weak = fighter({
+    combat: { 'Melee Skill': 10, 'Weapon Mastery': 10, 'Tactical Awareness': 10, 'Composure Under Fire': 10 },
+    physical: { Strength: 10, Endurance: 10, Agility: 10, Reflexes: 10, 'Pain Tolerance': 10 },
+  });
+
+  const combatResult = contest.resolveContest(engine.WorldState, {
+    contestId: 'flee-1', participantIds: [strong.id, weak.id], discipline: 'combat',
+  });
+  assert.ok(combatResult.loserOutcomes, 'combat should carry a real loserOutcomes object');
+  const loserId = [strong.id, weak.id].find((id) => id !== combatResult.winnerId);
+  assert.ok(['defeated', 'fled', 'submitted'].includes(combatResult.loserOutcomes[loserId]),
+    `unexpected loser outcome: ${combatResult.loserOutcomes[loserId]}`);
+
+  const gameResult = contest.resolveContest(engine.WorldState, {
+    contestId: 'flee-2', participantIds: [strong.id, weak.id], discipline: 'precision',
+  });
+  assert.equal(gameResult.loserOutcomes, null, 'nobody flees a game of pool');
+});
+
+test('fled vs. submitted is a real trait comparison -- found by mutation, not asserted on a lucky seed', () => {
+  // **A mutation this round went uncaught the first time**: the first
+  // version of this test only checked that the outcome was one of the
+  // three valid strings, which cannot tell "fled vs. submitted is a
+  // real distinction" apart from "always submitted" — the exact
+  // non-robust-mutation-test shape this project's own CLAUDE.md
+  // repeatedly names. Found by deliberately hard-coding 'submitted'
+  // in `resolveLoserOutcome`'s fled/submitted branch and confirming
+  // the suite still passed; fixed by searching for two real fixtures
+  // and contestIds that deterministically land on each branch.
+  const strong = fighter({
+    combat: { 'Melee Skill': 95, 'Weapon Mastery': 90, 'Tactical Awareness': 85, 'Composure Under Fire': 90 },
+    physical: { Strength: 90, Agility: 50, 'Pain Tolerance': 90 },
+  });
+
+  // Agility (90) exceeds Composure Under Fire (5) -- the real thing
+  // this loser is relatively better at is running.
+  const runner = fighter({
+    combat: { 'Melee Skill': 10, 'Weapon Mastery': 10, 'Tactical Awareness': 10, 'Composure Under Fire': 5 },
+    physical: { Strength: 10, Agility: 90, 'Pain Tolerance': 5 },
+  });
+  const fledResult = contest.resolveContest(engine.WorldState, {
+    contestId: 'flee-fled', participantIds: [strong.id, runner.id], discipline: 'combat', tick: 0,
+  });
+  assert.equal(fledResult.loserOutcomes[runner.id], 'fled');
+
+  // Composure Under Fire (30) exceeds Agility (5) -- real resolve is
+  // still low enough to break, but running is not this loser's
+  // relative strength, so they stay and submit instead.
+  const stander = fighter({
+    combat: { 'Melee Skill': 10, 'Weapon Mastery': 10, 'Tactical Awareness': 10, 'Composure Under Fire': 30 },
+    physical: { Strength: 10, Agility: 5, 'Pain Tolerance': 5 },
+  });
+  const submitResult = contest.resolveContest(engine.WorldState, {
+    contestId: 'flee-submit', participantIds: [strong.id, stander.id], discipline: 'combat', tick: 0,
+  });
+  assert.equal(submitResult.loserOutcomes[stander.id], 'submitted');
+});
+
+test('a loser with no real composure or pain-tolerance trait is honestly "defeated", not given a number it never had', () => {
+  // `fighter()` generates a real NPC with every trait family. This one
+  // keeps enough of `combat` for `rateEntity` to still rate it (the
+  // discipline is unaffected by this test) but has neither of
+  // `resolveLoserOutcome`'s own two real inputs removed outright --
+  // the same refusal `rateEntity` itself makes for a truly unrated
+  // entity, applied one level down.
+  const npc = engine.generateNPC();
+  const traitId = getTraitId('combat', 'Composure Under Fire');
+  const painId = getTraitId('physical', 'Pain Tolerance');
+  engine.WorldState.entityTraits = engine.WorldState.entityTraits.filter(
+    (r) => !(r.entity_id === npc.id && (r.trait_id === traitId || r.trait_id === painId)),
+  );
+  const strong = fighter({
+    combat: { 'Melee Skill': 95, 'Weapon Mastery': 90, 'Tactical Awareness': 85, 'Composure Under Fire': 90 },
+  });
+
+  const result = contest.resolveContest(engine.WorldState, {
+    contestId: 'flee-3', participantIds: [strong.id, npc.id], discipline: 'combat',
+    tick: 0,
+  });
+  if (result.winnerId !== npc.id) {
+    assert.equal(result.loserOutcomes[npc.id], 'defeated');
+  }
+});
+
+test('a loser who keeps their resolve is reported "defeated", unchanged from the original binary result', () => {
+  // The real, measured-high case: a loser with real composure and pain
+  // tolerance set to the trait scale's own ceiling should overwhelmingly
+  // keep fighting rather than flee or submit -- the behaviour this
+  // feature must not have changed for an ordinary loser.
+  const strong = fighter({
+    combat: { 'Melee Skill': 95, 'Weapon Mastery': 90, 'Tactical Awareness': 85, 'Composure Under Fire': 95 },
+    physical: { Strength: 90, Agility: 50, 'Pain Tolerance': 95 },
+  });
+  const weak = fighter({
+    combat: { 'Melee Skill': 10, 'Weapon Mastery': 10, 'Tactical Awareness': 10, 'Composure Under Fire': 95 },
+    physical: { Strength: 10, Agility: 10, 'Pain Tolerance': 95 },
+  });
+
+  const result = contest.resolveContest(engine.WorldState, {
+    contestId: 'flee-4', participantIds: [strong.id, weak.id], discipline: 'combat', tick: 1,
+  });
+  const loserId = [strong.id, weak.id].find((id) => id !== result.winnerId);
+  assert.equal(result.loserOutcomes[loserId], 'defeated',
+    'a loser with maximum real resolve should not flee or submit');
+});
+
+test('engine.resolveContest records what actually happened to the loser, not a flat "lost a real fight" always', () => {
+  const strong = fighter({
+    combat: { 'Melee Skill': 95, 'Weapon Mastery': 90, 'Tactical Awareness': 85, 'Composure Under Fire': 10 },
+    physical: { Strength: 90, Agility: 90, 'Pain Tolerance': 5 },
+  });
+  const weak = fighter({
+    combat: { 'Melee Skill': 10, 'Weapon Mastery': 10, 'Tactical Awareness': 10, 'Composure Under Fire': 5 },
+    physical: { Strength: 10, Agility: 90, 'Pain Tolerance': 5 },
+  });
+
+  const before = engine.WorldState.memories.length;
+  const result = engine.resolveContest({
+    contestId: 'flee-5', participantIds: [strong.id, weak.id], discipline: 'combat',
+  });
+  const loserId = [strong.id, weak.id].find((id) => id !== result.winnerId);
+  const added = engine.WorldState.memories.slice(before);
+  const loserMemory = added.find((m) => m.entity_id === loserId);
+  assert.ok(loserMemory, 'the loser should hold a real memory of this fight');
+  const outcome = result.loserOutcomes[loserId];
+  if (outcome === 'fled') assert.equal(loserMemory.description, 'fled a real fight');
+  else if (outcome === 'submitted') assert.equal(loserMemory.description, 'submitted in a real fight');
+  else assert.equal(loserMemory.description, 'lost a real fight');
+});

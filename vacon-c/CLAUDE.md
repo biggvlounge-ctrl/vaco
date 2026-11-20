@@ -8581,3 +8581,52 @@ fixed this round because `scheduleEvents` has three real writers
 (two of them filter-based removals on death/sentencing, not a single
 push site), which needs its own careful design rather than the
 four-line pattern this round reused three times safely.
+
+**A hundred-and-fiftieth, closing task #137 by direct instruction: "NPCs
+can run, tap out, choose not to fight once they feel a punch."**
+`contest.resolveContest`'s combat discipline was strictly binary —
+every entrant either won or lost, with no way a loser's own choice
+entered the result. Checked first whether this composed from
+something already real: nothing in `server/*.js` named flee,
+submit, surrender, retreat or tap-out as a combat concept before
+this (`groupFights.js`'s own `severity` — dead/injured/unharmed — is
+the loser's physical FATE after a group bout resolves, a different
+question from whether an individual loser kept fighting at all).
+
+**Reuses the exact real inputs `rateEntity('combat')` already reads
+and the exact real sigmoid `winProbability` already is — no third
+invented curve.** `combat['Composure Under Fire']` and
+`physical['Pain Tolerance']` (the request's own "once they feel a
+punch") average into a real `resolve` value, run through
+`winProbability` against 50 — the trait scale's own neutral centre,
+the twelfth standing rule's "centre on the average person" applied
+here rather than a fresh pick — for the chance an ORDINARY loser
+keeps fighting to the end. `'defeated'` is that unchanged original
+result; a loser who breaks gets a second real comparison, not a
+second invented probability: `physical.Agility` against their own
+`Composure Under Fire` decides fled vs. submitted, because running
+is the real thing a high-Agility loser is relatively better at.
+`contest.resolveContest` exposes this as `loserOutcomes`, real only
+for `discipline === 'combat'` (`null` for sport/teamSport/precision/
+wits — nobody flees a card game) and covering every non-winning
+entrant, since `pickWinner` already generalises past two entrants.
+
+**`engine.resolveContest`'s real "showdown" consequences** (stress,
+confidence swing, stamina cost, a memory, an event) already existed
+for every combat bout and now report what actually happened — "fled
+a real fight" / "submitted in a real fight" / "lost a real fight" —
+rather than one flat description regardless of outcome, with every
+numeric consequence otherwise unchanged.
+
+**A non-robust mutation test, caught before it shipped rather than
+after — the same pattern this project's own history keeps finding.**
+The first version of the fled-vs-submitted test only asserted the
+outcome was one of the three valid strings; hard-coding
+`'submitted'` into the fled/submitted branch passed that test
+unchanged. Fixed by searching for two real fixtures and contestIds
+that deterministically land on each branch and asserting the
+specific one each should produce. Mutation-verified three times in
+total: the `discipline === 'combat'` gate, the fled/submitted trait
+comparison, and the `keepsFighting` sigmoid gate itself — each
+caught, `server/contest.js` confirmed byte-identical to its own
+pre-mutation backup afterward.
