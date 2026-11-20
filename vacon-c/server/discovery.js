@@ -97,6 +97,9 @@ const POOLS = {
   // across every category" — one clause, two categories, and until
   // `landmarks.js` gained a `school` there was only one to attach it to.
   school: { books: 'all' },
+  // The identical real "Schools/Libraries" discovery clause — a
+  // private school is still a school, for this purpose.
+  'private-school': { books: 'all' },
   'theater-concert-hall': { artifacts: true },
   'notable-bridge': null,
   'monument-memorial': { artifacts: true },

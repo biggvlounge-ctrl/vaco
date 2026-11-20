@@ -83,6 +83,10 @@ const KEY_CATEGORIES = [
   // One more, by direct instruction ("big apartment complexes") --
   // see `vacon-c/server/landmarks.js`'s own comment above this entry.
   'apartment-complex',
+  // One more, "school system depth" -- a real, separate population
+  // `school`'s own public-only density never covered. See
+  // `vacon-c/server/landmarks.js`'s own comment above this entry.
+  'private-school',
 ];
 
 // UNESCO inscription is treated as maximal historical importance by

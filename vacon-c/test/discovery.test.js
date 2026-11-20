@@ -437,8 +437,9 @@ test('describeDiscovery names the poolless categories rather than hiding them', 
   // (distribution-center/industrial-plant) + 2 (discount-store/
   // restaurant) + 1 (big-box-store) + 2 (car-lot/car-wash) + 4
   // (military-base/forest/river/lake) + 1 (apartment-complex) + 4
-  // (bank/gas-station/liquor-store/nursing-home) = 57.
-  assert.equal(report.categories, 57);
+  // (bank/gas-station/liquor-store/nursing-home) + 1 (private-school,
+  // "school system depth") = 58.
+  assert.equal(report.categories, 58);
   assert.ok(report.poolless.includes('prison'));
   assert.ok(report.poolless.length < report.categories, 'nothing is searchable at all');
 });

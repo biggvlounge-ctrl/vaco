@@ -8180,3 +8180,95 @@ in this file already holds. Three gates mutation-verified: the
 employment exclusion, the real NCES-derived capacity bound, and the
 top-rung graduation/dropout distinction — all three caught.
 
+**A hundred-and-thirtieth, closing the last of this "next five" set:
+school system depth — grade/middle/high, private/religious (Christian/
+Jewish), performing-arts, and a real college/community-college
+inventory — attached as real attributes rather than a dozen new
+landmark categories.**
+
+`landmarks.js`'s own `school`/`university` categories have always been
+flat: one undifferentiated building each, with a real per-capita
+national rate but no real internal structure. `school`'s own comment
+already said its NCES count (99,297) is PUBLIC schools only — a real,
+separate population that count never covered — so `private-school` is
+the one genuinely new landmark category this round adds
+(`REPEATABLE_DENSITY_PER_1K`, NCES Private School Universe Survey
+2017-18: 28,141 private schools), riding `config.realLandmarkDensity`'s
+existing per-category loop the identical way every other entry in that
+table already does. Everything else — grade/middle/high level, private
+religious affiliation, the performing-arts flag, and a university's
+real 2-year/4-year split — is a real ATTRIBUTE `server/schoolSystem.js
+#assignSchoolDepth` writes onto whichever `school`/`private-school`/
+`university` properties a world already has, never a second landmark
+category per combination (which would have multiplied
+`CREW_BY_CATEGORY`/`KEY_BUILDING_TYPES` by a dozen entries all sharing
+the identical real crew and operator shape).
+
+**The real, cited shares, and what was honestly declared rather than
+guessed.** School level: NCES Digest Table 216.30 (2021 ed.), 2019-20
+public-school distribution (elementary 53.1%, middle 16.5%, secondary
+23.9%, other/ungraded 5.0%, normalized to sum to 1.0), reused for
+private schools too since no separate private-only level breakdown was
+found. Private-school religious affiliation: NCES PSS 2017-18 (72.4%
+religious, 24.7% Catholic) crossed with the AVI CHAI Foundation's own
+independent census of US Jewish day schools (Schick, 2013-14: 861
+schools, later reporting near 900) — the real, separate count PSS's own
+"other religious" bucket does not break out on its own, carved out of
+it the same way `islamicSectPacks.js` already uses a separate Pew
+survey for a sub-split its main source does not carry. **Not found, and
+not guessed**: a PSS line item specifically for Jewish schools, or a
+clean "Christian" share distinct from PSS's own "other religious"
+bucket (which is overwhelmingly Christian denominations but also
+carries other non-Catholic, non-Jewish faiths) — reported honestly as
+`other_religious` rather than relabelled. Performing arts: **flagged
+interpretive**, a small declared rate on secondary schools — no
+national census of performing/visual-arts magnet high schools was
+found with the tools at hand, the same honest limit the fifty-first
+standing rule already names for thin coverage elsewhere. Institution
+type: IPEDS/NSB 2015-16 degree-granting institutions, 1,579 of 4,583
+at the 2-year level (~34.5%) — `'community-college'` is the real,
+common name used directly rather than the more technical IPEDS
+phrasing.
+
+**A real design question resolved before writing any code, not after:
+`private-school`'s operator is `propertyType: 'commercial'`, the same
+real schema type `skyscraper` already uses, not a match to a specific
+community's religious order.** `church`/`mosque`/`synagogue`/`temple`
+already match a community's own real religious order by CATEGORY; a
+private school's religious affiliation is a finer-grained real fact
+(Catholic vs. Jewish vs. other religious) than any order this engine's
+religious-order generator carries, and forcing a match would either
+invent an affiliation on the order or silently mismatch it — the
+honest, generic business operator every other non-government,
+non-religious category here already falls back to.
+
+**Opt-in, same posture as every other real-data round in this file**
+(`config.schoolSystemDepth`, default false): off, every `school`/
+`private-school`/`university` property is exactly as it was before
+this round, no new fields written onto any of them — `private-school`
+itself still rides `config.realLandmarkDensity` independently, since
+that flag is about which real attributes land on top of whatever
+properties already exist, not about which properties get placed.
+`server/schoolSystem.js#schoolSystemInventory` is the real, computed-
+never-stored per-city rollup this task's own "college/community-college
+inventory" phrase names directly.
+
+**A non-robust mutation test, caught the same shape this session's own
+gossip.js and familyDominance.js rounds already found, and fixed before
+it could ship a false positive.** The first version of "assignSchoolDepth
+is idempotent" called the real pass twice on an unchanged world and
+compared the result — which proves nothing, because the draw is a pure
+function of a stable position and reproduces the identical value
+whether or not the already-assigned guard exists at all; removing the
+guard went uncaught (14/14 still passing). The real scenario the guard
+protects is different: a future real data source (the same shape
+`religionPacks.js` already is for `npcs.religion`) setting this field
+directly, which this file's own flagged-interpretive draw must never
+clobber. Fixed by pre-setting a real value that provably differs from
+what the seeded draw would produce at that position, then asserting it
+survives the real pass untouched — re-verified the mutation then failed
+as expected (12/14). Mutation-verified three times in total: the
+private-school-only religious-affiliation gate, the (fixed)
+already-assigned guard, and the secondary-only performing-arts gate —
+all three caught.
+

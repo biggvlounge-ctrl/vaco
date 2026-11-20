@@ -136,6 +136,7 @@ const weapons = require('./weapons.js');
 const worldStore = require('./worldStore.js');
 const characterCreation = require('./characterCreation.js');
 const hiddenCaches = require('./hiddenCaches.js');
+const schoolSystem = require('./schoolSystem.js');
 const drugTrade = require('./drugTrade.js');
 const { hashSeed, seededUnit } = require('./seeded.js');
 
@@ -289,6 +290,22 @@ const DEFAULTS = {
   // already asserts against -- no crew ever hired beyond what
   // `prisonStaffing`/`securityForces` already do, same as today.
   institutionStaffing: false,
+  // **Opt-in, same posture — "school system depth": real grade/middle/
+  // high level, real private/religious (Catholic/Jewish/other
+  // religious/nonsectarian) affiliation, and a real 2-year/4-year
+  // split for university properties, all from NCES/AVI CHAI/IPEDS
+  // real cited shares. Off, every `school`/`university`/`private-
+  // school` property is exactly as it was before this round: no new
+  // fields written onto any of them.** `private-school` itself (a
+  // real, separate population `school`'s own density never covered —
+  // see `landmarks.REPEATABLE_DENSITY_PER_1K`'s own comment) already
+  // rides `config.realLandmarkDensity`'s existing per-category loop
+  // the identical way every other entry in that table does — this
+  // flag is about the real ATTRIBUTES on top of whatever properties
+  // exist, not about which properties get placed. See
+  // `server/schoolSystem.js`'s own header and CLAUDE.md's
+  // hundred-and-thirtieth standing rule.
+  schoolSystemDepth: false,
   // **Opt-in, same posture -- a direct question found a real structural
   // limit: every hero-tier landmark category is drawn WITHOUT
   // REPLACEMENT per city ("a settlement does not get four airports"),
@@ -3277,6 +3294,16 @@ function generateWorld(options = {}) {
     const caches = hiddenCaches.generateHiddenCaches(w, { tick, seed: config.seed });
     summary.hiddenCaches = (w.hiddenCaches || []).length;
     summary.hiddenCachesCreated = caches.length;
+  }
+
+  // **School system depth, opt-in (`config.schoolSystemDepth`, default
+  // false — see that flag's own comment on `DEFAULTS`).** After every
+  // real `school`/`private-school`/`university` property this world
+  // will ever generate already exists — the real per-city hero draw
+  // above and the real per-capita density loop earlier in this same
+  // function, both already real by the time execution reaches here.
+  if (config.schoolSystemDepth) {
+    schoolSystem.assignSchoolDepth(w);
   }
 
   // A world with no history of crime has no clearance rate and no

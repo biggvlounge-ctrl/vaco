@@ -195,6 +195,20 @@ const KEY_BUILDING_TYPES = {
     significance: [40, 70], propertyType: 'government', staff: 'teacher',
     discovery: 'knowledge books across every category',
   },
+  //: A real, separate population from `school` above -- NCES's own
+  //: public-school count does not cover it. `propertyType:
+  //: 'commercial'`, the same real schema type `skyscraper` already
+  //: uses for a privately-operated building: a private school is not
+  //: state-run, and matching it to a specific community's religious
+  //: order (the way `church`/`mosque`/`synagogue`/`temple` already do)
+  //: would need a specific-affiliation match this engine's religious
+  //: orders do not carry -- the honest, generic business operator
+  //: every other non-government, non-religious category here falls
+  //: back to.
+  'private-school': {
+    significance: [40, 70], propertyType: 'commercial', staff: 'teacher',
+    discovery: 'knowledge books across every category',
+  },
   'theater-concert-hall': {
     significance: [40, 65], propertyType: 'commercial', staff: 'curator',
     discovery: 'cultural/historical artifacts',
@@ -484,6 +498,14 @@ const REPEATABLE_DENSITY_PER_1K = {
   // small machine shop — the 500+-employee subset is the honest match
   // for that, not the 285,500 total.
   'industrial-plant': 0.0101,
+  // NCES Private School Universe Survey, 2017-18: 28,141 private K-12
+  // schools nationally (the same survey this file's own `school_system
+  // .js` reads for the real religious-affiliation split, kept to one
+  // survey year for both so the two real figures agree with each
+  // other). The `school` entry above counts PUBLIC schools only (its
+  // own comment says so) -- this is the real, separate population
+  // that comment deliberately did not cover.
+  'private-school': 0.0860,
 };
 
 const REPEATABLE_CATEGORIES = Object.keys(REPEATABLE_DENSITY_PER_1K);
@@ -858,6 +880,7 @@ const CREW_BY_CATEGORY = {
   'stadium-arena': 'venue',
   library: 'learning',
   school: 'schoolhouse',
+  'private-school': 'schoolhouse',
   'theater-concert-hall': 'venue',
   'notable-bridge': 'unmanned',
   'monument-memorial': 'unmanned',

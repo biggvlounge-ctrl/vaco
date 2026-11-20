@@ -93,9 +93,14 @@ test('THE KEY’s twenty-three categories are all here, plus the school and five
   // never built beyond `cave-system`/`natural-formation`.
   // **Thirty-eight, after `apartment-complex`** — a real, named
   // multi-family housing development, by direct instruction.
-  assert.equal(landmarks.KEY_BUILDING_CATEGORIES.length, 38);
+  //
+  // **Thirty-nine, after `private-school`** — "school system depth"
+  // (task #71), the real, separate population NCES's own public-school
+  // count for `school` does not cover. See CLAUDE.md's hundred-and-
+  // thirtieth standing rule.
+  assert.equal(landmarks.KEY_BUILDING_CATEGORIES.length, 39);
   assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes('school'));
-  for (const category of ['casino', 'fire-station', 'ems-station', 'ranger-station', 'port-terminal', 'mall', 'park', 'distribution-center', 'industrial-plant', 'military-base', 'forest', 'river', 'lake', 'apartment-complex']) {
+  for (const category of ['casino', 'fire-station', 'ems-station', 'ranger-station', 'port-terminal', 'mall', 'park', 'distribution-center', 'industrial-plant', 'military-base', 'forest', 'river', 'lake', 'apartment-complex', 'private-school']) {
     assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes(category), category);
   }
   for (const category of landmarks.KEY_BUILDING_CATEGORIES) {

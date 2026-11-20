@@ -1938,6 +1938,22 @@ from this population on both sides of the crossing. `GET
 /api/entities/:id/enrollment` is the real, live, never-stored read.
 See CLAUDE.md's hundred-and-twenty-ninth standing rule.
 
+## School system depth
+`server/schoolSystem.js`. `private-school` is the one genuinely new
+landmark category (NCES PSS 2017-18: 28,141 private schools, the real,
+separate population `school`'s own public-only density never
+covered); grade/middle/high level, private religious affiliation
+(Catholic/Jewish/other religious/nonsectarian, PSS crossed with the
+AVI CHAI Foundation's independent Jewish day-school census), a
+flagged-interpretive performing-arts flag, and a university's real
+2-year ("community college")/4-year split (IPEDS/NSB 2015-16) are all
+real ATTRIBUTES written onto whichever `school`/`private-school`/
+`university` properties a world already has, never a dozen new
+landmark categories. `schoolSystemInventory` is the real,
+computed-never-stored per-city rollup. Opt-in
+(`config.schoolSystemDepth`, default false). See CLAUDE.md's
+hundred-and-thirtieth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a
