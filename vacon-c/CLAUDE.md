@@ -7868,3 +7868,81 @@ and removing `assignToPlaybook`'s own category-vocabulary gate
 (confirms an unreal category would otherwise be accepted and applied)
 — each caught by a real test in `test/playbook.test.js`.
 
+**A hundred-and-twenty-fifth, closing the last of "the next 5 tasks":
+sub-governments for orgs/tribes/gangs/towns, cohesion scaling with
+organization level — and two of the four named kinds turned out to
+already have one.**
+
+**Checked directly before writing anything, the same discipline the
+forty-fifth entry's own overlap check just modelled.** Towns already
+have a real sub-government: `politics.foundGovernment`'s real
+`scope_type: 'city'` government row — added for "the full political
+hierarchy (town/city/state/country)" — IS a government whose
+jurisdiction is narrower than the civilization-wide one, which is
+exactly what the task names. Gangs already have one too:
+`membership.gangTierFor`'s own comment names `lieutenant` and
+`shot_caller` as "the rank[s] most trusted with command" among its six
+real, every-tick-rederived tiers — a real internal command structure,
+read here rather than rebuilt. Neither needed a single new line.
+
+**The real gap was the other two — an ordinary organization (a tribe,
+a business) has no formal sub-leader layer at all.** `server/
+subGovernment.js#assignSubLeaders` closes it the identical way
+`playbook.js#assignToPlaybook` already closed task #45's own gap: the
+same bulk, per-member try/catch shape over the same real `leadership.
+assignRole` primitive, so a real refusal or a real invalid member
+never erases the real outcome already applied to the rest of the
+batch (that file's own lesson, reused rather than relearned). The
+vocabulary is deliberately a DIFFERENT, smaller one from `playbook.
+PLAYBOOK_CATEGORIES` — `lieutenant`/`council_member`/`deputy` — stated
+plainly rather than left for someone to wonder why two near-identical
+files exist: a playbook category is a FUNCTION ("what you work on"),
+a sub-government role is AUTHORITY ("who answers to the leader
+directly"), and conflating the two would let one field carry two
+disagreeing kinds of standing. `assignSubLeaders` never calls
+`leadership.assignRole` for a gang and needs no code of its own to
+refuse one — that function already does, per member, for the real
+reason stated in ITS OWN header.
+
+**"Organization level" is real size, never an invented tier.**
+`membership.memberCount` is the identical real measure
+`influence.js#influenceRatingOf` already reads for the same reason — a
+bigger real roster is a bigger real fact, not a second "level" column
+invented to restate it. `subGovernmentCoverageOf` is the real ratio of
+actual sub-leaders (a gang's own real command-tier members, or this
+file's own vocabulary for an ordinary organization) against how many
+a real `MEMBERS_PER_SUBLEADER` span-of-control number says that size
+calls for — flagged interpretive, no document gives a real number,
+same honesty this project's other invented constants already carry.
+
+**`organizationCohesionOf` is deliberately NOT a copy of
+`familyTraits.cohesionOf`'s own pull/drag shape, and saying so plainly
+is the finding worth keeping.** That function blends a real PULL
+(unity + cooperation) against a real DRAG (`families.conflict`,
+a real written column). Checked directly before reaching for the same
+shape here: `traitDefinitions.ORGANIZATION_DEFINITIONS` names nine
+real dimensions (`power`, `membership`, `production`, `territory`,
+`resources`, `leadershipQuality`, `internalLoyalty`, `diplomacy`,
+`growthPotential`) and organizations have no conflict-equivalent
+column at all — inventing a drag term to force the same formula shape
+would have been a second, disagreeing number with nothing real behind
+it, the twenty-fifth standing rule's lesson about trusting a shape
+just because it worked somewhere else. The real organization-side pull
+is `internalLoyalty` (the real trait this vocabulary's own name
+already is); the real second term this file actually has is
+structural (`subGovernmentCoverageOf`), so cohesion is the real
+loyalty pull, narrowed toward half its value the less that real size
+is actually answered for by real command structure — "cohesion
+scaling with organization level," built literally rather than
+figuratively.
+
+Mutation-verified three times: removing the real gang/ordinary branch
+in `currentSubLeadersOf` (confirms a gang's own command tiers would
+otherwise go uncounted, or an ordinary organization would wrongly
+count them), dropping the coverage term from `organizationCohesionOf`
+entirely (confirms cohesion would otherwise never fall as an
+organization outgrows its real structure), and forcing
+`requiredSubLeadersFor` to ignore real member count (confirms every
+organization would otherwise read as fully, trivially covered) — each
+caught by a real test in `test/subgovernment.test.js`.
+

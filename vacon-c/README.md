@@ -1849,6 +1849,26 @@ real, computed-never-stored rollup (standing rule 3) over
 column, never a second count kept in sync by hand. See CLAUDE.md's
 hundred-and-twenty-fourth standing rule.
 
+## Sub-governments (orgs/tribes/gangs/towns) + cohesion scaling with level
+Checked directly before building anything: towns already have a real
+sub-government (`politics.foundGovernment`'s city-scoped rows) and
+gangs already have one too (`membership.gangTierFor`'s own named
+command tiers, `lieutenant`/`shot_caller`) — nothing to add for
+either. The real gap was an ordinary organization (tribe/business),
+closed by `server/subGovernment.js`: `assignSubLeaders` is the
+identical bulk per-member try/catch shape `playbook.js` already
+established over the same real `leadership.assignRole` primitive, a
+different bounded vocabulary (authority, not function). "Organization
+level" is the real `membership.memberCount`; `subGovernmentCoverageOf`
+is the real ratio of actual sub-leaders (or, for a gang, actual
+command-tier members) against how many that real size calls for.
+`organizationCohesionOf` blends the real `internalLoyalty` trait
+against that real coverage ratio -- deliberately NOT a copy of
+`familyTraits.cohesionOf`'s pull/drag shape, because organizations
+have no real conflict column to drag against, stated plainly rather
+than inventing one. See CLAUDE.md's hundred-and-twenty-fifth standing
+rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a
