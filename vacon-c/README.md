@@ -2213,6 +2213,27 @@ already uses, deliberately kept out of the separately-calibrated
 of the existing area-varying mechanism for free. See CLAUDE.md's
 hundred-and-sixty-second standing rule.
 
+## Community takeovers of real youth-program sites (closes task #169)
+By direct instruction: "the community leaders, organizations, tribe
+gangs will try to open up gyms and get back open and take over high
+schools so they can give something for the youth to do." No new
+mechanism and no new landmark category: "tribe gangs"/"community
+leaders" is the real, already-built family/tribe takeover key
+(`control.assess`/`control.attempt`, tasks #19/#47/#48), and
+"gyms... high schools" is the three real, already-existing landmark
+categories that already cover the same function (`school`, `park`,
+`stadium-arena`) rather than an invented `gym` category with no real
+source behind it. `server/youthPrograms.js#runYouthProgramTakeovers`
+reuses `recruitment.BASE_RECRUITMENT_RISK` and `crime.dangerByCommunity`
+verbatim -- the identical real-danger-scaled-rate pattern
+`recruitment.js` already established -- scoped to communities with a
+real `crime.isIdleYouth` resident (task #166) and a real resident
+family; on a hit, the real target that family is actually closest to
+fielding wins, through the unmodified real `control.attempt`. Wired
+into `tick.js`'s Security phase beside `recruitment.
+runChaosFamilyAbsorption`. See CLAUDE.md's hundred-and-sixty-third
+standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

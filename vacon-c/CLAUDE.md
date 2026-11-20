@@ -9490,3 +9490,80 @@ DEPRIVATION_RISK` is too small for that to produce a measurable count
 in a practical test), and checks the measured ratio lands near the
 real 1.14 itself, not merely "idle offends more" — a wrong weight
 (1.0, or 3.0) would still pass the weaker check.
+
+**A hundred-and-sixty-third, task #169, and the actor behind every
+word in the instruction turned out to already exist.** By direct
+instruction: "when the youth start to get out of control, this is
+where they start to try to, the community leaders, organizations,
+tribe gangs will try to open up gyms and get back open and take over
+high schools so they can give something for the youth to do."
+
+**"Tribe gangs" and "community leaders" are not three concepts
+needing three mechanisms — they are this file's own nineteenth
+standing rule, read again.** That rule already settled "Tribe" as what
+the recovered documents call a family, and the real, already-built
+takeover key (`control.assess`/`control.attempt`, tasks #19/#47/#48)
+acts through exactly that — a `tribeId`. `control.roleOf`'s own real
+`'elder'`/`'enforcer'` roster is this engine's model of who leads and
+defends that family. Building a second, disagreeing "organization
+takeover" mechanic to answer the word "organizations" on its own would
+have been this file's own third standing rule at the level of a single
+sentence: `server/youthPrograms.js` reuses `control.attempt` completely
+unmodified.
+
+**"Open up gyms... take over high schools" is one real target set, not
+a new landmark category with nothing behind it.** No gym/recreation-
+center landmark category exists anywhere in this registry, and
+checked directly before writing anything: none of the real sources
+already imported into this engine (HIFLD, Census, NCES) name one at
+the per-city grain `landmarkPacks.js` already works at the way it does
+`school`, `park` and `stadium-arena`. Those three real, already-
+existing categories already cover the real-world function a gym and a
+school would — a real US high school's own gymnasium, a real public
+park, a real stadium-arena — so `YOUTH_PROGRAM_CATEGORIES` is those
+three, named rather than a fourth, invented one built on no real data.
+
+**The trigger reuses `recruitment.js`'s own real danger measure and
+real rate rather than inventing a second "chaos has erupted"
+threshold.** `runYouthProgramTakeovers` is the identical real class of
+event recruitment.js already rates ("once chaos starts to erupt, there
+will be a lot of recruitment"), one real idle-youth gate narrower
+(`crime.isIdleYouth`, task #166) — it reuses
+`recruitment.BASE_RECRUITMENT_RISK` verbatim rather than defining a
+second constant at the same value under a new name, the identical
+discipline `influence.js`'s own `IMMEDIATE_FAMILY_BOND_BONUS` already
+holds naming its figure as a multiple of an existing constant. On a
+hit, the real target a resident family is actually closest to
+fielding — `control.assess`'s own `finalSuccessProbability`, never
+array order — is the one `control.attempt` is called against, exactly
+as every other tribe takeover in this engine already works; a facility
+the acting family already holds (`property.getCurrentOwner`) is never
+offered again.
+
+**Mutation-verified, and the second check found something worth
+recording rather than something broken.** Removing the idle-youth gate
+(`if (!idleYouthPresent(...)) continue;`) was caught immediately — a
+tribe took over a school with nobody idle to serve, in a fixture built
+specifically to have none. Removing the real-danger gate
+(`if (!dangerScore) continue;`) was NOT caught by any test, and
+checking why rather than assuming a miss found that this is the
+correct, harmless result rather than a gap: `dangerByCommunity` returns
+a real `0`, not `undefined`, for a measured-but-quiet community, and
+`0 ?? forcedValue` does not fire (nullish coalescing does not replace
+a real zero) — the chance this pass draws against is `BASE_
+RECRUITMENT_RISK * dangerScore`, so a zero danger score already yields
+a zero chance through the multiplication itself. The explicit `continue`
+is a real optimisation (skip the family/target scan for a community
+with no data at all) rather than a second, independently load-bearing
+gate — `recruitment.js`'s own identical line, confirmed by reading its
+header again rather than assumed, serves the same documented purpose
+there. Reporting a mutation that did not change behaviour, and why, is
+the same honesty this file's own fourteenth standing rule already
+asks for a threshold that never fires — a gate that turns out to be
+redundant-but-safe is a fact worth keeping, not a failed check worth
+hiding.
+
+Wired into `tick.js`'s Security phase, immediately beside
+`recruitment.runChaosFamilyAbsorption` — same phase, same real danger
+measure, for the identical reason that call is there rather than in a
+twelfth phase. 9 tests in `test/youth-programs.test.js`.

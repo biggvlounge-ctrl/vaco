@@ -77,6 +77,7 @@ const archetypes = require('./archetypes.js');
 const competition = require('./competition.js');
 const justice = require('./justice.js');
 const recruitment = require('./recruitment.js');
+const youthPrograms = require('./youthPrograms.js');
 const households = require('./households.js');
 const roguePolice = require('./roguePolice.js');
 const fraud = require('./fraud.js');
@@ -1408,6 +1409,15 @@ function runSecurityPhase(worldState) {
   // "Families/tribes" section for exactly what this does and does not
   // cover.
   recruitment.runChaosFamilyAbsorption(worldState, { tick: worldState.tick });
+
+  // Same phase, same real danger measure, one real idle-youth gate
+  // narrower: "the community leaders, organizations, tribe gangs will
+  // try to open up gyms and get back open and take over high schools
+  // so they can give something for the youth to do." See
+  // `youthPrograms.js`'s own header for why this reuses
+  // `control.attempt` and `recruitment.BASE_RECRUITMENT_RISK` rather
+  // than inventing a second takeover mechanism or a second rate.
+  youthPrograms.runYouthProgramTakeovers(worldState, { tick: worldState.tick });
 
   return events;
 }
