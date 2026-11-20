@@ -8630,3 +8630,81 @@ total: the `discipline === 'combat'` gate, the fled/submitted trait
 comparison, and the `keepsFighting` sigmoid gate itself — each
 caught, `server/contest.js` confirmed byte-identical to its own
 pre-mutation backup afterward.
+
+**A hundred-and-fifty-first, closing task #151 by direct instruction,
+after an earlier round in the same conversation declined to use real
+NAMED INDIVIDUALS and the user explicitly agreed the right real thing
+to acknowledge instead was the GANG ITSELF.** "If you see a gang
+somewhere, just make sure you acknowledge the gang... you can attach
+them to a neighborhood. It doesn't even have to be that exact
+neighborhood." A gang's own name is a real, public, documented
+organizational fact — court records, DOJ/FBI materials, and
+peer-reviewed criminology (Brotherton & Barrios's 2004 study of the
+Almighty Latin King and Queen Nation is the clearest example) name it
+the same way this registry already names real political parties,
+companies and denominations — a different and narrower thing than
+the real named individuals this project has repeatedly declined
+(the thirty-second/thirty-eighth standing rules).
+
+**Checked first, and confirmed real: `gangPacks.js` only ever reads
+anonymous counts and rates.** `grep` for any specific real gang name
+anywhere in `server/*.js` returned zero hits before this — the exact
+"organization, not member" layer the user asked for had never been
+built.
+
+**Scoped to two real cities, the same shape `crimeHotspotPacks.js`
+already uses for an unrelated real source (LA/Chicago crime-incident
+data).** FBI NGIC's National Gang Report series names gang families
+and trends but not a per-city named roster at this grain; the real,
+citable, NAMED detail exists at useful depth for exactly Los Angeles
+(Crips, Bloods, 18th Street, MS-13 — DOJ/FBI materials plus academic/
+journalistic histories) and New York (the Almighty Latin King and
+Queen Nation, Trinitarios, United Blood Nation, Ñetas — Rikers Island
+origins, NYPD and academic documentation). `server/namedGangPacks.js`
+is a pack covering ONE of these two cities, following every other
+reader in this registry's own discipline: a pack is refused, never
+partly used; a world with no pack generates exactly as before.
+
+**Real disagreement between sources is carried, never smoothed
+over** — Trinitarios' founding date (1993 Rikers Island per the
+dominant account, versus a law-enforcement source suggesting 1970s
+roots) and NYPD-linked gang-membership figures (cited roughly 1,200
+vs. roughly 3,200 in different reports) are both named explicitly on
+the pack rather than resolved to a single number, the same "declare
+the uncertainty" discipline the self-report undercount caveat in
+`gangPacks.js` already holds.
+
+**One real correction a naive version of this would have missed:
+East Coast "Bloods" and West Coast "Bloods" are not the same real
+organization.** United Blood Nation (1993, Rikers Island, formed as
+self-protection against Latin King dominance in NYC jails) shares a
+name and red iconography with the Los Angeles Bloods (1972) but is a
+real, separate, organizationally distinct lineage. Kept as two
+entries under two cities rather than one, so the shared name never
+implies a single organization operating both coasts.
+
+**Trafficking-corridor data is carried as cited context, never as an
+invented precise number.** ATF trace reporting and the NY Attorney
+General's 2016 "Target on Trafficking" report document the real
+I-95 "Iron Pipeline" corridor as the dominant source of crime guns
+recovered in New York specifically — real and directionally citable,
+and genuinely why New York is one of the two real anchors here — but
+the research behind this round could not confirm an exact current
+percentage against a primary ATF table, so `traffickingContext` is a
+citation and a direction only; nothing downstream reads it as a
+multiplier, avoiding the twenty-fifth standing rule's own trap (a
+measurement is not its consequence) one step earlier, before a number
+that was never verified could become one.
+
+`worldgen.js`'s existing faction-naming line
+(`` `${random.pick(SURNAMES, ...)} Crew` ``) is now the fallback, not
+the only path — a real named gang, when `config.namedGangPack`
+covers the city, replaces it and carries its real `originCity`/
+`originEra`/`confidence`/`note` alongside the faction as background
+fact, never as a trait a Key resolver reads (§9 held exactly as
+everywhere else: nothing here reads an NPC's own ethnicity or
+ancestry to decide gang membership). Mutation-verified three times:
+the real-name substitution itself, `gangFor`'s real position-cycling,
+and the pack's own city whitelist — each caught, `server/worldgen.js`
+and `server/namedGangPacks.js` confirmed byte-identical to their own
+pre-mutation backups afterward.

@@ -2022,6 +2022,16 @@ sigmoid, with Agility vs. Composure deciding fled vs. submitted.
 consequences now report what actually happened. See CLAUDE.md's
 hundred-and-fiftieth standing rule.
 
+## Real, named, documented street gangs (Los Angeles / New York)
+`namedGangPacks.js` replaces a faction's invented "Surname Crew" name
+with a real one -- Crips/Bloods/18th Street/MS-13 for Los Angeles,
+the Almighty Latin King and Queen Nation/Trinitarios/United Blood
+Nation/Ñetas for New York -- when a pack covers the city. Real
+disagreement (Trinitarios' founding date, NYPD membership-count
+figures) is carried as a flagged caveat. A world with no pack
+generates exactly as before. See CLAUDE.md's hundred-and-fifty-first
+standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

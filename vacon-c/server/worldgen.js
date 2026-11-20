@@ -119,6 +119,7 @@ const ancestryPacks = require('./ancestryPacks.js');
 const natalityPacks = require('./natalityPacks.js');
 const incomePacks = require('./incomePacks.js');
 const gangPacks = require('./gangPacks.js');
+const namedGangPacks = require('./namedGangPacks.js');
 const politicalPacks = require('./politicalPacks.js');
 const crimeHotspotPacks = require('./crimeHotspotPacks.js');
 const woodPacks = require('./woodPacks.js');
@@ -595,6 +596,11 @@ function generateWorld(options = {}) {
   } else if (w.gangPack) {
     gangPacks.assertPack(w.gangPack);
   }
+  if (config.namedGangPack) {
+    w.namedGangPack = namedGangPacks.assertPack(config.namedGangPack);
+  } else if (w.namedGangPack) {
+    namedGangPacks.assertPack(w.namedGangPack);
+  }
   if (config.politicalPack) {
     w.politicalPack = politicalPacks.assertPack(config.politicalPack);
   } else if (w.politicalPack) {
@@ -965,14 +971,32 @@ function generateWorld(options = {}) {
     const factionCount = realGangCount ?? config.factionsPerCity;
     const factions = [];
     for (let f = 0; f < factionCount; f += 1) {
+      // **A real, named, documented gang (task #151), when a named-gang
+      // pack covers this city — cycled by faction index the same way
+      // `gangPacks.jurisdictionFor` cycles by city position.** Null
+      // for any world with no pack, which keeps the invented "Surname
+      // Crew" name exactly as it always was.
+      const namedGang = namedGangPacks.gangFor(w.namedGangPack, f);
       const faction = engine.generateFaction({
-        name: `${random.pick(SURNAMES, 'faction', c, f)} Crew`,
+        name: namedGang?.name ?? `${random.pick(SURNAMES, 'faction', c, f)} Crew`,
         type: 'gang',
         traitValueFor: (def) => Math.round(
           random.range(20, 90, 'faction-trait', c, f, def.family, def.name),
         ),
       });
       faction.influence = Math.round(random.range(10, 80, 'faction-inf', c, f));
+      // Real documented provenance, carried alongside the faction
+      // rather than folded into any trait a Key resolver reads — this
+      // is background fact about the organization, not a mechanical
+      // input.
+      if (namedGang) {
+        faction.realGangOrigin = {
+          originCity: namedGang.originCity,
+          originEra: namedGang.originEra,
+          confidence: namedGang.confidence,
+          note: namedGang.note,
+        };
+      }
       factions.push(faction);
     }
     summary.organizations += factions.length;
