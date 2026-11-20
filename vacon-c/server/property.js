@@ -201,6 +201,12 @@ function generateProperty(worldState, options = {}) {
     // False, not null: a shop nobody has taken has genuinely not been
     // cleared out.
     merchandise_taken: options.merchandiseTaken ?? false,
+    // Whether this property's doors are actually locked. False, not
+    // null — the same "not an unobserved fact" shape `merchandise_
+    // taken` above already uses: a property nobody has locked has
+    // genuinely not been secured. `lockProperty`/`unlockProperty`
+    // below are the only real writers.
+    locked: options.locked ?? false,
     former_type: null,
     repurposed_tick: null,
     // Not schema columns. Kept so a property can be placed in the world
@@ -279,6 +285,58 @@ const CONDEMNED_CONDITION_FLOOR = 10;
 function isCondemned(property) {
   if (!property) return false;
   return Number(property.condition ?? 100) <= CONDEMNED_CONDITION_FLOOR;
+}
+
+// ---------------------------------------------------------------------------
+// Locks — real property security, by direct instruction: "learning how
+// to... lock the door... should be shown as they go through the
+// initial steps."
+// ---------------------------------------------------------------------------
+// A new property starts unlocked (see `generateProperty` above) —
+// locking it is a real thing a person does, not a fact a generator
+// gets to assume. `canLock` is the one real authorization check both
+// `lockProperty` and `unlockProperty` share: a real occupant
+// (`occupants` — a home's own residents), a real member of the
+// operating organization (a business's own staff), or the real
+// current owner (`getCurrentOwner`, ownership_records) — never a
+// stranger, and never the same check duplicated three different ways.
+function canLock(worldState, propertyId, entityId) {
+  const property = (worldState.properties || []).find((p) => p.id === propertyId);
+  if (!property) return false;
+  if (Array.isArray(property.occupants) && property.occupants.includes(entityId)) return true;
+  if (property.operating_organization_id != null) {
+    // eslint-disable-next-line global-require
+    const membership = require('./membership.js');
+    if (membership.findMembership(worldState, entityId, property.operating_organization_id)) {
+      return true;
+    }
+  }
+  const owner = getCurrentOwner(worldState, propertyId);
+  return owner !== null && owner.owner_entity_id === entityId;
+}
+
+function lockProperty(worldState, entityId, propertyId) {
+  const property = (worldState.properties || []).find((p) => p.id === propertyId);
+  if (!property) throw new Error(`lockProperty: no property ${propertyId}`);
+  if (!canLock(worldState, propertyId, entityId)) {
+    throw new Error(
+      `lockProperty: entity ${entityId} is not a real occupant, staff member, or owner of property ${propertyId}`,
+    );
+  }
+  property.locked = true;
+  return property;
+}
+
+function unlockProperty(worldState, entityId, propertyId) {
+  const property = (worldState.properties || []).find((p) => p.id === propertyId);
+  if (!property) throw new Error(`unlockProperty: no property ${propertyId}`);
+  if (!canLock(worldState, propertyId, entityId)) {
+    throw new Error(
+      `unlockProperty: entity ${entityId} is not a real occupant, staff member, or owner of property ${propertyId}`,
+    );
+  }
+  property.locked = false;
+  return property;
 }
 
 // ---------------------------------------------------------------------------
@@ -593,6 +651,9 @@ function reseedIds(worldState) {
 module.exports = {
   CONDEMNED_CONDITION_FLOOR,
   isCondemned,
+  canLock,
+  lockProperty,
+  unlockProperty,
   CONDITION_DECAY_PER_TICK,
   OCCUPANT_UPKEEP_PER_TICK,
   OWNER_UPKEEP_PER_TICK,

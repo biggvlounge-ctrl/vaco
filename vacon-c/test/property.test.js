@@ -634,3 +634,87 @@ test('isCondemned never throws on a missing property or a missing real condition
   assert.equal(property.isCondemned(null), false);
   assert.equal(property.isCondemned({}), false);
 });
+
+// ---------------------------------------------------------------------------
+// Locks — real property security
+// ---------------------------------------------------------------------------
+
+test('a newly generated property starts unlocked', () => {
+  const world = freshWorld();
+  const home = property.generateProperty(world, { type: 'residential', value: 90000 });
+  assert.equal(home.locked, false);
+});
+
+test('a real occupant can lock and unlock their own property', () => {
+  const world = freshWorld();
+  const home = property.generateProperty(world, {
+    type: 'residential', value: 90000, occupants: [7],
+  });
+  property.lockProperty(world, 7, home.id);
+  assert.equal(home.locked, true);
+  property.unlockProperty(world, 7, home.id);
+  assert.equal(home.locked, false);
+});
+
+test('a real member of the operating organization can lock a property', () => {
+  const world = freshWorld();
+  world.entityOrganizationMemberships = [
+    { id: 1, entity_id: 9, organization_id: 55, status: 'active' },
+  ];
+  const shop = property.generateProperty(world, {
+    type: 'commercial', value: 50000, operatingOrganizationId: 55,
+  });
+  property.lockProperty(world, 9, shop.id);
+  assert.equal(shop.locked, true);
+});
+
+test('the real current owner can lock a property with no occupants and no operator', () => {
+  const world = freshWorld();
+  const vacant = property.generateProperty(world, { type: 'residential', value: 40000 });
+  property.recordOwnership(world, {
+    entityId: vacant.id, ownerEntityId: 3, ownerType: 'individual',
+    acquiredMethod: 'purchased', tick: 0,
+  });
+  property.lockProperty(world, 3, vacant.id);
+  assert.equal(vacant.locked, true);
+});
+
+test('lockProperty refuses a real non-member even when a real organization operates the property', () => {
+  const world = freshWorld();
+  world.entityOrganizationMemberships = [
+    { id: 1, entity_id: 9, organization_id: 55, status: 'active' },
+  ];
+  const shop = property.generateProperty(world, {
+    type: 'commercial', value: 50000, operatingOrganizationId: 55,
+  });
+  assert.throws(
+    () => property.lockProperty(world, 999, shop.id),
+    /not a real occupant, staff member, or owner/,
+  );
+  assert.equal(shop.locked, false);
+});
+
+test('lockProperty refuses a real stranger with no occupancy, membership, or ownership', () => {
+  const world = freshWorld();
+  const home = property.generateProperty(world, {
+    type: 'residential', value: 90000, occupants: [7],
+  });
+  assert.throws(
+    () => property.lockProperty(world, 999, home.id),
+    /not a real occupant, staff member, or owner/,
+  );
+  assert.equal(home.locked, false);
+});
+
+test('unlockProperty refuses the identical real stranger check', () => {
+  const world = freshWorld();
+  const home = property.generateProperty(world, {
+    type: 'residential', value: 90000, occupants: [7],
+  });
+  home.locked = true;
+  assert.throws(
+    () => property.unlockProperty(world, 999, home.id),
+    /not a real occupant, staff member, or owner/,
+  );
+  assert.equal(home.locked, true);
+});

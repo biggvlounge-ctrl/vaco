@@ -1329,6 +1329,8 @@ const ACTION_VERBS = {
   repurposeProperty: (...args) => repurposeProperty(...args),
   breakDownItem: (...args) => breakDownItem(...args),
   stripBuilding: (...args) => stripBuilding(...args),
+  lockProperty: (...args) => lockProperty(...args),
+  unlockProperty: (...args) => unlockProperty(...args),
   makeThing: (...args) => makeThing(...args),
   canMakeThing: (...args) => canMakeThing(...args),
   searchLocation: (...args) => searchLocation(...args),
@@ -1650,7 +1652,16 @@ function breakDownItem(entityId, options = {}) {
 function stripBuilding(entityId, options = {}) {
   return salvage.stripProperty(WorldState, entityId, Number(options.propertyId), {
     tick: WorldState.tick,
+    force: options.force === true,
   });
+}
+
+function lockProperty(entityId, options = {}) {
+  return property.lockProperty(WorldState, entityId, Number(options.propertyId));
+}
+
+function unlockProperty(entityId, options = {}) {
+  return property.unlockProperty(WorldState, entityId, Number(options.propertyId));
 }
 
 function makeThing(entityId, options = {}) {

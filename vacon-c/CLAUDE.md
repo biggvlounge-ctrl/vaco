@@ -8445,3 +8445,46 @@ and were fixed the same way. All four of this round's real gates
 scarcity threshold) are mutation-verified now; `server/
 missionVariety.js` confirmed byte-identical to its own pre-mutation
 backup after each check.
+
+**A hundred-and-thirty-third, closing task #100 by direct instruction
+— "learning how to... lock the door... should be shown as they go
+through the initial steps."**
+
+`properties.locked` is a new, honest boolean: false on every newly
+generated property, the same "not an unobserved fact" shape
+`merchandise_taken` already uses — nobody has locked a building that
+was just generated, so unlocked is a real starting fact, not a guess.
+`property.lockProperty`/`unlockProperty` are the only real writers,
+gated by `canLock` on exactly one of three real relationships to the
+property: a real occupant (`occupants`), a real member of the real
+operating organization (`membership.findMembership`), or the real
+current owner (`getCurrentOwner`) — never a stranger.
+
+**The real consequence lives in `salvage.stripProperty`, the one
+function that already models breaking into an unoccupied building.**
+A locked property refuses stripping outright unless the caller passes
+`options.force: true`, and forcing costs real extra condition on top
+of the ordinary strip cost — `FORCE_ENTRY_CONDITION_COST`, flagged
+interpretive, set equal to `STRIP_CONDITION_COST` itself (breaking a
+lock doubles the real cost) rather than a second invented number,
+following the same discipline `influence.js`'s own
+`IMMEDIATE_FAMILY_BOND_BONUS` already used for picking a multiple of
+an already-justified constant instead of guessing fresh. `strip-
+building`'s own player verb and `corruption.runCollapseLooting`'s
+ambient callers both pass through unchanged — a locked building an
+NPC loots during a lawless collapse is forced the identical real way
+a player's own strip attempt would be, with no second code path.
+
+**A real bug caught mutation-verifying `canLock`'s owner branch, not
+by inspection.** `getCurrentOwner` returns the whole ownership
+RECORD, not the owner's entity id — `ownershipRecords`' own real
+append-only shape, confirmed by reading `getOwnerIndex` directly
+before trusting the name. The first version compared the returned
+record object to a bare entity id, which is never equal to anything,
+so a real owner could never lock their own vacant property. Fixed by
+reading `.owner_entity_id` off the returned record. Mutation-verified
+five times in total: the locked-property refusal in `stripProperty`,
+the force-entry extra condition cost, and all three of `canLock`'s
+real branches (occupant, operating-organization membership, current
+owner) — each caught, `server/property.js` and `server/salvage.js`
+confirmed byte-identical to their own pre-mutation backups afterward.

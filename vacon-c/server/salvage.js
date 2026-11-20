@@ -588,6 +588,9 @@ function salvageOfProperty(worldState, propertyId) {
 //: neglect taken in an afternoon — which is roughly what pulling the
 //: windows and floorboards out of a place does to it.
 const STRIP_CONDITION_COST = 10;
+// See `stripProperty`'s own header for why this equals the strip cost
+// itself rather than a second invented number.
+const FORCE_ENTRY_CONDITION_COST = STRIP_CONDITION_COST;
 
 // ---------------------------------------------------------------------
 // stripProperty — where glass, timber and stone actually come from
@@ -624,6 +627,18 @@ function stripProperty(worldState, entityId, propertyId, options = {}) {
   if (Number(row.condition ?? 0) <= 0) {
     throw new Error(`property ${propertyId} has been stripped to nothing already`);
   }
+  // **A real locked door is a real refusal, not decoration.** By
+  // direct instruction — "learning how to... lock the door... should
+  // be shown." An unoccupied, unstaffed property can still be locked
+  // (`property.lockProperty`); stripping one requires `options.force`,
+  // the same explicit admission `strip-building`'s own player verb
+  // already requires for other refusals it overrides nowhere else —
+  // this is the one it does.
+  if (row.locked === true && !options.force) {
+    throw new Error(
+      `property ${propertyId} is locked — force entry with options.force to break in`,
+    );
+  }
 
   const yielded = salvageOfProperty(worldState, propertyId);
   registerItems(worldState);
@@ -632,8 +647,19 @@ function stripProperty(worldState, entityId, propertyId, options = {}) {
   for (const [material, amount] of Object.entries(yielded)) {
     inventory.give(worldState, { entityId, itemName: material, quantity: amount, tick });
   }
-  row.condition = Math.max(0, Number(row.condition ?? 100) - STRIP_CONDITION_COST);
-  return { propertyId, yielded, condition: row.condition };
+  // Forcing a real lock costs real extra condition on top of the
+  // ordinary strip cost — breaking a door is not the same act as
+  // walking through an open one. `FORCE_ENTRY_CONDITION_COST` is
+  // flagged interpretive: no document gives a real figure for this,
+  // so it is set equal to `STRIP_CONDITION_COST` itself (the strip
+  // costs double when a lock has to be broken first) rather than a
+  // second invented order of magnitude.
+  const forced = row.locked === true;
+  row.condition = Math.max(
+    0,
+    Number(row.condition ?? 100) - STRIP_CONDITION_COST - (forced ? FORCE_ENTRY_CONDITION_COST : 0),
+  );
+  return { propertyId, yielded, condition: row.condition, forced };
 }
 
 // ---------------------------------------------------------------------
@@ -1059,6 +1085,7 @@ module.exports = {
   BUILDING_TEARDOWNS,
   AREA_PER_YIELD,
   STRIP_CONDITION_COST,
+  FORCE_ENTRY_CONDITION_COST,
   stripProperty,
   SKILL_PER_TIER,
   skillFloorFor,

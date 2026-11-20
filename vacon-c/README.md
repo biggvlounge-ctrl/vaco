@@ -1984,6 +1984,16 @@ each needs a real player verb built first (checked directly: none of
 `extortion.runExtortion` are callable by a player today). See
 CLAUDE.md's hundred-and-thirty-second standing rule.
 
+## Property security (locked doors)
+`properties.locked`, false on every newly generated property. Real
+writers: `lock-property`/`unlock-property`, gated on being a real
+occupant, a real member of the operating organization, or the real
+current owner. `salvage.stripProperty` refuses a locked property
+unless `options.force: true`, which also costs real extra condition
+(`FORCE_ENTRY_CONDITION_COST`, equal to `STRIP_CONDITION_COST`) --
+breaking a lock doubles the real cost of stripping. See CLAUDE.md's
+hundred-and-thirty-third standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

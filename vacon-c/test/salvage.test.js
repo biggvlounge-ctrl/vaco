@@ -469,6 +469,35 @@ test('a building an organization works out of is not salvage', () => {
   assert.throws(() => salvage.stripProperty(w, 1, 10), /in use by organization/);
 });
 
+test('a locked building refuses stripping without a real force option', () => {
+  const w = world();
+  person(w, { id: 1 });
+  const b = building(w, { id: 10, condition: 100, landSize: 1000, floors: 2 });
+  b.locked = true;
+  assert.throws(() => salvage.stripProperty(w, 1, 10), /is locked/);
+});
+
+test('forcing a locked building strips it but costs real extra condition', () => {
+  const w = world();
+  person(w, { id: 1 });
+  const b = building(w, { id: 10, condition: 100, landSize: 1000, floors: 2 });
+  b.locked = true;
+
+  const result = salvage.stripProperty(w, 1, 10, { force: true });
+  assert.equal(result.forced, true);
+  assert.equal(b.condition, 100 - salvage.STRIP_CONDITION_COST - salvage.FORCE_ENTRY_CONDITION_COST);
+});
+
+test('an unlocked building never pays the force-entry cost, forced or not', () => {
+  const w = world();
+  person(w, { id: 1 });
+  const b = building(w, { id: 10, condition: 100, landSize: 1000, floors: 2 });
+
+  const result = salvage.stripProperty(w, 1, 10, { force: true });
+  assert.equal(result.forced, false);
+  assert.equal(b.condition, 100 - salvage.STRIP_CONDITION_COST);
+});
+
 test('a building runs out — the supply is finite, not a ratchet', () => {
   // Standing rule 13: a mechanism with no inverse has no equilibrium.
   // Stripping creates material out of the world, so the thing to check

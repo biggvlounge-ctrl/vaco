@@ -240,13 +240,30 @@ const ACTIONS = {
   },
 
   'strip-building': {
-    summary: 'Strip an empty building for materials. It will not survive many visits.',
+    summary: 'Strip an empty building for materials. It will not survive many visits. A locked one must be forced.',
     modes: ['citizen', 'leader'],
     requires: ['propertyId'],
     verbs: ['stripBuilding'],
     run: (verbs, actorId, body) => verbs.stripBuilding(actorId, {
       propertyId: Number(body.propertyId),
+      force: body.force === true,
     }),
+  },
+
+  'lock-property': {
+    summary: 'Lock a real property you occupy, staff, or own.',
+    modes: ['citizen', 'leader'],
+    requires: ['propertyId'],
+    verbs: ['lockProperty'],
+    run: (verbs, actorId, body) => verbs.lockProperty(actorId, { propertyId: Number(body.propertyId) }),
+  },
+
+  'unlock-property': {
+    summary: 'Unlock a real property you occupy, staff, or own.',
+    modes: ['citizen', 'leader'],
+    requires: ['propertyId'],
+    verbs: ['unlockProperty'],
+    run: (verbs, actorId, body) => verbs.unlockProperty(actorId, { propertyId: Number(body.propertyId) }),
   },
 
   // **Searching a landmark for what is in it.** The other half of
