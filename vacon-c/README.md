@@ -1833,6 +1833,22 @@ operating organization's `assets` -- the same direct-mutation pattern
 `corruption.js` already uses for organization assets. See CLAUDE.md's
 hundred-and-twenty-third standing rule.
 
+## Playbook / role-allocation (assign N members to strategy/security/etc.)
+Bulks and bounds the already-built task-delegation primitive
+(`leadership.js#assignRole`, task #44) rather than a second
+role-assignment mechanism: `server/playbook.js#assignToPlaybook` loops
+real subordinate ids through the identical real loyalty-gated
+compliance draw `assignRole` already uses, against a small,
+flagged-interpretive, bounded vocabulary (`strategy`/`security`/
+`operations`/`recruitment`) in place of `assignRole`'s own open free
+text for organizations. Catches per member rather than letting one
+real refusal or invalid id abort the whole batch and discard the real,
+already-applied outcome for everyone else in it. `playbookOf` is a
+real, computed-never-stored rollup (standing rule 3) over
+`membership.membersOf`/`findMembership`'s own live `role_in_org`
+column, never a second count kept in sync by hand. See CLAUDE.md's
+hundred-and-twenty-fourth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

@@ -7800,3 +7800,71 @@ credit, and the real `justice.inmatesOf` call (swapped for a bare
 open court case would then wrongly pass) — each caught by a real test
 in `test/penitentiary.test.js`.
 
+**A hundred-and-twenty-fourth, closing the next pending task: a
+playbook/role-allocation system (assign N members to strategy/
+security/etc.) — found, before writing a line of it, to already have
+its real primitive built under a different task number.**
+
+**Checking for overlap with task #44 first, as planned, found the
+whole primitive already real.** `leadership.js#assignRole` IS "org/
+tribe task delegation (assign members to tasks, gated on leadership/
+loyalty)" — a real leader assigns one real subordinate one role,
+through `complianceDraw`'s real loyalty-gated probability (the
+identical mechanism `directMission` already uses), writing the real
+`entityOrganizationMemberships.role_in_org` column. So this round adds
+exactly what task #44 does not have, never a second, disagreeing
+assignment mechanism: BULK assignment (N members, one call) and a
+BOUNDED real vocabulary (the task's own "strategy/security/etc.",
+never `assignRole`'s own open free text for organizations).
+
+**A citation checked and found false before it could ship.** The
+first draft of `PLAYBOOK_CATEGORIES`'s own header claimed the
+vocabulary was grounded in a `Security`/`Diplomacy` dimension
+`traitDefinitions.ORGANIZATION_DEFINITIONS` already measures. Checked
+directly before writing it down for good: that family names nine real
+dimensions (`power`, `membership`, `production`, `territory`,
+`resources`, `leadershipQuality`, `internalLoyalty`, `diplomacy`,
+`growthPotential`) and none of them is "security" or "operations" —
+so the claim was wrong, caught by reading the actual list rather than
+trusting what sounded plausible. The corrected header says so plainly:
+the vocabulary is flagged interpretive, kept to the task's own two
+named examples plus two further functional areas small enough to
+stay honestly invented, never dressed up as derived from a sheet that
+does not actually name them.
+
+**One member's failure must not erase what happened to the others in
+the same bulk call, and the naive version genuinely does erase it.**
+`assignRole` RETURNS `{complied: false}` for a real loyalty refusal —
+not an exception — but it THROWS for a real input error (not a
+member of the organization, the organization is a gang/faction,
+naming the leader as their own subordinate). A bare `Array.prototype.
+map` calling `assignRole` once per subordinate would let the first
+such throw abort the whole batch, discarding the real, already-applied
+outcome for every member processed before it — confirmed directly: a
+two-member batch where the first member actually complies and the
+second is not a real member throws past the first member's own
+already-set `role_in_org`, which stays set even though the function
+call that produced it never got to return. `assignToPlaybook` catches
+per member instead, so "this one complied, that one refused, this one
+was not a real member" is the honest, complete report a bulk operation
+owes its caller — never losing real information to one bad row.
+
+**`playbookOf` is a real, computed-never-stored rollup, standing rule
+3's shape again** — tallying `membership.membersOf`/`findMembership`'s
+own live `role_in_org` column by real category, rather than a second
+count this file would have to keep in sync by hand. A role set by
+`assignRole`'s own open free text (outside the bounded playbook
+vocabulary) is reported as unassigned rather than silently miscounted
+into the nearest category, the same honest "unknown is not a zero"
+discipline the twelfth standing rule's corollary already states for a
+different field.
+
+Mutation-verified three times: removing the per-member catch (confirms
+a real input error would otherwise abort the batch and lose the
+earlier members' real outcomes), removing `playbookOf`'s real category
+membership check (confirms a free-text role would otherwise be
+miscounted into a real category instead of reported as unassigned),
+and removing `assignToPlaybook`'s own category-vocabulary gate
+(confirms an unreal category would otherwise be accepted and applied)
+— each caught by a real test in `test/playbook.test.js`.
+
