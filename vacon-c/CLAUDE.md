@@ -9957,6 +9957,32 @@ consumers (`playbook.test.js`, `plays.test.js`, `disposition.test.js`,
 claim rather than assuming it. Both the centring floor and the weight
 constant are mutation-verified — each caught.
 
+**A hundred-and-seventy-second, task #173, by direct instruction:**
+"you need to look at the youth's age range and how many they account
+for and how many adults account for in that area." `statistics.js`
+already had `minor_share` (under 18) and `elder_share` (65+) real and
+computed — what it did not have is the one age band every youth
+mechanic this engine already runs on (idle-youth mischief, chaos
+recruitment, youth programs, youth cliques): `crime.
+IDLE_YOUTH_AGE_RANGE` (14-29). `youth_share`/`adult_share` reuse that
+real range and `minor_share`'s own real 18+ cutoff respectively,
+rather than inventing a third, disagreeing "youth" definition.
+
+**The two bands deliberately overlap, and that is stated rather than
+smoothed into a false partition.** Ages 18-29 count toward both
+`youth_share` and `adult_share` — they answer two different real
+questions (recruitment-age vulnerability; legal-majority adulthood),
+not two halves of one pie chart. 2 new tests in `test/
+statistics.test.js`, including one built specifically to exercise the
+overlap (a 25-year-old counted in both). Both real cutoffs are
+mutation-verified — each caught. One development mistake worth naming
+rather than hiding: the first attempt at re-adding this code after a
+mutation-test restore cycle landed TWICE in the catalogue, caught
+immediately by `test/statistics.test.js`'s own pre-existing "no key
+appears twice" test (129 real unique keys against 131 reported) —
+exactly the kind of guard this project's own discipline says to keep
+for precisely this reason.
+
 **Mutation-checked the early danger-score `continue` and found it
 non-load-bearing — the FOURTH time this exact pattern has turned up**
 (`recruitment.js`, `youthPrograms.js`, `leagues.js` each document it

@@ -2348,6 +2348,17 @@ a guarantee. The word-of-mouth/"aura" half of the same task is split
 off to task #235, pending a real measurement pass. See CLAUDE.md's
 hundred-and-seventy-first standing rule.
 
+## Real youth-vs-adult age-structure statistics (closes task #173)
+By direct instruction: "look at the youth's age range and how many
+they account for and how many adults account for in that area."
+`statistics.js` gains `youth_share` (reusing `crime
+.IDLE_YOUTH_AGE_RANGE`, 14-29 -- the real band every youth mechanic in
+this engine already runs on) and `adult_share` (reusing
+`minor_share`'s own real 18+ cutoff). The two bands deliberately
+overlap (18-29 counts toward both) rather than being forced into a
+false partition neither real cutoff actually describes. See CLAUDE.md's
+hundred-and-seventy-second standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

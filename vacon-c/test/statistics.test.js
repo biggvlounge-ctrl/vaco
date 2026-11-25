@@ -295,11 +295,27 @@ test('the computed statistics read real records', () => {
   assert.equal(s.median_wage.value, 20);
   assert.equal(s.minor_share.value, 0.25);
   assert.equal(s.elder_share.value, 0.25);
+  assert.equal(s.youth_share.value, 0.25, 'only the real 20-year-old falls in the real 14-29 recruitment-age band');
+  assert.equal(s.adult_share.value, 0.75, 'the 20/40/70-year-olds are all real adults by the 18+ cutoff');
   assert.equal(s.crime_rate_per_1k.value, 500);
   assert.equal(s.violent_crime_per_1k.value, 250);
   assert.equal(s.theft_crime_per_1k.value, 250);
   assert.equal(s.business_density_per_1k.value, 250);
   assert.equal(s.max_organization_influence.value, 60);
+});
+
+test('task #173: youth_share (14-29) and adult_share (18+) deliberately overlap -- a 25-year-old is real in both', () => {
+  const w = world();
+  const city = territory.generateCity(w, { name: 'Overlap City' });
+  const c = territory.generateCommunity(w, { cityId: city.id });
+
+  person(w, { communityId: c.id, savings: 0, age: 25 }); // both youth and adult
+  person(w, { communityId: c.id, savings: 0, age: 5 }); // neither
+  person(w, { communityId: c.id, savings: 0, age: 50 }); // adult only
+
+  const s = statistics.profileFor(w, c.id).statistics;
+  assert.equal(s.youth_share.value, 0.3333, 'the real 25-year-old should be the only one in the real 14-29 band');
+  assert.equal(s.adult_share.value, 0.6667, 'the real 25- and 50-year-olds should both clear the real 18+ cutoff');
 });
 
 test('housing statistics read a property\'s community, which nothing read before', () => {

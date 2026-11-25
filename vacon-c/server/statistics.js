@@ -276,6 +276,37 @@ const CATALOGUE = [
       return share(ages.filter((a) => a >= 65).length, ages.length);
     },
   },
+  // Task #173, by direct instruction: "you need to look at the
+  // youth's age range and how many they account for and how many
+  // adults account for in that area." `crime.IDLE_YOUTH_AGE_RANGE`
+  // (14-29) is reused directly -- the real, already-established age
+  // band every one of this engine's youth mechanics (idle-youth
+  // mischief, chaos recruitment, youth programs, youth cliques) is
+  // already gated on, not a second, disagreeing "youth" definition
+  // invented here. `minor_share` (above) already answers "under 18"
+  // for the separate real question of legal minority; this answers
+  // the recruitment-age question instead, and the two bands
+  // deliberately overlap (ages 18-29 count toward BOTH `youth_share`
+  // and `adult_share` below) rather than being forced into a false
+  // partition neither real cutoff actually describes.
+  {
+    key: 'youth_share', category: 'population', unit: 'share', scope: 'community',
+    compute: (ctx) => {
+      const ages = ageValues(ctx);
+      const [lo, hi] = crime.IDLE_YOUTH_AGE_RANGE;
+      return share(ages.filter((a) => a >= lo && a <= hi).length, ages.length);
+    },
+  },
+  // The real complement the user's own words ask for in the same
+  // breath -- adults, using the same real age-of-majority cutoff
+  // `minor_share` already uses (18), not a second invented threshold.
+  {
+    key: 'adult_share', category: 'population', unit: 'share', scope: 'community',
+    compute: (ctx) => {
+      const ages = ageValues(ctx);
+      return share(ages.filter((a) => a >= 18).length, ages.length);
+    },
+  },
   {
     key: 'death_rate', category: 'population', unit: 'share', scope: 'community',
     compute: (ctx) => areaStats.statsFor(ctx.worldState, ctx.communityId, {
