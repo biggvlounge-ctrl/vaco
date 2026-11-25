@@ -2278,6 +2278,17 @@ highest-win champion from a real, computed-never-stored table when a
 season runs out of fixtures. See CLAUDE.md's hundred-and-sixty-sixth
 standing rule.
 
+## Real analog TV channel, by direct instruction (closes task #204)
+By direct instruction: "even some towns pop up with TV, as long as
+it's not digitized... you have to have the old models." A real new
+`media.js` channel, honestly documented as an extension rather than
+misattributed to this file's own header (whose "networks" sentence
+already means `social_media`, checked directly rather than assumed).
+Shares `radio`'s real `electricity`-era gate and distortion figure,
+but reaches only a city, never the world radio already reaches -- a
+real local station, never a network. See CLAUDE.md's
+hundred-and-sixty-seventh standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

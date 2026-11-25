@@ -143,9 +143,12 @@ test('every channel requires an era the ladder actually has', () => {
       `channel ${name} requires era ${channel.era}, which is not on the ladder`);
   }
   // §61 names six things; five are channels and "community
-  // communication" is the category, not a sixth channel.
+  // communication" is the category, not a sixth channel. `tv` is a
+  // sixth real CHANNEL_NAMES entry on top of those five, added by
+  // direct instruction (task #204) rather than from §61's own list —
+  // named here rather than silently assumed to be part of the spec.
   assert.deepEqual(media.CHANNEL_NAMES, [
-    'word_of_mouth', 'bulletin', 'local_news', 'radio', 'social_media',
+    'word_of_mouth', 'bulletin', 'local_news', 'radio', 'tv', 'social_media',
   ]);
 });
 
@@ -214,6 +217,32 @@ test('a channel that needs an outlet is shut when there is none', () => {
   assert.ok(withOutlet.includes('local_news') && withOutlet.includes('radio'));
   assert.deepEqual(without, ['word_of_mouth', 'bulletin'],
     'a printed sheet or a broadcast happened with nobody to run it');
+});
+
+// -- task #204: tv, by direct instruction, not from §61's own list ------
+
+test('tv shares radio\'s real era gate, by direct instruction rather than from §61\'s own list', () => {
+  const eras = ['stone_tools', 'writing', 'electricity'];
+  const withOutlet = media.availableChannels(mediaWorld({ eras, outletInfluence: 60 }), 1);
+  assert.ok(withOutlet.includes('tv'), 'electricity-era, outlet-having world has no real tv channel');
+
+  const noElectricity = media.availableChannels(
+    mediaWorld({ eras: ['stone_tools', 'writing'], outletInfluence: 60 }), 1,
+  );
+  assert.ok(!noElectricity.includes('tv'), 'tv is reachable before the real electricity era');
+});
+
+test('tv reaches a city, never the world radio already reaches -- "towns pop up with TV," not a network', () => {
+  const w = mediaWorld({ eras: ['stone_tools', 'writing', 'electricity'], outletInfluence: 100 });
+  assert.equal(media.audienceFor(w, 'tv', { cityId: 1 }).length, 10);
+  assert.equal(media.CHANNELS.tv.reach, 'city');
+  assert.notEqual(media.CHANNELS.tv.reach, media.CHANNELS.radio.reach,
+    'tv reaches the same audience as radio, so a station is indistinguishable from a network');
+});
+
+test('bestChannel still picks radio over tv once both are real -- wider reach wins first', () => {
+  const w = mediaWorld({ eras: ['stone_tools', 'writing', 'electricity'], outletInfluence: 60 });
+  assert.equal(media.bestChannel(w, 1), 'radio');
 });
 
 // ---------------------------------------------------------------------

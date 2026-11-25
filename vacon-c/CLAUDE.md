@@ -9727,3 +9727,42 @@ runCompetition`, immediately after it — a league reads a settled
 population and a community that has already had its ordinary social
 life for the tick, the identical ordering reason that call is already
 there.
+
+**A hundred-and-sixty-seventh, task #204, and it is a correction to my
+own first reading of this file's own header before anything was
+built.** By direct instruction: "people also learn how to turn back on
+the basic radio stations, and we'll have local radio, local news...
+even some towns pop up with TV, as long as it's not digitized... you
+have to have the old models or something connect to an old way."
+
+`media.js`'s own header has a sentence that reads, out of context, like
+it already names television as an unbuilt gap: "...restores networks —
+but nothing models that restoration either." **It does not.** Read in
+full, that sentence is about `social_media` — "`computing` plus a
+standing `internet` site brings networks back" is this file's own
+description of the channel it already built, not a second, unbuilt
+one. §61's own real channel list ("local news, radio, social media,
+community bulletins, word-of-mouth") never names television at all.
+Checking this directly, rather than trusting the first, convenient
+reading, is this file's own oldest lesson applied to itself: "citation
+is not presence" cuts both ways, and a comment that LOOKS like it
+names a gap has to be read in full before it is treated as one.
+
+So `tv` is a real, new `CHANNELS` entry, honestly documented as an
+extension by direct instruction rather than misattributed to §61 or to
+this file's own header. It shares `radio`'s real `electricity`-era
+gate — real analog broadcast television is contemporaneous
+transmitter-era technology with radio, no digital signal involved, so
+it needs no finer era `technology.ERA_NAMES` does not have — and
+`radio`'s own distortion figure, the same "don't invent a second
+number for the same broadcast class of channel" reasoning `DIRECTED_
+CHANNELS.telephone` already gives reusing `radio`'s figure for itself.
+The one real difference, and it is the point of the user's own
+framing ("even some towns pop up with TV"): `reach: 'city'`, not
+`radio`'s `'world'` — an over-the-air station before cable/satellite
+consolidation served one real metro market, a station, never a
+network.
+
+3 new tests in `test/media.test.js`; both real distinguishing facts
+(the era gate, the narrower `'city'` reach) mutation-verified —
+removing either was caught.

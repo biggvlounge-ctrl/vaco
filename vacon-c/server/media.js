@@ -120,6 +120,30 @@ const CHANNELS = {
     era: 'electricity', reach: 'world', outlet: true, infrastructure: null,
     distortion: 0.12, spreadRate: null,
   },
+  // By direct instruction, not from §61's own list (which names "local
+  // news, radio, social media, community bulletins, word-of-mouth" and
+  // nothing else) — checked directly before adding it, so it is named
+  // honestly as an extension rather than misattributed to this file's
+  // own header, whose "networks" sentence already means `social_media`
+  // (`computing` plus a standing `internet` site), not television.
+  // Real analog broadcast TV is contemporaneous `electricity`-era
+  // technology with radio — the same transmitter/vacuum-tube base, no
+  // digital signal involved — so it shares that gate rather than
+  // inventing a finer era `technology.ERA_NAMES` does not have between
+  // `electricity` and `computing`. Scoped to analog on purpose ("as
+  // long as it's not digitized... old models"): `reach: 'city'`, not
+  // `radio`'s `'world'`, because an over-the-air station before cable/
+  // satellite consolidation served one metro market — "even some towns
+  // pop up with TV" is a real station in a real city, not a network.
+  // Distortion matches `radio`'s own figure — the same broadcast,
+  // one-way-transmission class of channel, and giving the televised
+  // version a different number from its audio twin would be asserting
+  // a difference nobody measured (the same reasoning `DIRECTED_
+  // CHANNELS.telephone` already gives reusing `radio`'s own figure).
+  tv: {
+    era: 'electricity', reach: 'city', outlet: true, infrastructure: null,
+    distortion: 0.12, spreadRate: null,
+  },
   social_media: {
     era: 'computing', reach: 'world', outlet: true, infrastructure: 'internet',
     distortion: 0.3, spreadRate: 0.04,
