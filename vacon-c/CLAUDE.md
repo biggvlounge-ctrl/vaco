@@ -9766,3 +9766,62 @@ network.
 3 new tests in `test/media.test.js`; both real distinguishing facts
 (the era gate, the narrower `'city'` reach) mutation-verified —
 removing either was caught.
+
+**A hundred-and-sixty-eighth, task #208, by direct instruction after
+comparing VACON-C's gameplay against GTA's own:** "I would like how
+they go into their mission modes. I would like ours to naturally go
+into mission modes. When there's a certain intenseness in the game, it
+automatically goes into mission mode."
+
+`server/intensityMissions.js` is the real wiring, and the whole point
+of the design is that it reuses TWO already-real, already-calibrated
+things rather than inventing a third "intensity meter": `crime.
+dangerByCommunity` (the exact same real, bounded 0..1 danger score
+`recruitment.js`/`youthPrograms.js`/`leagues.js` already gate their
+own chaos-driven rates on) as the real intensity signal, and
+`missionTriggers.MISSION_TRIGGER_CHANCE` (that file's own measured
+"neither instant nor decorative" rate) as the real per-tick draw,
+scaled by the danger score — the identical `realRate * dangerScore`
+shape every sibling module already uses. `missions.generateMission`
+is the real state machine this writes into; no parallel one.
+
+**Deliberately scoped away from `tick.js#runSecurityPhase`'s own
+`AGGRESSION_FLASHPOINT_RATE`/`keys.resolveAggression` pipeline.** That
+mechanism is the seventeenth standing rule's own four-attempt,
+measured calibration, and it already auto-resolves a real
+confrontation with no player input at all, by design. This file does
+not touch it, gate it, or read its outcome — it is a separate,
+additive trigger on a player's own standing neighborhood danger, which
+is also the more literal read of "intensity": the world around the
+player has gotten dangerous, not that one specific scripted fight
+between two named NPCs has already happened.
+
+A player-linked NPC needs a real place for this to be about —
+`npc.home_property_id`, the one real per-person location this engine
+already has (`worldgen.js` sets it; `mortality.js` already reads it
+for a death's location) — and a player with none (a real, honest,
+allowed state) gets no intensity mission rather than a fabricated
+location, same refusal `missionTriggers.js`'s own header already
+documents for `practise-habit`.
+
+`mission.trigger_source = 'intensity'` is the one new field, in-memory
+only (no schema column, the same documented posture `issuing_
+organization_id`/`issued_by_entity_id` already carry on this exact
+table) — the real signal a client reads to open "mission mode"
+automatically rather than waiting for the player to browse a job
+board, which is the literal feature asked for.
+
+**Mutation-checked the early danger-score `continue` and found it
+non-load-bearing — the FOURTH time this exact pattern has turned up**
+(`recruitment.js`, `youthPrograms.js`, `leagues.js` each document it
+once already): `danger.get(...)` returns `0`, never `undefined`, for
+a real community with population and genuinely no recent incidents,
+and `MISSION_TRIGGER_CHANCE * 0` already yields `0`, which a uniform
+draw is always `>= `. Kept anyway, for the same honest-early-exit
+reason every sibling module keeps it.
+
+Wired into `tick.js`'s same cross-cutting slot as `leagues.
+runLeagues`, immediately after it. 8 tests in `test/
+intensityMissions.test.js`; the real open-mission stacking guard
+(reusing `missionTriggers.hasOpenMissionAt` rather than a second copy)
+is mutation-verified — caught.

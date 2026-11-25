@@ -76,6 +76,7 @@ const motivation = require('./motivation.js');
 const archetypes = require('./archetypes.js');
 const competition = require('./competition.js');
 const leagues = require('./leagues.js');
+const intensityMissions = require('./intensityMissions.js');
 const justice = require('./justice.js');
 const recruitment = require('./recruitment.js');
 const youthPrograms = require('./youthPrograms.js');
@@ -1749,6 +1750,16 @@ function advanceTick(worldState, options = {}) {
   // this reuses `recruitment.js`'s real chaos-driven rate rather than
   // running unconditionally in every community.
   candidateEvents.push(...leagues.runLeagues(worldState, { tick: worldState.tick }));
+
+  // Task #208, by direct instruction: "when there's a certain
+  // intenseness in the game, it automatically goes into mission
+  // mode." Reuses crime.dangerByCommunity (the same real signal
+  // recruitment.js/youthPrograms.js/leagues.js already gate their own
+  // chaos-driven rates on) rather than inventing a second "intensity"
+  // meter — see intensityMissions.js's own header for why this is a
+  // separate, additive trigger that does not touch the already
+  // calibrated AGGRESSION_FLASHPOINT_RATE pipeline above.
+  candidateEvents.push(...intensityMissions.runIntensityMissions(worldState, { tick: worldState.tick }));
 
   // What the tribes can now do — `TRIBE_GROWTH_MISSION_UNLOCK_SYSTEM.md`.
   //

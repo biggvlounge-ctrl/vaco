@@ -2289,6 +2289,23 @@ but reaches only a city, never the world radio already reaches -- a
 real local station, never a network. See CLAUDE.md's
 hundred-and-sixty-seventh standing rule.
 
+## Automatic mission-mode transition from real intensity (closes task #208)
+By direct instruction, comparing VACON-C's gameplay against GTA's own:
+"when there's a certain intenseness in the game, it automatically goes
+into mission mode." `server/intensityMissions.js` reuses the real,
+already-calibrated `crime.dangerByCommunity` score (the same signal
+`recruitment.js`/`youthPrograms.js`/`leagues.js` already gate their
+own chaos-driven rates on) and `missionTriggers.MISSION_TRIGGER_CHANCE`
+as the real draw, scaled by that danger score, rather than inventing a
+new "intensity meter." Deliberately does not touch the already
+four-attempt-calibrated `AGGRESSION_FLASHPOINT_RATE`/`resolveAggression`
+pipeline -- this is a separate trigger on a player's own standing
+neighborhood danger, generating a real mission (via `missions.
+generateMission`) at the player's own real `home_property_id`, marked
+`trigger_source: 'intensity'` so a client can auto-open mission mode
+rather than waiting for the player to browse a job board. See
+CLAUDE.md's hundred-and-sixty-eighth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a
