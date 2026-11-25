@@ -2333,6 +2333,21 @@ legal conviction. New `['citizen', 'leader']` verbs: `capture-entity`,
 `dispose-of-capture`. See CLAUDE.md's hundred-and-seventieth standing
 rule.
 
+## Fear as a real, bounded compliance bonus (closes task #206's fear half)
+By direct instruction: "the fear you can install in other people also
+matters what people follow." `leadership.complianceDraw` -- the one
+real draw `assignRole`/`directMission`/`plays.js`/`disposition.js` all
+share -- now also reads the directing entity's own real
+`reputation['Fear Factor']`, adding a bonus ONLY above the trait
+scale's own centre (50) and reusing `intimidation
+.INTIMIDATION_FEAR_WEIGHT` rather than a second number. Every existing
+leader in every existing fixture defaults to Fear Factor 50, so every
+prior test and behavior is byte-identical; only a measurably
+above-average-fear leader gets any real boost, capped well short of
+a guarantee. The word-of-mouth/"aura" half of the same task is split
+off to task #235, pending a real measurement pass. See CLAUDE.md's
+hundred-and-seventy-first standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

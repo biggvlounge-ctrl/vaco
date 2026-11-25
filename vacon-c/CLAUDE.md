@@ -9918,6 +9918,45 @@ themselves" discipline the takeover verbs already hold. 12 tests in
 `test/disposition.test.js`; both the capturable-outcome gate and the
 already-resolved guard are mutation-verified — each caught.
 
+**A hundred-and-seventy-first, task #206's fear half, by direct
+instruction:** "the fear you can install in other people also matters
+what people follow." The other half of task #206 ("rumors and gossip
+and word of mouth also power aura") is split off to task #235, needing
+a real measurement pass first — see that task's own description.
+
+**The first version of this was caught before it shipped, not after,
+and the catch is worth keeping for its own sake.** `leadership
+.complianceDraw` is the one real function every loyalty-gated draw in
+this engine already shares (`assignRole`, `directMission`, `plays.js#
+runPlay`, now `disposition.js#disposeOf`'s recruit path). The obvious
+build takes the MAX of a loyalty-chance and a fear-chance — the same
+"best one carries it" shape `influenceRatingOf` already uses across
+multiple led organizations. Checked directly before writing it:
+`reputation['Fear Factor']` defaults to 50 — the trait scale's own
+real centre — for every leader in every existing fixture across this
+engine's own test suite, none of which ever traits it. `max(loyalty
+Chance, 0.5)` would have silently turned "zero loyalty never
+complies" into "zero loyalty complies half the time" for every one of
+those tests — the seventeenth standing rule's own lesson, caught here
+by reading what an UNTRAITED leader's real number actually is before
+wiring it in, not after a test failed.
+
+The real fix: fear only ever ADDS, and only above the real centre —
+`Math.max(0, (fearFactor - 50) / 100) * intimidation
+.INTIMIDATION_FEAR_WEIGHT` (reusing that file's own real 0.5 weight
+rather than inventing a second number for the identical question that
+file already answers for intimidation checks). Zero for anyone at or
+below average, so every existing fixture — every one of which leaves
+Fear Factor at its real default — is byte-identical to before this
+existed; a maximally feared leader (Fear Factor 100) adds at most
+0.25, never enough on its own to force compliance from someone with
+zero loyalty and zero fear of them. 2 new tests in `test/
+leadership.test.js`; the full suite of `complianceDraw`'s own
+consumers (`playbook.test.js`, `plays.test.js`, `disposition.test.js`,
+`espionage.test.js`) re-run unchanged, confirming the zero-regression
+claim rather than assuming it. Both the centring floor and the weight
+constant are mutation-verified — each caught.
+
 **Mutation-checked the early danger-score `continue` and found it
 non-load-bearing — the FOURTH time this exact pattern has turned up**
 (`recruitment.js`, `youthPrograms.js`, `leagues.js` each document it

@@ -20,6 +20,7 @@ const players = require('../server/players.js');
 const leadership = require('../server/leadership.js');
 const influence = require('../server/influence.js');
 const heat = require('../server/heat.js');
+const { getTraitId } = require('../server/traitDefinitions.js');
 
 let nextId = 900000;
 
@@ -88,6 +89,13 @@ function join(worldState, entityId, organizationId, role = null) {
 
 function artifact(worldState, name) {
   return missions.generateArtifact(worldState, { name });
+}
+
+function setFearFactor(worldState, entityId, value) {
+  worldState.entityTraits.push({
+    id: worldState.entityTraits.length + 1, entity_id: entityId,
+    trait_id: getTraitId('reputation', 'Fear Factor'), current_value: value,
+  });
 }
 
 // -- isLeaderOf / organizationsLedBy -------------------------------------
@@ -293,6 +301,40 @@ test('a subordinate with full loyalty always complies, and a subordinate with ze
     assert.equal(disloyalResult.complied, false, `tick ${tick}: zero loyalty must never comply`);
     assert.equal(disloyalResult.mission, null, 'a refused order creates no mission at all');
   }
+});
+
+test('task #206: zero loyalty still never complies against a leader at or below average Fear Factor -- the real centred-bonus guard', () => {
+  const w = world();
+  const leader = person(w);
+  const subordinate = person(w);
+  const org = organization(w, { leaderId: leader.id });
+  join(w, subordinate.id, org.id);
+  worldStore.getOrCreateRelationship(w, leader.id, subordinate.id, 'social').loyalty = 0;
+  setFearFactor(w, leader.id, 10); // below the trait scale's own centre
+
+  for (let tick = 0; tick < 25; tick += 1) {
+    const { complied, fearBonus } = leadership.complianceDraw(w, leader.id, subordinate.id, 'test', tick);
+    assert.equal(fearBonus, 0, `tick ${tick}: a below-average Fear Factor must contribute no bonus at all`);
+    assert.equal(complied, false, `tick ${tick}: zero loyalty plus zero fear bonus must never comply`);
+  }
+});
+
+test('task #206: a maximally feared leader measurably raises compliance odds above zero loyalty alone, never to a guarantee', () => {
+  const w = world();
+  const leader = person(w);
+  const subordinate = person(w);
+  const org = organization(w, { leaderId: leader.id });
+  join(w, subordinate.id, org.id);
+  worldStore.getOrCreateRelationship(w, leader.id, subordinate.id, 'social').loyalty = 0;
+  setFearFactor(w, leader.id, 100);
+
+  let complied = 0;
+  const trials = 400;
+  for (let tick = 0; tick < trials; tick += 1) {
+    if (leadership.complianceDraw(w, leader.id, subordinate.id, 'test', tick).complied) complied += 1;
+  }
+  const rate = complied / trials;
+  assert.ok(rate > 0.15 && rate < 0.35, `max fear at zero loyalty should comply roughly a quarter of the time, got ${rate}`);
 });
 
 test('compliance at middling loyalty is a real distribution, not a coin either leader can call', () => {

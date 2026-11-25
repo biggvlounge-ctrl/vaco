@@ -97,6 +97,7 @@ const influence = require('./influence.js');
 const characterCreation = require('./characterCreation.js');
 const heat = require('./heat.js');
 const localEvents = require('./events.js');
+const intimidation = require('./intimidation.js');
 const { seededDraw } = require('./seeded.js');
 
 function clamp01(x) {
@@ -157,14 +158,52 @@ function clamp01(x) {
 // copied: `complianceDraw` is the one function both verbs call.
 const ASSIGNABLE_FAMILY_ROLES = ['guardian', 'mentor', 'protector', 'caregiver', 'black_sheep'];
 
+// **"The fear you can install in other people also matters what
+// people follow" — by direct instruction (task #206).** Fear is a
+// real, additive BONUS on top of loyalty, never a second, independent
+// channel that could override it — see why below.
+//
+// A first version took the max of a loyalty-chance and a fear-chance,
+// the same shape `influenceRatingOf`'s own "best one carries it"
+// already uses for multiple led organizations. Caught before it
+// shipped: `reputation['Fear Factor']` defaults to 50 (the trait
+// scale's own centre, the twelfth standing rule) for anyone this
+// engine has not specifically traited — which is every leader in
+// every existing fixture across this file's own test suite and
+// plays.js/disposition.js/playbook.js's own. `max(loyaltyChance, 0.5)`
+// would have silently turned "zero loyalty never complies" into "zero
+// loyalty complies half the time" for every one of those tests, none
+// of which set Fear Factor at all — the exact class of mistake the
+// seventeenth standing rule's own case study is about, caught here by
+// checking what an UNTRAITED leader's number actually is before
+// wiring it in, not after.
+//
+// The fix: fear only ever ADDS, and only above the real centre.
+// `Math.max(0, (fearFactor - 50) / 100)` is zero for anyone at or
+// below the trait scale's own average — so every existing fixture,
+// every one of which leaves Fear Factor at its real default, is
+// byte-identical to before this existed. Only a leader who is
+// measurably MORE feared than average gets any real boost at all, and
+// `intimidation.INTIMIDATION_FEAR_WEIGHT` (0.5) is reused as the
+// scaling factor rather than inventing a second number for the
+// identical real question ("how much does Fear Factor matter") that
+// file already answers for intimidation checks — a maximally feared
+// leader (Fear Factor 100) adds at most 0.25 to the real chance,
+// never enough on its own to force compliance from someone with zero
+// loyalty and zero fear of them.
 function complianceDraw(worldState, leaderEntityId, subordinateId, tag, tick) {
   const relationship = worldStore.findRelationship(worldState, leaderEntityId, subordinateId);
   const gatingValue = relationship ? Number(relationship.loyalty) : 50;
-  const complianceChance = clamp01(gatingValue / 100);
+  const fearFactor = getLiveEntity(worldState, leaderEntityId)?.traits?.reputation?.['Fear Factor'];
+  const fearValue = Number.isFinite(Number(fearFactor)) ? Number(fearFactor) : 50;
+  const fearBonus = Math.max(0, (fearValue - 50) / 100) * intimidation.INTIMIDATION_FEAR_WEIGHT;
+  const complianceChance = clamp01((gatingValue / 100) + fearBonus);
   const draw = seededDraw([
     worldState.seed ?? 'world', tag, leaderEntityId, subordinateId, tick,
   ]);
-  return { complied: draw < complianceChance, gatingValue, complianceChance };
+  return {
+    complied: draw < complianceChance, gatingValue, complianceChance, fearValue, fearBonus,
+  };
 }
 
 // By direct instruction: "this allows NPCs to become main characters
