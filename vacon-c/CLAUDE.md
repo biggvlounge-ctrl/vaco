@@ -9860,6 +9860,64 @@ two of the three never reaches the real ceiling — fixed by also
 granting the test leader this engine's one real tier-7 occupation
 (`polymath`), not by changing the formula.
 
+**A hundred-and-seventieth, task #216, from the master spec's §9:**
+"Encounters may support interaction with wounded, incapacitated,
+surrendering or captured NPCs... Disposition includes: Recruit...
+Exile/relocation... Prisoner/custody... Release." `contest.js`'s own
+real `loserOutcomes` (task #137 — `defeated`/`fled`/`submitted`) had
+exactly two real, live consumers before this round, and both of them
+only ever turned the string into flavour text (`engine.js`'s
+`resolveContest` wrapper, `leagues.js`'s own match memories) — nobody
+could actually DO anything with a real submission. `server/
+disposition.js` is the real missing half.
+
+**`CAPTURABLE_LOSER_OUTCOMES` is `['defeated', 'submitted']`, never
+`'fled'`** — read directly off contest.js's own real vocabulary rather
+than inventing a fourth outcome: someone who got away is not standing
+in front of the winner to be disposed of.
+
+**`npc.status = 'captive'` is a third real value alongside the two
+this engine already has (`'active'`, `'imprisoned'`), checked directly
+before adding it.** Every one of this engine's own roughly fifty
+`status === 'active'` gates (hiring, routine, recruitment eligibility)
+already excludes anyone not `'active'`, so a captive reads as correctly
+unavailable for ordinary life with zero changes to any of them; the
+roughly eighteen `status === 'imprisoned'`-specific reads (legal-system
+checks, by their own name) correctly do NOT fire for an informal
+capture — a captor is not a court, and conflating the two would have
+misreported every informal capture as a real conviction. The same two
+real consequences `justice.imprison` already applies for the identical
+stated reason ("a status field nothing reads is the eleventh standing
+rule wearing a prison uniform") are applied on capture here too —
+`economy.endEmployment`, clearing `scheduleEvents` — rather than
+leaving the new status as decoration.
+
+**Each of the four real dispositions reuses an existing real mechanism,
+none invented:** `recruit` is `leadership.complianceDraw` directly —
+the identical loyalty-gated draw `assignRole`/`directMission`/
+`plays.js#runPlay` already use, defaulting to a real coin flip (50) for
+a first-ever contact rather than a guaranteed yes or an invented zero.
+A refusal leaves the capture record UNRESOLVED rather than forcing an
+outcome. `exile` is `migration.relocate` with `migrationType:
+'forced'`, a real, already-enumerated type (`migration.MIGRATION_
+TYPES`), to a real destination community validated against
+`worldState.communities` — the captor chooses where; nothing here
+invents a "far away" algorithm. `custody` is the honest minimal case:
+the capture record resolves and the captive simply stays `'captive'`
+— no facility/parole system invented for an informal holder. `release`
+sets `'active'` again and writes a real memory on both sides; nothing
+moves `relationships.trust`/`loyalty` by an invented, uncalibrated
+number (the seventeenth standing rule's own lesson).
+
+Wired into `actions.js` as `capture-entity` and `dispose-of-capture`,
+both `['citizen', 'leader']` — capturing and disposing of someone is
+not a leadership-exclusive act the way directing a subordinate is.
+`engine.js#disposeOfCapture` checks the capture actually belongs to
+the calling actor before delegating, the same "a player acts as
+themselves" discipline the takeover verbs already hold. 12 tests in
+`test/disposition.test.js`; both the capturable-outcome gate and the
+already-resolved guard are mutation-verified — each caught.
+
 **Mutation-checked the early danger-score `continue` and found it
 non-load-bearing — the FOURTH time this exact pattern has turned up**
 (`recruitment.js`, `youthPrograms.js`, `leagues.js` each document it

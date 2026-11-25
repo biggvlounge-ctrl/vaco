@@ -2320,6 +2320,19 @@ MAXIMUM_ATTENDANCE` for "capacity scaled by leadership." New `'leader'`
 verbs: `draw-play`, `run-play`. See CLAUDE.md's hundred-and-sixty-ninth
 standing rule.
 
+## Real post-encounter disposition choice (closes task #216)
+From the master spec's §9: a real combat loss (`contest.js`'s own
+`defeated`/`fled`/`submitted`, task #137) previously only ever became
+flavor text. `server/disposition.js` lets the winner actually capture
+a defeated or submitted opponent (never someone who fled) and choose
+a real disposition -- recruit (gated on `leadership.complianceDraw`,
+never guaranteed), exile (`migration.relocate`, `migrationType:
+'forced'`), custody, or release. New `npc.status`: `'captive'`, a
+third real value alongside `'active'`/`'imprisoned'`, distinct from a
+legal conviction. New `['citizen', 'leader']` verbs: `capture-entity`,
+`dispose-of-capture`. See CLAUDE.md's hundred-and-seventieth standing
+rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

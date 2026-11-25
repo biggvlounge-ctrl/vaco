@@ -672,6 +672,33 @@ const ACTIONS = {
     run: (verbs, actorId, body) => verbs.runPlay(actorId, Number(body.playId)),
   },
 
+  // Task #216: a real post-encounter disposition choice, following a
+  // real contest.resolveContest loss (task #137). See disposition.js's
+  // own header.
+  'capture-entity': {
+    summary: 'Take a real defeated or submitted opponent captive -- never someone who fled.',
+    modes: ['citizen', 'leader'],
+    requires: ['capturedEntityId', 'loserOutcome'],
+    verbs: ['captureEntity'],
+    run: (verbs, actorId, body) => verbs.captureEntity(actorId, {
+      capturedEntityId: Number(body.capturedEntityId),
+      loserOutcome: body.loserOutcome,
+    }),
+  },
+
+  'dispose-of-capture': {
+    summary: 'Decide a real captive\'s fate: recruit, exile, hold in custody, or release.',
+    modes: ['citizen', 'leader'],
+    requires: ['captureId', 'disposition'],
+    verbs: ['disposeOfCapture'],
+    run: (verbs, actorId, body) => verbs.disposeOfCapture(actorId, Number(body.captureId), {
+      disposition: body.disposition,
+      organizationId: body.organizationId != null ? Number(body.organizationId) : null,
+      toCommunityId: body.toCommunityId != null ? Number(body.toCommunityId) : null,
+      toPropertyId: body.toPropertyId != null ? Number(body.toPropertyId) : null,
+    }),
+  },
+
   // **`travel.js`'s real player-facing half** — Oregon Trail-style
   // group travel: a real haversine distance between two real cities at
   // a real, cited historical pace, consuming real food/water from

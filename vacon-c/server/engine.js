@@ -66,6 +66,7 @@ const tick = require('./tick.js');
 const players = require('./players.js');
 const leadership = require('./leadership.js');
 const plays = require('./plays.js');
+const disposition = require('./disposition.js');
 const espionage = require('./espionage.js');
 const heists = require('./heists.js');
 const hiddenCaches = require('./hiddenCaches.js');
@@ -858,6 +859,23 @@ function runPlay(entityId, playId, options = {}) {
   return plays.runPlay(WorldState, entityId, playId, options);
 }
 
+// Task #216: a real post-encounter disposition choice. `capturedByEntityId`
+// is the player's own actor -- resolved from their player record the
+// same way every other actor-performing verb already is, never a
+// caller-supplied id (the fourth standing Phase-3 rule).
+function captureEntity(capturedByEntityId, options = {}) {
+  return disposition.capture(WorldState, { ...options, capturedByEntityId });
+}
+
+function disposeOfCapture(capturedByEntityId, captureId, options = {}) {
+  const record = disposition.capturesOf(WorldState, { capturedByEntityId })
+    .find((c) => c.id === Number(captureId));
+  if (!record) {
+    throw new Error(`disposeOfCapture: entity ${capturedByEntityId} holds no real open capture with id ${captureId}.`);
+  }
+  return disposition.disposeOf(WorldState, captureId, options);
+}
+
 // Same convention again: a sponsor (organization leader or family
 // head) sending one of their own real people to spy on a real
 // community — see espionage.js's own header for the full design.
@@ -1313,6 +1331,8 @@ const ACTION_VERBS = {
   broadcastMessage: (...args) => broadcastMessage(...args),
   drawPlay: (...args) => drawPlay(...args),
   runPlay: (...args) => runPlay(...args),
+  captureEntity: (...args) => captureEntity(...args),
+  disposeOfCapture: (...args) => disposeOfCapture(...args),
   assignRole: (...args) => assignRole(...args),
   sendSpy: (...args) => sendSpy(...args),
   attemptHeist: (...args) => attemptHeist(...args),
