@@ -3275,6 +3275,10 @@ function generateWorld(options = {}) {
   // with a pile of scrap. See `weapons.js`'s own header for the three
   // interpretive calls this closes.
   summary.weaponsItems = weapons.registerItems(w);
+  // **The walkie-talkie, task #199.** Same posture as every catalogue
+  // above — registered through `worldState.barterItems`, handed out
+  // to nobody at generation.
+  summary.walkieTalkieItems = media.registerWalkieTalkie(w);
   summary.knowledgeItems = 0;
   made.people.forEach((npc, pi) => {
     if (random.unit('book', pi) > config.survivingBookRate) return;

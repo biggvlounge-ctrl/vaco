@@ -9997,3 +9997,69 @@ runLeagues`, immediately after it. 8 tests in `test/
 intensityMissions.test.js`; the real open-mission stacking guard
 (reusing `missionTriggers.hasOpenMissionAt` rather than a second copy)
 is mutation-verified — caught.
+
+**A hundred-and-seventy-third, closing task #199 — walkie-talkies, and
+the point of the task was in its own last word: "infrastructure-
+independent."** `media.js`'s existing `DIRECTED_CHANNELS` (telephone,
+letter) answer "can this WORLD do this" — gated on `technology.
+ERA_NAMES` alone, with no wire, exchange or handset anywhere in the
+world once the era is reached (task #134's own still-open gap,
+deliberately not touched here). A walkie-talkie is the opposite shape
+by the task's own framing: it needs no era and no infrastructure,
+only two people who each physically hold one. That makes it an ITEM
+question, not a third table entry — the same equipped-possession gate
+`weapons.isFunctioningFirearm` already uses for "is this person
+actually armed," reused rather than a second mechanism invented
+beside it.
+
+§26 has no communication/electronics category. `tools` is the
+closest real one — the same category `Hammer`/`Saw` already hold in
+`items.js` — and the one `discovery.js` pool already draws from
+`electronics-store`, `hardware-store`, `sporting-goods-store`,
+`military-base` and `gun-store`, so this needed no change to
+`discovery.js` at all: a `walkie_talkie` turns up in exactly the
+real-world places a two-way radio would, the moment it is registered.
+Remnant-only, the same reasoning `weapons.FIREARMS` already gives
+firearms: nobody alive in this setting's Tier 1-2 salvage economy is
+assembling a two-way radio from scrap.
+
+`server/media.js#registerWalkieTalkie` registers the item through
+`worldState.barterItems`, the same idempotent-by-name extension point
+`weapons.registerItems` already uses, wired into `worldgen.js` and
+`restore.js` at the identical call sites `weapons.registerItems`
+already sits at. `carriesWalkieTalkie` reads `inventory.equippedItems`
+— held but not equipped is not carried, the same gate
+`weapons.equippedFirearm` already applies to a gun.
+
+**The one real decision: `sendMessage` checks possession FIRST, before
+`bestDirectedChannel`'s own era ladder, and `bestDirectedChannel`
+itself is untouched.** It already has a passing test asserting its
+exact era-only behaviour with no entity arguments
+(`test/media.test.js`'s "climbs the same era ladder"), so bending it
+to take entity ids would either break that test or silently add a
+branch its own assertions never exercise. Instead `sendMessage` asks
+`carriesWalkieTalkie` of both the sender and the recipient first; only
+when that is false does it fall through to the existing era-gated
+path, unchanged. `WALKIE_TALKIE_CHANNEL` reuses `CHANNELS.radio`'s own
+distortion figure — the same electric, one-author-per-transmission
+class `DIRECTED_CHANNELS.telephone` already borrows it for — and
+`era: null`, the same "needs nothing" floor `word_of_mouth` already
+rests on, rather than inventing a second distortion number for a
+channel of the same real class.
+
+**Centred on the default, the twelfth standing rule's own discipline**:
+a world with nobody carrying the item is bit-for-bit what it was
+before this round — `carriesWalkieTalkie` reads `worldState.inventory`,
+which starts empty, so every existing `sendMessage` test (33 of them)
+passed unchanged, and a new test asserts the specific case this
+mechanism must NOT touch: a `stone_tools` world with no walkie-talkies
+still refuses exactly as before. 5 new tests in `test/media.test.js`
+(38 total): registration is idempotent; possession requires EQUIPPED,
+not merely held; a real pair reaches each other in a `stone_tools`
+world where `bestDirectedChannel` itself returns `null` (the
+"infrastructure-independent" claim, proved rather than asserted); the
+no-radios case is unchanged; and one side alone carrying one is not
+enough. Mutation-verified: stubbed the new possession check to `false`
+and confirmed exactly the era-bypass test failed, nothing else —
+confirming it is this check, and only this check, that the new
+behaviour depends on.

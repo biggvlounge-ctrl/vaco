@@ -71,6 +71,7 @@ const technology = require('./technology.js');
 const infrastructure = require('./infrastructure.js');
 const worldStore = require('./worldStore.js');
 const perception = require('./perception.js');
+const inventory = require('./inventory.js');
 const { seededDraw } = require('./seeded.js');
 
 const clamp01 = (n) => Math.max(0, Math.min(1, n));
@@ -442,6 +443,62 @@ function bestDirectedChannel(worldState) {
   return null;
 }
 
+// ---------------------------------------------------------------------
+// Walkie-talkies — an addressed channel gated on possession, not era
+// ---------------------------------------------------------------------
+//
+// Task #199, by direct instruction: "infrastructure-independent" is
+// the real distinguishing fact asked for, and every `DIRECTED_
+// CHANNELS` entry above answers "can this WORLD do this" — gated on
+// `technology.ERA_NAMES` alone, with no wire, exchange or handset
+// anywhere in the world once the era is reached (task #134's own
+// still-open gap, deliberately not fixed here). A walkie-talkie is
+// the opposite shape: it needs no era and no infrastructure, only two
+// people who each physically hold one. That makes it an ITEM, which
+// answers "can these TWO PEOPLE do this," the same equipped-possession
+// gate `weapons.isFunctioningFirearm` already uses for "is this person
+// actually armed" — not a third entry in a table keyed on what the
+// world has climbed back to.
+//
+// §26 has no communication/electronics category. `tools` is the
+// closest real one — the same category `Hammer`/`Saw` already hold in
+// `items.js` — and the one `discovery.js` pool already draws from
+// `electronics-store`, `hardware-store`, `sporting-goods-store`,
+// `military-base` and `gun-store`, so this needs no change to
+// `discovery.js` at all: a walkie-talkie turns up in exactly the
+// real-world places a two-way radio would. Remnant-only, the same
+// reasoning `weapons.FIREARMS` already gives firearms: nobody alive in
+// this setting's Tier 1-2 salvage economy is assembling a two-way
+// radio from scrap.
+const WALKIE_TALKIE_ITEM = 'walkie_talkie';
+
+// Reuses `radio`'s own distortion figure — the same electric,
+// one-author-per-transmission class of channel `DIRECTED_CHANNELS
+// .telephone` already borrows it for — rather than inventing a second
+// number for a channel of the same real class. `era: null` is the
+// same "needs nothing" floor `word_of_mouth` already rests on.
+const WALKIE_TALKIE_CHANNEL = { era: null, distortion: CHANNELS.radio.distortion };
+
+// Registers the item through `worldState.barterItems`, the same
+// extension point and idempotent-by-name shape `weapons.registerItems`
+// already uses. Registered, never handed out — a world starts with
+// nobody carrying one, same as nobody starts armed.
+function registerWalkieTalkie(worldState) {
+  if (!Array.isArray(worldState.barterItems)) worldState.barterItems = [];
+  if (worldState.barterItems.some((i) => i?.name === WALKIE_TALKIE_ITEM)) return 0;
+  worldState.barterItems.push({
+    name: WALKIE_TALKIE_ITEM, category: 'tools', origin: 'remnant', walkieTalkie: true,
+  });
+  return 1;
+}
+
+// Equipped, specifically — a walkie-talkie zipped in a bag is not on,
+// the same gate `weapons.equippedFirearm` already applies to a gun.
+function carriesWalkieTalkie(worldState, entityId) {
+  return inventory.equippedItems(worldState, entityId)
+    .some((h) => h.item_name === WALKIE_TALKIE_ITEM);
+}
+
 // Sends ONE fact `fromEntityId` already holds to ONE named
 // `toEntityId`, regardless of distance — the real difference from
 // every channel above, all of which reach whoever is nearby rather
@@ -473,9 +530,19 @@ function sendMessage(worldState, options = {}) {
     throw new Error(`media.sendMessage: "${toEntityId}" is not a real, living entity`);
   }
 
-  const channelName = bestDirectedChannel(worldState);
-  if (channelName === null) return null;
-  const channel = DIRECTED_CHANNELS[channelName];
+  // A real walkie-talkie in both hands beats the era ladder entirely —
+  // it is the one addressed channel this file has that does not ask
+  // what the world has climbed back to.
+  let channelName;
+  let channel;
+  if (carriesWalkieTalkie(worldState, fromEntityId) && carriesWalkieTalkie(worldState, toEntityId)) {
+    channelName = 'walkie_talkie';
+    channel = WALKIE_TALKIE_CHANNEL;
+  } else {
+    channelName = bestDirectedChannel(worldState);
+    if (channelName === null) return null;
+    channel = DIRECTED_CHANNELS[channelName];
+  }
 
   // The most confident thing the sender holds on the subject, the same
   // "one real opinion per person" rule `computeApproval` already
@@ -712,5 +779,8 @@ module.exports = {
   describeMedia,
   DIRECTED_CHANNELS,
   bestDirectedChannel,
+  WALKIE_TALKIE_ITEM,
+  registerWalkieTalkie,
+  carriesWalkieTalkie,
   sendMessage,
 };

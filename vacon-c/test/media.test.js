@@ -47,6 +47,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const media = require('../server/media.js');
+const inventory = require('../server/inventory.js');
 const technology = require('../server/technology.js');
 const politics = require('../server/politics.js');
 const urbanSystems = require('../server/urbanSystems.js');
@@ -86,6 +87,8 @@ function mediaWorld({
     publicOpinion: [],
     beliefs: [],
     infrastructure: [],
+    inventory: [],
+    barterItems: [],
   };
 
   // The real ladder, so a channel's era gate is checked against the
@@ -642,4 +645,79 @@ test('sendMessage picks the most confident fact about the named subject, not jus
 test('§22 Communication is levelled to what the code does', () => {
   const level = (n) => urbanSystems.SYSTEMS.find((s) => s.n === n).level;
   assert.equal(level(22), 'modelled');
+});
+
+// ---------------------------------------------------------------------
+// Task #199 — walkie-talkies, an addressed channel gated on
+// possession rather than era
+// ---------------------------------------------------------------------
+
+test('registerWalkieTalkie adds the item exactly once, idempotently', () => {
+  const w = mediaWorld();
+  const added = media.registerWalkieTalkie(w);
+  assert.equal(added, 1);
+  assert.ok(w.barterItems.some((i) => i.name === media.WALKIE_TALKIE_ITEM));
+  const addedAgain = media.registerWalkieTalkie(w);
+  assert.equal(addedAgain, 0);
+  assert.equal(
+    w.barterItems.filter((i) => i.name === media.WALKIE_TALKIE_ITEM).length, 1,
+  );
+});
+
+test('carriesWalkieTalkie is true only once the item is actually equipped', () => {
+  const w = mediaWorld({ eras: ['stone_tools'] });
+  media.registerWalkieTalkie(w);
+  const [holder] = w.npcs;
+  assert.equal(media.carriesWalkieTalkie(w, holder.id), false);
+  inventory.give(w, { entityId: holder.id, itemName: media.WALKIE_TALKIE_ITEM });
+  assert.equal(media.carriesWalkieTalkie(w, holder.id), false, 'held but not equipped is not carried');
+  inventory.equip(w, { entityId: holder.id, itemName: media.WALKIE_TALKIE_ITEM });
+  assert.equal(media.carriesWalkieTalkie(w, holder.id), true);
+});
+
+test('sendMessage reaches a real walkie-talkie pair even in a stone_tools world, where bestDirectedChannel is null', () => {
+  const w = mediaWorld({ eras: ['stone_tools'] });
+  media.registerWalkieTalkie(w);
+  const [sender, recipient] = w.npcs;
+  for (const id of [sender.id, recipient.id]) {
+    inventory.give(w, { entityId: id, itemName: media.WALKIE_TALKIE_ITEM });
+    inventory.equip(w, { entityId: id, itemName: media.WALKIE_TALKIE_ITEM });
+  }
+  assert.equal(media.bestDirectedChannel(w), null, 'the world itself has reached no addressed-channel era');
+
+  w.entityKnowledge.push({
+    entity_id: sender.id, subject_entity_id: null, fact_type: 'known',
+    fact_content: 'news:flood', confidence_level: 0.8,
+    source_entity_id: null, spread_rate: null, distortion_level: null, acquired_tick: 1,
+  });
+  const result = media.sendMessage(w, { fromEntityId: sender.id, toEntityId: recipient.id });
+  assert.ok(result, 'a real walkie-talkie pair can send regardless of the world\'s own era');
+  assert.equal(result.distortion_level, media.CHANNELS.radio.distortion);
+  assert.equal(result.confidence_level, 0.8 * (1 - media.CHANNELS.radio.distortion));
+});
+
+test('sendMessage still refuses with no walkie-talkies and no era reached — zero behavioral change for the untraited fixture', () => {
+  const w = mediaWorld({ eras: ['stone_tools'] });
+  media.registerWalkieTalkie(w);
+  const [sender, recipient] = w.npcs;
+  w.entityKnowledge.push({
+    entity_id: sender.id, subject_entity_id: null, fact_type: 'known',
+    fact_content: 'news:flood', confidence_level: 0.8,
+    source_entity_id: null, spread_rate: null, distortion_level: null, acquired_tick: 1,
+  });
+  assert.equal(media.sendMessage(w, { fromEntityId: sender.id, toEntityId: recipient.id }), null);
+});
+
+test('sendMessage does not use the walkie-talkie channel when only one side carries one', () => {
+  const w = mediaWorld({ eras: ['stone_tools'] });
+  media.registerWalkieTalkie(w);
+  const [sender, recipient] = w.npcs;
+  inventory.give(w, { entityId: sender.id, itemName: media.WALKIE_TALKIE_ITEM });
+  inventory.equip(w, { entityId: sender.id, itemName: media.WALKIE_TALKIE_ITEM });
+  w.entityKnowledge.push({
+    entity_id: sender.id, subject_entity_id: null, fact_type: 'known',
+    fact_content: 'news:flood', confidence_level: 0.8,
+    source_entity_id: null, spread_rate: null, distortion_level: null, acquired_tick: 1,
+  });
+  assert.equal(media.sendMessage(w, { fromEntityId: sender.id, toEntityId: recipient.id }), null);
 });

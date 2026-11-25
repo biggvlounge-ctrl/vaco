@@ -63,6 +63,7 @@ const salvage = require('./salvage.js');
 const produce = require('./produce.js');
 const merchandise = require('./merchandise.js');
 const weapons = require('./weapons.js');
+const media = require('./media.js');
 
 // Turn `SELECT *` rows into what the engine expects. Postgres returns
 // NUMERIC as a string, which is correct of it and wrong for an engine
@@ -518,6 +519,7 @@ async function restoreWorldStateFromPostgres(worldState) {
   produce.registerItems(worldState);
   merchandise.registerItems(worldState);
   weapons.registerItems(worldState);
+  media.registerWalkieTalkie(worldState);
   summary.barter_items = (worldState.barterItems || []).length;
 
   worldState.decisionLog = (await q('SELECT * FROM decision_log ORDER BY id')).map((d) =>

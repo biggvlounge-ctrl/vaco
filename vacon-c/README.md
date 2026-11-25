@@ -2359,6 +2359,29 @@ overlap (18-29 counts toward both) rather than being forced into a
 false partition neither real cutoff actually describes. See CLAUDE.md's
 hundred-and-seventy-second standing rule.
 
+## Walkie-talkies -- a real, infrastructure-independent communication item (closes task #199)
+`media.js`'s existing addressed channels (telephone, letter) answer
+"can this WORLD do this," gated on `technology.ERA_NAMES` alone. A
+walkie-talkie is the opposite shape by the task's own framing: it
+needs no era and no infrastructure, only two people who each
+physically hold one -- an ITEM question, using the same
+equipped-possession gate `weapons.isFunctioningFirearm` already uses
+for "is this person actually armed." Registered through
+`worldState.barterItems` (category `tools`, the same one `Hammer`/
+`Saw` hold, origin `remnant`), so it turns up through the real
+`discovery.js` pools that already draw `tools` -- `electronics-store`,
+`hardware-store`, `sporting-goods-store`, `military-base`,
+`gun-store` -- with no change to that file at all.
+`media.sendMessage` checks whether both the sender and recipient
+carry one (equipped, not merely held) BEFORE falling through to the
+existing, untouched era ladder; a real pair reaches each other even in
+a `stone_tools` world where `bestDirectedChannel` itself returns
+`null`. Distortion reuses `CHANNELS.radio`'s own figure rather than
+inventing a second number for the same class of channel. A world with
+nobody carrying one is unchanged -- all 33 pre-existing `media.test.js`
+tests still pass, plus 5 new ones. See CLAUDE.md's
+hundred-and-seventy-third standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a
