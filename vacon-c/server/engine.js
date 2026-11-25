@@ -65,6 +65,7 @@ const investments = require('./investments.js');
 const tick = require('./tick.js');
 const players = require('./players.js');
 const leadership = require('./leadership.js');
+const plays = require('./plays.js');
 const espionage = require('./espionage.js');
 const heists = require('./heists.js');
 const hiddenCaches = require('./hiddenCaches.js');
@@ -846,6 +847,17 @@ function assignRole(entityId, options = {}) {
   return leadership.assignRole(WorldState, entityId, options);
 }
 
+// Tasks #184/#225: a real leader draws a named, reusable coordinated
+// play (who defends where, how aggressively, to what end) and runs it
+// -- see plays.js's own header for the full design.
+function drawPlay(entityId, options = {}) {
+  return plays.drawPlay(WorldState, entityId, options);
+}
+
+function runPlay(entityId, playId, options = {}) {
+  return plays.runPlay(WorldState, entityId, playId, options);
+}
+
 // Same convention again: a sponsor (organization leader or family
 // head) sending one of their own real people to spy on a real
 // community — see espionage.js's own header for the full design.
@@ -1299,6 +1311,8 @@ const ACTION_VERBS = {
   resolveMission: (...args) => resolveMission(...args),
   directMission: (...args) => directMission(...args),
   broadcastMessage: (...args) => broadcastMessage(...args),
+  drawPlay: (...args) => drawPlay(...args),
+  runPlay: (...args) => runPlay(...args),
   assignRole: (...args) => assignRole(...args),
   sendSpy: (...args) => sendSpy(...args),
   attemptHeist: (...args) => attemptHeist(...args),

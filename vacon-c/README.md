@@ -2306,6 +2306,20 @@ generateMission`) at the player's own real `home_property_id`, marked
 rather than waiting for the player to browse a job board. See
 CLAUDE.md's hundred-and-sixty-eighth standing rule.
 
+## Coordinated strategist playbooks -- real squad-command plays (closes tasks #184/#225)
+By direct instruction, twice over: a squad-command request ("2 people
+defending door 1, door 2... aggression... education, defense,
+offense") and the "sports play" framing ("if you have the right
+person, you can set up a strategy or a play... to do a mission").
+`server/plays.js` lets a real org leader or family head draw a named,
+reusable play -- real subordinates assigned to real properties, each
+with an aggression level and an intent -- and run it any number of
+times. Reuses `leadership.complianceDraw` (never a guaranteed order)
+and `influence.influenceRatingOf` scaled against `meetings.
+MAXIMUM_ATTENDANCE` for "capacity scaled by leadership." New `'leader'`
+verbs: `draw-play`, `run-play`. See CLAUDE.md's hundred-and-sixty-ninth
+standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

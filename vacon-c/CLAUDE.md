@@ -9811,6 +9811,55 @@ table) — the real signal a client reads to open "mission mode"
 automatically rather than waiting for the player to browse a job
 board, which is the literal feature asked for.
 
+**A hundred-and-sixty-ninth, tasks #184 and #225 together, by direct
+instruction twice over — once as a squad-command request ("we need 2
+people defending door 1, door 2... set their aggression... set some
+of them in for education, knowledge, some for defense, some on
+offense") and once, in a later message, as "the sports play
+concept... if you have the right person, you can set up a strategy or
+a play, per se, to do a mission."** Read together, the first names the
+real CONTENT of a play and the second names its real SHAPE (named,
+retained, run more than once) — one real mechanism closes both rather
+than two that would disagree.
+
+`server/plays.js` adds nothing to this engine's authority or
+compliance model. `drawPlay`/`runPlay` reuse `leadership.js#assignRole`'s
+own two ownership checks (a real org `leader_id` or a real family
+`head_npc_id`) and `leadership.complianceDraw` directly — the identical
+loyalty-gated draw `directMission`/`assignRole` already use, never a
+second, invented compliance mechanism. `AGGRESSION_LEVELS` (light/
+medium/aggressive) and `INTENTS` (education/defense/offense) are the
+user's own named vocabularies, not flagged interpretive, because the
+user is the one who specified them. `capacityFor` reuses `influence.
+influenceRatingOf` (the forty-eighth standing rule's own real,
+derived, never-stored composite) scaled against `meetings.
+MAXIMUM_ATTENDANCE` as the real ceiling — "capacity scaled by
+leadership," the user's own words, with no new number invented to
+express it.
+
+**Two things the spec's language suggested and this build deliberately
+declined**, both explained in `plays.js`'s own header: a mechanical
+compliance bonus for a "refined," reused play (the seventeenth
+standing rule's lesson — an uncalibrated modifier on a compliance draw
+is a guess, not a feature, until it is measured against a real
+distribution), and branching contingency trees (the honest, minimal
+form of "contingency" this engine already has is `playbook.js#
+assignToPlaybook`'s own per-member catch — `runPlay` takes the
+identical shape, a full per-assignment compliance report rather than
+one pass/fail boolean for the whole play).
+
+Wired into `actions.js` as two new `'leader'`-only verbs, `draw-play`
+and `run-play`, the same posture `direct-mission`/`broadcast-message`
+already established — no dedicated REST route of their own, reachable
+only through the real player dispatcher. 11 tests in `test/
+plays.test.js`; the real capacity gate is mutation-verified — caught.
+One test-fixture bug found and fixed during development, not a code
+bug: `influenceRatingOf`'s three components (occupation/organization/
+social) each cap below 100 on their own, so a fixture maximizing only
+two of the three never reaches the real ceiling — fixed by also
+granting the test leader this engine's one real tier-7 occupation
+(`polymath`), not by changing the formula.
+
 **Mutation-checked the early danger-score `continue` and found it
 non-load-bearing — the FOURTH time this exact pattern has turned up**
 (`recruitment.js`, `youthPrograms.js`, `leagues.js` each document it

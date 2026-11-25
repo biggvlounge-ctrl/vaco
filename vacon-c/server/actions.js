@@ -640,6 +640,38 @@ const ACTIONS = {
     }),
   },
 
+  // Tasks #184/#225: a real leader draws a named, reusable coordinated
+  // play -- who defends which real property, how aggressively, to
+  // what end -- then runs it. See plays.js's own header.
+  'draw-play': {
+    summary: 'Draw up a named, reusable play: real subordinates assigned to real positions, each with '
+      + 'an aggression level (light/medium/aggressive) and an intent (education/defense/offense). '
+      + 'How many positions a play can hold scales with your own real influence.',
+    modes: ['leader'],
+    requires: ['name', 'assignments'],
+    verbs: ['drawPlay'],
+    run: (verbs, actorId, body) => verbs.drawPlay(actorId, {
+      name: body.name,
+      organizationId: body.organizationId != null ? Number(body.organizationId) : null,
+      familyId: body.familyId != null ? Number(body.familyId) : null,
+      assignments: Array.isArray(body.assignments) ? body.assignments.map((a) => ({
+        subordinateEntityId: Number(a.subordinateEntityId),
+        locationPropertyId: Number(a.locationPropertyId),
+        aggression: a.aggression,
+        intent: a.intent,
+      })) : [],
+    }),
+  },
+
+  'run-play': {
+    summary: 'Call a previously drawn play. Every assigned subordinate gets their own real compliance '
+      + 'draw against their loyalty to you -- never guaranteed, and reported per-position.',
+    modes: ['leader'],
+    requires: ['playId'],
+    verbs: ['runPlay'],
+    run: (verbs, actorId, body) => verbs.runPlay(actorId, Number(body.playId)),
+  },
+
   // **`travel.js`'s real player-facing half** — Oregon Trail-style
   // group travel: a real haversine distance between two real cities at
   // a real, cited historical pace, consuming real food/water from
