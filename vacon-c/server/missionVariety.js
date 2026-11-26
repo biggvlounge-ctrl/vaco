@@ -52,6 +52,7 @@ const vehicles = require('./vehicles.js');
 const geo = require('./geo.js');
 const nomadic = require('./nomadic.js');
 const camps = require('./camps.js');
+const control = require('./control.js');
 
 const MISSION_RECRUIT_REWARD = 40;
 const MISSION_ALLIANCE_REWARD = 40;
@@ -60,6 +61,7 @@ const MISSION_BARTER_REWARD = 40;
 const MISSION_HUNT_REWARD = 40;
 const MISSION_TRAVEL_REWARD = 40;
 const MISSION_NOMADIC_REWARD = 40;
+const MISSION_EXPANSION_REWARD = 40;
 
 function communityAnchor(worldState, communityId) {
   return (worldState.properties || []).find((p) => p.community_id === communityId) ?? null;
@@ -425,6 +427,108 @@ function offerNomadicMission(worldState, npcId, options = {}) {
   return { mission, campId: camp.id, destinationCityId: destinationCity.id };
 }
 
+// **Task #124 — org expansion, reusing `control.viableTargetsFor`
+// directly rather than scanning for a second, disagreeing notion of
+// "what could this tribe take."** `viableTargetsFor(worldState,
+// {tribeId, cityId, tick})` is the real, already-tested
+// (`control.test.js`) scan over every real candidate in one city;
+// this is that identical scan pointed at a city the citizen's own
+// organization does not already reach — which is what "expansion"
+// has to mean for an organization, since `control.js`'s own
+// organization-scale comment already states "organizations have no
+// city of their own in the schema."
+//
+// An organization's HOME city is read the only way the schema
+// actually records one: the real properties it operates
+// (`properties.operating_organization_id`), never a second, invented
+// "headquarters" field. An organization with no real property
+// anywhere yet has nowhere to expand FROM; a world with only one real
+// city has nowhere to expand TO. Both are honest unmet preconditions
+// — the eleventh standing rule's shape — not thrown errors.
+//
+// **Scans every real non-home city in order and offers the FIRST real
+// viable target it finds — not the first non-home CITY**, which can
+// hold no viable target at all while a later city does. Checked
+// directly rather than assumed: within one call, `tribeId` and
+// `tick` are fixed, so `control.assess`'s own `margin` term
+// (`min(1, roster.fielded / composition.total)`) is provably exactly 1
+// on EVERY candidate `compositionRequirementMet` ever accepts — summing
+// a met role's own count across every required role already puts
+// `fielded` at or above `total`, and `fielded` only sums MORE than that
+// once unrequired roles are folded in. So `finalSuccessProbability`
+// (`margin * tribeCohesionScore`) is identical on every real viable
+// candidate a single call can ever compare, for the identical tribe —
+// there is no real "better" target to rank among them, only a real
+// "found one" versus "kept looking." A version of this that compared
+// `finalSuccessProbability` across candidates would be comparing a
+// constant to itself, the eleventh standing rule's shape one level
+// down inside a loop rather than around a whole function.
+//
+// The resolution verb is the real `attempt-takeover` already exposed
+// (tribe-scoped, exactly as `COMPOSITION_REQUIREMENTS_TRIBE_COHESION
+// .md` specifies) — this function names a real opportunity for it,
+// the same "naming, not a new mechanic" role every sibling function
+// in this file plays.
+function offerExpansionMission(worldState, npcId, options = {}) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`offerExpansionMission: no NPC ${npcId}`);
+
+  const organizationId = ownOrganizationIdOf(worldState, npcId);
+  if (organizationId == null) return null;
+  // A fast, documenting early-exit, not a load-bearing one:
+  // `control.assess` already returns null for a `tribeId` no real
+  // family matches, so every candidate below would be excluded on its
+  // own even without this. Kept anyway for the same reason
+  // `tribeIdFor`'s own (thrown) version is kept one layer up --
+  // see test/missionVariety.test.js's own note on why this is not
+  // mutation-guarded.
+  const tribeId = ownFamilyIdOf(worldState, npcId);
+  if (tribeId == null) return null;
+
+  const homeProperties = (worldState.properties || [])
+    .filter((p) => p.operating_organization_id === organizationId);
+  if (homeProperties.length === 0) return null;
+
+  const homeCityIds = new Set();
+  for (const property of homeProperties) {
+    const community = (worldState.communities || [])
+      .find((c) => c.id === property.community_id);
+    if (community) homeCityIds.add(community.city_id);
+  }
+
+  const tick = options.tick ?? worldState.tick ?? 0;
+  let best = null;
+  let bestCity = null;
+  for (const city of (worldState.cities || [])) {
+    if (homeCityIds.has(city.id)) continue;
+    const targets = control.viableTargetsFor(worldState, { tribeId, cityId: city.id, tick })
+      .filter((t) => t.scale === 'property');
+    if (targets.length > 0) {
+      [best] = targets;
+      bestCity = city;
+      break;
+    }
+  }
+  if (!best) return null;
+
+  const anchor = (worldState.properties || []).find((p) => p.id === best.locationId);
+  if (!anchor) return null;
+
+  const mission = missions.generateMission(worldState, {
+    locationId: anchor.id,
+    objective: `Take ${anchor.type ?? 'a property'} in `
+      + `${bestCity.name ?? `city ${bestCity.id}`} for your own organization — `
+      + 'real expansion into a city it does not already reach',
+    reward: options.reward ?? MISSION_EXPANSION_REWARD,
+  });
+  return {
+    mission,
+    destinationCityId: bestCity.id,
+    locationId: anchor.id,
+    finalSuccessProbability: best.finalSuccessProbability,
+  };
+}
+
 module.exports = {
   MISSION_RECRUIT_REWARD,
   MISSION_ALLIANCE_REWARD,
@@ -433,6 +537,7 @@ module.exports = {
   MISSION_HUNT_REWARD,
   MISSION_TRAVEL_REWARD,
   MISSION_NOMADIC_REWARD,
+  MISSION_EXPANSION_REWARD,
   offerRecruitMission,
   offerAllianceMission,
   offerSpyMission,
@@ -440,4 +545,5 @@ module.exports = {
   offerHuntMission,
   offerTravelMission,
   offerNomadicMission,
+  offerExpansionMission,
 };

@@ -335,3 +335,217 @@ test('offerBarterMission returns null when the city is not really short of anyth
   landmark(engine.WorldState, 69109, 'shop', 69009);
   assert.equal(missionVariety.offerBarterMission(engine.WorldState, npc.id), null);
 });
+
+// ---------------------------------------------------------------------
+// Task #124 -- org expansion, the eighth offer*Mission.
+//
+// A hand-built, ISOLATED world (not `engine.WorldState`) on purpose --
+// this function scans EVERY real city in the world, and
+// `engine.WorldState` accumulates cities across every test in this
+// file with no reset between them (the same convention
+// `offerNomadicMission`'s own tests already warn about). Scanning the
+// whole shared world would make "the one real candidate" depend on
+// which of dozens of leftover cities happens to compare best, which is
+// nothing a test should assert on. `control.test.js`'s and
+// `build-barricade.test.js`'s own hand-built `world()` fixtures are
+// the precedent: neither `missionVariety.js`'s functions nor
+// `control.js`'s are bound to `engine.WorldState` at all.
+function expansionWorld(tick = 10000) {
+  return {
+    tick,
+    families: [],
+    familyMemberships: [],
+    npcs: [],
+    entityOrganizationMemberships: [],
+    organizations: [],
+    properties: [],
+    communities: [],
+    cities: [],
+    inventory: [],
+    barterItems: [],
+    employmentRecords: [],
+    entityTraits: [],
+    missions: [],
+  };
+}
+
+function expansionFounder(w, { npcId, familyId, organizationId, tick }) {
+  w.npcs.push({ id: npcId, status: 'alive', createdTick: tick - Math.round(30 * 365) });
+  w.families.push({ id: familyId, surname: `Expando ${familyId}`, unity: 100, conflict: 0, head_npc_id: npcId });
+  w.familyMemberships.push({ entity_id: npcId, family_id: familyId, role: 'founder', generation_number: 1 });
+  w.entityOrganizationMemberships.push({
+    id: npcId, entity_id: npcId, organization_id: organizationId, status: 'active',
+  });
+  w.organizations.push({ id: organizationId, type: 'business', leader_id: npcId });
+  // §26 `tools`, the real materiel `TOOLS_PER_HAND` requires -- the
+  // same real item `control.test.js`'s own `kit()` uses.
+  w.inventory.push({
+    id: w.inventory.length + 1, holder_entity_id: npcId, item_name: 'Hammer', quantity: 2, condition: 80,
+  });
+}
+
+function expansionProperty(w, { id, communityId, operatingOrganizationId = null }) {
+  w.properties.push({
+    id, type: 'commercial', operating_organization_id: operatingOrganizationId,
+    community_id: communityId, condition: 100, land_size: 500, floors: 1, occupants: [], discoveries_taken: 0,
+  });
+}
+
+test('offerExpansionMission points at a real viable property in a real city the organization does not already reach', () => {
+  const w = expansionWorld();
+  expansionFounder(w, { npcId: 1, familyId: 900, organizationId: 500, tick: w.tick });
+
+  // Home city -- the real property the organization already operates.
+  w.communities.push({ id: 10, city_id: 100 });
+  w.cities.push({ id: 100, name: 'Home City' });
+  expansionProperty(w, { id: 1000, communityId: 10, operatingOrganizationId: 500 });
+
+  // A real, different city the organization does not reach yet, with
+  // one real, trivially-capturable property (no holders, no operator).
+  w.communities.push({ id: 20, city_id: 200 });
+  w.cities.push({ id: 200, name: 'New City' });
+  expansionProperty(w, { id: 2000, communityId: 20 });
+
+  const offer = missionVariety.offerExpansionMission(w, 1);
+  assert.ok(offer, 'no expansion mission was offered');
+  assert.equal(offer.destinationCityId, 200, 'the real city the organization does not already reach');
+  assert.equal(offer.locationId, 2000);
+  assert.match(offer.mission.objective, /New City/);
+  assert.ok(offer.finalSuccessProbability > 0);
+});
+
+test('offerExpansionMission keeps scanning past a real but genuinely unviable first-found city, rather than stopping there', () => {
+  const w = expansionWorld();
+  expansionFounder(w, { npcId: 1, familyId: 900, organizationId: 500, tick: w.tick });
+
+  w.communities.push({ id: 10, city_id: 100 });
+  w.cities.push({ id: 100, name: 'Home City' });
+  expansionProperty(w, { id: 1000, communityId: 10, operatingOrganizationId: 500 });
+
+  // Checked FIRST (lower id) and genuinely NOT viable: three real
+  // holders push the real required force past what a one-person
+  // tribe can field, so `compositionRequirementMet` is false and
+  // `viableTargetsFor` excludes it outright -- a function that
+  // stopped at the first non-home city would see nothing here and
+  // return null, never reaching the real opportunity below.
+  w.communities.push({ id: 20, city_id: 200 });
+  w.cities.push({ id: 200, name: 'Overheld City' });
+  for (let i = 0; i < 3; i += 1) {
+    w.npcs.push({ id: 100 + i, status: 'alive', createdTick: w.tick - Math.round(30 * 365), home_property_id: 2000 });
+  }
+  expansionProperty(w, { id: 2000, communityId: 20 });
+
+  // Checked SECOND and genuinely viable: nobody holds it at all --
+  // the real "a flat with nobody holding it still takes one person" floor.
+  w.communities.push({ id: 30, city_id: 300 });
+  w.cities.push({ id: 300, name: 'Open City' });
+  expansionProperty(w, { id: 3000, communityId: 30 });
+
+  const offer = missionVariety.offerExpansionMission(w, 1);
+  assert.ok(offer, 'the real viable city past the unviable one was missed');
+  assert.equal(offer.destinationCityId, 300);
+  assert.equal(offer.locationId, 3000);
+});
+
+// Pins the one real behaviour left once two cities are BOTH
+// genuinely viable for the same tribe at once: every such candidate
+// ties at the identical `finalSuccessProbability` (the tribe and tick
+// are fixed within one call, and `control.assess`'s own `margin` term
+// is provably 1 on every candidate it accepts -- see the function's
+// own header), so there is no real "better" to rank, and the function
+// stops at the first one found rather than scanning needlessly on.
+test('offerExpansionMission picks the first real viable city found when more than one genuinely qualifies', () => {
+  const w = expansionWorld();
+  expansionFounder(w, { npcId: 1, familyId: 900, organizationId: 500, tick: w.tick });
+
+  w.communities.push({ id: 10, city_id: 100 });
+  w.cities.push({ id: 100, name: 'Home City' });
+  expansionProperty(w, { id: 1000, communityId: 10, operatingOrganizationId: 500 });
+
+  w.communities.push({ id: 20, city_id: 200 });
+  w.cities.push({ id: 200, name: 'First Open City' });
+  expansionProperty(w, { id: 2000, communityId: 20 });
+
+  w.communities.push({ id: 30, city_id: 300 });
+  w.cities.push({ id: 300, name: 'Second Open City' });
+  expansionProperty(w, { id: 3000, communityId: 30 });
+
+  const offer = missionVariety.offerExpansionMission(w, 1);
+  assert.ok(offer);
+  assert.equal(offer.destinationCityId, 200, 'the first real viable city, not the second');
+  assert.equal(offer.locationId, 2000);
+});
+
+test('offerExpansionMission returns null for a citizen with no real organization at all', () => {
+  const w = expansionWorld();
+  w.npcs.push({ id: 1, status: 'alive', createdTick: w.tick - Math.round(30 * 365) });
+  w.families.push({ id: 900, surname: 'No Org', unity: 100, conflict: 0, head_npc_id: 1 });
+  w.familyMemberships.push({ entity_id: 1, family_id: 900, role: 'founder', generation_number: 1 });
+  w.inventory.push({
+    id: w.inventory.length + 1, holder_entity_id: 1, item_name: 'Hammer', quantity: 2, condition: 80,
+  });
+  w.communities.push({ id: 10, city_id: 100 });
+  w.cities.push({ id: 100, name: 'Only City' });
+  // A real UNOPERATED property (`operating_organization_id: null`) --
+  // present on purpose, so this actually discriminates the org check.
+  // `ownOrganizationIdOf` returning null must not be allowed to match
+  // this property's own null `operating_organization_id` in the
+  // `homeProperties` filter below and get treated as a real "home";
+  // without the explicit early return, that coincidence would make
+  // city 100 count as reached and this community's own real viable
+  // target in a SECOND city would wrongly be offered to someone with
+  // no organization at all.
+  expansionProperty(w, { id: 1000, communityId: 10 });
+  // A real OTHER organization's property, genuinely unoperated by
+  // "no organization" (id 999 is unrelated to this citizen entirely)
+  // -- without the early return, this city would wrongly read as a
+  // real, trivially-capturable expansion opportunity.
+  w.organizations.push({ id: 999, type: 'business', leader_id: null });
+  w.communities.push({ id: 20, city_id: 200 });
+  w.cities.push({ id: 200, name: 'Other City' });
+  expansionProperty(w, { id: 2000, communityId: 20, operatingOrganizationId: 999 });
+
+  assert.equal(missionVariety.offerExpansionMission(w, 1), null);
+});
+
+// NOT a mutation-guarded check on `tribeId == null` -- there is no
+// family row with `id === null` to match, so `control.assess` (and
+// `viableTargetsFor` over it) already excludes every candidate for a
+// null tribe on its own; removing the explicit early-return changes
+// nothing a mutation test can observe. This asserts the real,
+// observable behaviour instead: a real organization member with no
+// real family gets no expansion mission, full stop, by whichever real
+// path produces that -- the explicit check is kept anyway because it
+// fails fast and says why, the same documentation role `assessTakeover`
+// /`attemptTakeover`'s own (throwing) family check plays one layer up.
+test('offerExpansionMission returns null for a real organization member with no real family of their own', () => {
+  const w = expansionWorld();
+  w.npcs.push({ id: 1, status: 'alive', createdTick: w.tick - Math.round(30 * 365) });
+  w.organizations.push({ id: 500, type: 'business', leader_id: 1 });
+  w.entityOrganizationMemberships.push({ id: 1, entity_id: 1, organization_id: 500, status: 'active' });
+  w.communities.push({ id: 10, city_id: 100 });
+  w.cities.push({ id: 100, name: 'Only City' });
+  expansionProperty(w, { id: 1000, communityId: 10, operatingOrganizationId: 500 });
+
+  assert.equal(missionVariety.offerExpansionMission(w, 1), null);
+});
+
+test('offerExpansionMission returns null for a real organization with no real property anywhere yet -- nothing to expand FROM', () => {
+  const w = expansionWorld();
+  expansionFounder(w, { npcId: 1, familyId: 900, organizationId: 500, tick: w.tick });
+  w.communities.push({ id: 20, city_id: 200 });
+  w.cities.push({ id: 200, name: 'Only Other City' });
+  expansionProperty(w, { id: 2000, communityId: 20 });
+
+  assert.equal(missionVariety.offerExpansionMission(w, 1), null);
+});
+
+test('offerExpansionMission returns null for a world with only the organization\'s own home city -- nothing to expand TO', () => {
+  const w = expansionWorld();
+  expansionFounder(w, { npcId: 1, familyId: 900, organizationId: 500, tick: w.tick });
+  w.communities.push({ id: 10, city_id: 100 });
+  w.cities.push({ id: 100, name: 'Only City' });
+  expansionProperty(w, { id: 1000, communityId: 10, operatingOrganizationId: 500 });
+
+  assert.equal(missionVariety.offerExpansionMission(w, 1), null);
+});

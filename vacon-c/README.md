@@ -2456,6 +2456,25 @@ rather than reimplemented) and is idempotent on a repeat save. New
 fail exactly the test that names them. See CLAUDE.md's
 hundred-and-seventy-eighth standing rule.
 
+## Real org expansion mission (closes task #124)
+`offerExpansionMission` reads an organization's home city the only
+way the schema records one -- the real properties it operates -- and
+scans every real OTHER city for a real, already-tested
+`control.viableTargetsFor` candidate. The first version claimed to
+pick the single BEST target by `finalSuccessProbability`; a mutation
+that flipped the comparison broke nothing, which is correct, because
+`control.assess`'s own `margin` term is provably exactly 1 on every
+candidate it ever accepts for one tribe in one call -- there is no
+real "better" to rank. Rewritten to the honest claim: scan every
+non-home city in order, return the first real viable target found.
+7 new tests in `test/missionVariety.test.js`; two of the original
+ones did not actually discriminate what they claimed to (the same
+non-discriminating-test shape tasks #119/#125 already hit) and were
+fixed by making the fixture genuinely able to fail, not by softening
+the assertion. No new verb or route -- the resolution path is the
+real, already-exposed `attempt-takeover`. See CLAUDE.md's
+hundred-and-seventy-ninth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

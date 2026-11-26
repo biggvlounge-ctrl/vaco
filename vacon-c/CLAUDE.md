@@ -10289,3 +10289,59 @@ full suite failed on exactly those two assertions, re-derived rather
 than trusted, the same way that file's own header says a typed-once
 number always eventually will. Fixed to 167/129 before this entry was
 written, not after.
+
+**A hundred-and-seventy-ninth, closing task #124 — org expansion, the
+eighth `missionVariety.js` function, and a real structural fact about
+`control.assess` found while mutation-verifying rather than assumed.**
+`control.js`'s own organization-scale comment already states
+"organizations have no city of their own in the schema," so
+`offerExpansionMission` reads an organization's HOME city the only
+way the schema actually records one — the real properties it operates
+(`properties.operating_organization_id`) — and scans every real OTHER
+city for a real, already-tested `control.viableTargetsFor` candidate
+(`control.test.js`'s own scan, reused rather than reimplemented,
+scoped to `scale === 'property'`).
+
+**The first version claimed to pick the single BEST target across
+every non-home city, by `finalSuccessProbability` — and that claim
+was false, caught by a mutation that flipped `>` to `<` and watched
+nothing break.** Proven rather than patched over: within one call,
+`tribeId` and `tick` are fixed, and `control.assess`'s own `margin`
+term (`min(1, roster.fielded / composition.total)`) is provably
+exactly 1 on EVERY candidate `compositionRequirementMet` ever accepts
+— summing a met role's own count across every required role already
+puts `fielded` at or above `total`, and folding in unrequired roles
+only pushes `fielded` higher. So `finalSuccessProbability` is
+identical on every real viable candidate a single call can ever
+compare, for the one tribe making the call — there is no real
+"better" to rank among them. Rewritten to the honest claim instead:
+scan every real non-home city in order, return the FIRST real viable
+target found, stop. The eleventh standing rule's shape one level down
+inside a loop rather than around a whole function.
+
+**Two more mutations exposed non-discriminating tests the same way
+tasks #119 and #125 already had — both fixed by making the fixture
+WORSE, not the assertion softer.** The "no real organization" test's world
+had zero properties at all, so `homeProperties.length === 0` already
+returned null regardless of whether the organization check ran;
+removing that check passed every test anyway. Fixed by giving the
+world a real unoperated property (`operating_organization_id: null`)
+that could have coincidentally matched a null `organizationId` in the
+filter, plus a real viable target in a second city reached by a real
+OTHER organization — so the mutation now genuinely has something to
+wrongly succeed at, and it does, until the check is restored. The
+`tribeId == null` early return stayed honestly UN-guarded instead:
+`control.assess` already returns null for a tribeId no real family
+matches, so every candidate is excluded on its own either way — kept
+for the same documenting reason `tribeIdFor`'s own thrown version is
+kept one layer up, with the test's own comment saying so rather than
+implying a guard that is not there.
+
+Three real preconditions ARE genuinely mutation-guarded: the home-city
+exclusion (4 tests catch its removal at once), the first-found
+scan order (a dedicated two-simultaneously-viable-city test), and the
+"no real property anywhere to expand FROM" refusal. 7 new tests in
+`test/missionVariety.test.js`. No new verb or route — every one of
+this file's other seven `offer*Mission` functions is a pure,
+unwired-to-the-API library function too, the resolution path being
+the real, already-exposed `attempt-takeover`.
