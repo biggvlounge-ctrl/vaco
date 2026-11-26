@@ -78,7 +78,7 @@ test('every verb an action names is one the engine actually supplies', () => {
   );
   assert.deepEqual(
     actions.REQUIRED_VERBS,
-    ['acceptMission', 'addScheduleEvent', 'applyRecommendedSplit', 'askAround', 'assembleParty', 'assessTakeover', 'assessThreat', 'assignPartyRole', 'assignRole', 'attemptHeist', 'attemptTakeover',
+    ['acceptMission', 'addScheduleEvent', 'applyHold', 'applyRecommendedSplit', 'askAround', 'assembleParty', 'assessTakeover', 'assessThreat', 'assignPartyRole', 'assignRole', 'attemptHeist', 'attemptTakeover',
       'beginJourney', 'breakCamp', 'breakDownItem', 'broadcastMessage', 'buildBarricade', 'callBluff', 'canHarvest', 'canMakeThing', 'captureEntity', 'designateStashHouse', 'directMission', 'disposeOfCapture', 'drawPlay', 'establishCamp', 'findOrCreateContact', 'guessFugitiveLocation', 'guessFugitiveLocationWithParty', 'guessMissingRelationLocation', 'guessMissingRelationLocationWithParty', 'harvest', 'holdMeeting',
       'intimidate', 'investInTarget', 'joinCamp', 'leaveCamp', 'lockProperty', 'makeThing', 'manufactureAmmunition', 'quoteTrade',
       'reinforceHabit', 'releaseFromParty', 'repurposeProperty', 'resolveContest', 'restoreVehicle', 'revealCache', 'runPlay', 'saveLocation', 'searchLocation', 'sendMessage', 'sendSpy',

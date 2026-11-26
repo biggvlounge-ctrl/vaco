@@ -88,7 +88,12 @@ const economy = require('./economy.js');
 const worldStore = require('./worldStore.js');
 
 const DISPOSITIONS = ['recruit', 'exile', 'custody', 'release'];
-const CAPTURABLE_LOSER_OUTCOMES = ['defeated', 'submitted'];
+// 'passed_out' joined for task #136's own live hold mechanic
+// (contest.resolveHold): a victim choked or kneed unconscious is at
+// least as capturable as one merely 'defeated' -- more so, since they
+// cannot resist at all. Reuses this exact list rather than a second,
+// parallel "what counts as captured" vocabulary.
+const CAPTURABLE_LOSER_OUTCOMES = ['defeated', 'submitted', 'passed_out'];
 
 let nextCaptureId = 1;
 
@@ -109,7 +114,8 @@ function capture(worldState, options = {}) {
   if (!CAPTURABLE_LOSER_OUTCOMES.includes(loserOutcome)) {
     throw new Error(
       `capture: "${loserOutcome}" is not a real capturable outcome — contest.resolveContest's `
-      + `own loserOutcomes gives ${CAPTURABLE_LOSER_OUTCOMES.join(' and ')}; someone who fled was never captured.`,
+      + `own loserOutcomes and contest.resolveHold's own outcome give ${CAPTURABLE_LOSER_OUTCOMES.join(', ')}; `
+      + 'someone who fled or escaped was never captured.',
     );
   }
 
@@ -143,7 +149,9 @@ function capture(worldState, options = {}) {
     entityId: npc.id, memoryType: 'experience', category: 'personal',
     description: loserOutcome === 'submitted'
       ? 'submitted in a real fight and was taken captive'
-      : 'was beaten in a real fight and taken captive',
+      : loserOutcome === 'passed_out'
+        ? 'was choked or kneed unconscious and taken captive'
+        : 'was beaten in a real fight and taken captive',
     importance: 85, emotionLevel: 70,
     relatedEntityIds: [Number(capturedByEntityId)], tick,
   });

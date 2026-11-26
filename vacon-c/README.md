@@ -2475,6 +2475,32 @@ the assertion. No new verb or route -- the resolution path is the
 real, already-exposed `attempt-takeover`. See CLAUDE.md's
 hundred-and-seventy-ninth standing rule.
 
+### Real per-incident force-level rating + live submission-hold pressure bar (closes task #136)
+`crime.js#recordEscalation` always received a real, per-incident
+`responseLevel` and threw it away -- `Math.max(severityFloor,
+responseLevel)` almost always keeps the category floor. A real
+400-tick, one-seed world measured the real FIRED-escalation
+population directly (9 incidents, 57-81) and `FORCE_LEVELS` bands it
+into `push`/`punch`/`knee`/`choke` -- the National Institute of
+Justice's own real soft-control/hard-strike/neck-restraint ordering,
+not an invented one. Null for an armed incident (a shooting is not
+any of the four). `crime_incidents.force_level TEXT` follows the
+`investigated_tick`/`cleared` ALTER-TABLE precedent exactly.
+
+By direct instruction in the same round, its live counterpart:
+`contest.js#resolveHold` is a real, round-by-round pressure bar for
+choke/knee-on-neck/arm-hold, computed in one seeded call (same
+reproducibility `resolveContest`/`verifyContest` already have).
+Choke and knee-on-neck can genuinely pass somebody out; an arm hold
+is a joint lock and never does -- mutation-verified with a fixture
+built so Pain Tolerance (which governs both arm_hold's resistance
+and how readily a victim submits) could not accidentally make the
+test non-discriminating. `disposition.CAPTURABLE_LOSER_OUTCOMES`
+gained `'passed_out'`, reusing task #216's own capture pathway. New
+player verb: `'apply-hold'`. 17 tests in `test/contest-hold.test.js`,
+8 in `test/crime-force-level.test.js`. See CLAUDE.md's
+hundred-and-eightieth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

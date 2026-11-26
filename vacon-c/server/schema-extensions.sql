@@ -247,6 +247,11 @@ CREATE INDEX IF NOT EXISTS idx_crime_incidents_category ON crime_incidents (cate
 -- re-investigate the entire history of the world on the next tick.
 ALTER TABLE crime_incidents ADD COLUMN IF NOT EXISTS investigated_tick BIGINT;
 ALTER TABLE crime_incidents ADD COLUMN IF NOT EXISTS cleared BOOLEAN;
+-- Task #136: a real, snapshotted-once force-level label for the unarmed
+-- violent/domestic incidents that carry one ('push'|'punch'|'knee'|
+-- 'choke', server/crime.js#FORCE_LEVELS) -- null for every other
+-- incident, same posture as `detail`.
+ALTER TABLE crime_incidents ADD COLUMN IF NOT EXISTS force_level TEXT;
 
 
 -- ---------------------------------------------------------------------

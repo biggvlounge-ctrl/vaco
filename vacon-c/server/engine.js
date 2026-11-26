@@ -875,6 +875,15 @@ function captureEntity(capturedByEntityId, options = {}) {
   return disposition.capture(WorldState, { ...options, capturedByEntityId });
 }
 
+// Task #136's live counterpart (direct instruction): a real pressure bar
+// for choke / knee-on-neck / arm-hold, via contest.js#resolveHold. The
+// actor is always the holder -- resolved from their own player record,
+// never a caller-supplied id (the fourth standing Phase-3 rule, same as
+// every other actor-performing verb).
+function applyHold(holderId, options = {}) {
+  return contest.resolveHold(WorldState, { ...options, holderId });
+}
+
 function disposeOfCapture(capturedByEntityId, captureId, options = {}) {
   const record = disposition.capturesOf(WorldState, { capturedByEntityId })
     .find((c) => c.id === Number(captureId));
@@ -1372,6 +1381,7 @@ const ACTION_VERBS = {
   addScheduleEvent: (...args) => addScheduleEvent(...args),
   reinforceHabit: (...args) => reinforceHabit(...args),
   resolveContest: (...args) => resolveContest(...args),
+  applyHold: (...args) => applyHold(...args),
   assessTakeover: (...args) => assessTakeover(...args),
   attemptTakeover: (...args) => attemptTakeover(...args),
   buildBarricade: (...args) => buildBarricade(...args),
@@ -1572,6 +1582,10 @@ function resolveContest(options) {
 
 function verifyContest(result) {
   return contest.verifyContest(WorldState, result);
+}
+
+function verifyHold(result) {
+  return contest.verifyHold(WorldState, result);
 }
 
 // ---------------------------------------------------------------------------
@@ -2237,6 +2251,8 @@ module.exports = {
   SHOWDOWN_SPARRING_REINFORCEMENT,
   resolveContest,
   verifyContest,
+  applyHold,
+  verifyHold,
   assessTakeover,
   holdMeeting,
   sendMessage,

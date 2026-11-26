@@ -10345,3 +10345,107 @@ scan order (a dedicated two-simultaneously-viable-city test), and the
 this file's other seven `offer*Mission` functions is a pure,
 unwired-to-the-API library function too, the resolution path being
 the real, already-exposed `attempt-takeover`.
+
+**A hundred-and-eightieth, closing task #136 — a real per-incident
+force-level rating for violent acts — and, by direct instruction in
+the same round, its own live counterpart: a real pressure bar for
+choke/knee-on-neck/arm-hold holds.**
+
+`crime.js#recordEscalation` always received a real, per-incident,
+trait-derived `responseLevel` (`keys.resolveAggression`'s own
+formula) and threw it away: `severity: Math.max(severityFloor,
+responseLevel)` almost always keeps the FLOOR, because `SEVERITY
+.violent`/`.domestic` (70/65) sit well above `responseLevel`'s own
+real range — so every violent incident read as a flat 70, every
+domestic one a flat 65, and "choke, knee, punch" (this task's own
+examples) had nowhere to attach to.
+
+**Measured the right population, not the one already on file.**
+`keys.js`'s own seventeenth standing rule already measured
+`responseLevel` once, over the ELIGIBLE-PAIR population at a single
+snapshot (p50 5, p95 28, max 36) — the wrong population for THIS
+purpose, because that is every pair a flashpoint could draw against,
+not the incidents that actually fired. Conflict climbs every tick
+until a flashpoint hits, so by the time one does, `responseLevel` is
+usually well past the floor it needed to clear. A real 400-tick,
+one-seed world, instrumented at `crime.recordEscalation` itself,
+recorded every FIRED escalation's real `responseLevel` directly: 9
+incidents, 57, 58, 67, 67, 69, 69, 71, 76, 81 — min 57, p50 69, max
+81, nothing anywhere near the eligible-pair snapshot's own numbers,
+because it is a different population by construction. `FORCE_LEVELS`
+bands that real sample at clean decade boundaries (60/70/80) — `push`
+below the cluster, `punch`/`knee` spanning the dense middle, `choke`
+above it — small sample (n=9, one seed), flagged for recalibration
+against a larger one the same way the seventeenth rule's own four
+attempts were.
+
+**The four names are a real, citable ordering, not interchangeable
+synonyms for "hit somebody."** The National Institute of Justice's
+own use-of-force continuum splits unarmed technique into "soft"
+control holds and "hard" strikes, and treats neck restraints as the
+most dangerous unarmed technique a department can authorize — `push`
+is the soft/control end, `punch`/`knee` are hard strikes ascending,
+`choke` is the neck-restraint end.
+
+**`force_level` is null for an armed incident, on purpose.**
+`weapons.isFunctioningFirearm` already takes precedence in
+`recordEscalation`'s own category choice; a shooting is not a push, a
+punch, a knee or a choke, so the new field is gated on `!functioning`
+the same way `category` already is. `schema-extensions.sql` adds
+`crime_incidents.force_level TEXT`, following the exact `investigated
+_tick`/`cleared` ALTER-TABLE precedent on the same table;
+`migrate.js`'s own INSERT carries it; no restore.js change was needed
+because a TEXT column passes through `SELECT *` unchanged — the
+tenth standing rule's BIGINT/NUMERIC trap does not apply to it.
+
+**The live counterpart, by direct instruction: "add a pressure bar...
+for pass out or submission... knee on the neck or arm hold."**
+`contest.js#resolveHold` is the same shape `resolveContest` already
+is — a whole round-by-round trace computed in ONE seeded call, never
+a value that lives only in server memory while a request is in
+flight, so `rounds` is both the live bar a caller renders and a
+record `verifyHold` can re-derive and check later, the identical
+reproducibility `verifyContest`'s own header already argues for
+(recorded seed and chances, never a re-read of a world that moved
+on).
+
+**Two real endings, not one mechanic pretending three holds are the
+same physiological event.** A choke and a knee across the neck both
+restrict the airway/blood supply and can genuinely produce a real
+pass-out; an arm hold is a joint lock, and a joint lock does not black
+anyone out — it makes the pain unbearable first.
+`HOLD_TECHNIQUES[name].passesOut` carries that distinction, and it is
+genuinely mutation-guarded: a fixture built from `strongHolder()` vs.
+`weakVictim()` (low Strength AND low Pain Tolerance) does NOT
+discriminate it, because Pain Tolerance governs BOTH arm_hold's own
+resistance and how readily that same victim submits — a victim weak
+enough to build pressure fast is also weak enough to tap out long
+before the ceiling, so removing the `passesOut &&` guard left that
+fixture's test passing regardless. The real guard is
+`ceilingReachingArmHoldVictim()` — low Strength/Pain Tolerance (fast
+pressure, arm_hold's own two resistance traits) with Composure Under
+Fire kept separately HIGH, so pressure keeps climbing past the submit
+check for real rounds before a submission actually lands. Confirmed:
+removing the guard made this specific test fail; the weaker fixture's
+version of the same test did not.
+
+A second mutation (removing the `enduranceChance !== null` submit
+check entirely) was caught the same way — the first version of that
+pinning test hard-coded one tick/contestId pair found by a one-off
+search script, and it broke the moment the file ran inside the full
+suite rather than alone, because the shared `engine.WorldState`
+singleton had already accumulated NPCs from every earlier test and
+the id shift changed the seed. Fixed by searching a real bounded
+range of ticks at test time and asserting at least one submits,
+rather than trusting one seed's accident — the twenty-fourth standing
+rule's own lesson, found a second time in a place that looked like a
+simple pin.
+
+`disposition.CAPTURABLE_LOSER_OUTCOMES` gained `'passed_out'` —
+reusing the exact capture pathway task #216 already built rather than
+inventing a second "what counts as captured" vocabulary; a choked-out
+victim is at least as capturable as one merely `'defeated'`.
+`engine.applyHold`/`verifyHold` and the `'apply-hold'` player verb
+follow `resolveContest`'s/`'enter-contest'`'s own identical wiring
+shape. 17 tests in `test/contest-hold.test.js`, 8 in `test/crime-
+force-level.test.js`.

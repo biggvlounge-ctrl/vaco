@@ -387,6 +387,231 @@ function verifyContest(worldState, result) {
 }
 
 // ---------------------------------------------------------------------------
+// Submission holds — choke / knee-on-neck / arm-hold — a real, LIVE pressure
+// bar, by direct instruction alongside task #136's own per-incident
+// force-level rating (`crime.js`'s `FORCE_LEVELS`, a SNAPSHOT taken once an
+// incident has already resolved).
+// ---------------------------------------------------------------------------
+// This is that rating's live counterpart: a bar an onlooker, or a UI, would
+// actually watch MOVE round by round while a hold is still happening, not
+// a single number produced after the fact.
+//
+// **Deterministic and re-runnable, same discipline as the rest of this
+// file — never a value that lives only in server memory while a request is
+// in flight.** `resolveHold` computes the WHOLE round-by-round trace in one
+// seeded call, the same way `resolveContest` settles a whole bout in one
+// call. `rounds` IS the live bar: one entry per round, for a caller to
+// render exactly as recorded, in order. `verifyHold` re-derives the
+// identical trace from the recorded seed and the recorded per-round
+// chances — the same real guarantee `verifyContest`'s own header already
+// argues for (recorded inputs, not a re-read of a world that moved on).
+//
+// **Two real endings, not one mechanic pretending all three holds are the
+// same physiological event.** A choke restricts the airway/carotids, and a
+// knee planted across the neck does the same thing from a different
+// position — both can genuinely make somebody pass out. An arm hold is a
+// joint lock: it does not black anybody out, it makes the pain unbearable
+// first. `HOLD_TECHNIQUES[name].passesOut` carries that distinction rather
+// than inventing a pass-out path for a technique that cannot physically
+// produce one.
+const HOLD_TECHNIQUES = {
+  // Airway/blood restriction — resisted by raw strength (breaking the
+  // grip) and endurance (how long the body holds out without air).
+  choke: { passesOut: true, resistTraits: ['Strength', 'Endurance'] },
+  knee_on_neck: { passesOut: true, resistTraits: ['Strength', 'Endurance'] },
+  // A joint lock — resisted by strength (fighting the angle) and pain
+  // tolerance (enduring it), never endurance, which has nothing to do
+  // with how long an elbow can bend the wrong way.
+  arm_hold: { passesOut: false, resistTraits: ['Strength', 'Pain Tolerance'] },
+};
+const HOLD_TECHNIQUE_NAMES = Object.keys(HOLD_TECHNIQUES);
+
+const HOLD_PASS_OUT_THRESHOLD = 100; // the bar is 0..100
+// Past this, the victim gets a real chance to tap out each round rather
+// than being carried helplessly to the pass-out threshold — reuses
+// `resolveLoserOutcome`'s own real resolve check (Composure Under Fire +
+// Pain Tolerance, against the trait scale's own neutral centre), never a
+// second, invented "give up" curve.
+const HOLD_SUBMIT_THRESHOLD = 60;
+const HOLD_MAX_ROUNDS = 8; // a real bound; nobody holds a struggling person forever
+const HOLD_BASE_PRESSURE_PER_ROUND = 25; // an even matchup fills the bar in ~4 rounds
+
+// The holder's own control — how much pressure they can apply per round.
+// `Melee Skill` is technique; `Strength` is the raw grip/weight behind it.
+// The same `rateEntity`-style "mean of the real traits", no new curve.
+function holderControlOf(worldState, holderId) {
+  const live = getLiveEntity(worldState, holderId);
+  const strength = Number(live?.traits?.physical?.Strength);
+  const melee = Number(live?.traits?.combat?.['Melee Skill']);
+  if (!Number.isFinite(strength) || !Number.isFinite(melee)) return null;
+  return (strength + melee) / 2;
+}
+
+// The victim's own resistance — which two real traits depends on the
+// technique (see HOLD_TECHNIQUES' own header above).
+function victimResistanceOf(worldState, victimId, technique) {
+  const live = getLiveEntity(worldState, victimId);
+  const [traitA, traitB] = HOLD_TECHNIQUES[technique].resistTraits;
+  const a = Number(live?.traits?.physical?.[traitA]);
+  const b = Number(live?.traits?.physical?.[traitB]);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  return (a + b) / 2;
+}
+
+// The victim's own real resolve to keep enduring once the bar crosses
+// HOLD_SUBMIT_THRESHOLD — byte-identical to `resolveLoserOutcome`'s own
+// Composure Under Fire + Pain Tolerance mean, read against 50. `null` when
+// either trait was never generated for this entity, same as that function's
+// own "an unrated resolve cannot be given a number" refusal.
+function victimEnduranceChanceOf(worldState, victimId) {
+  const live = getLiveEntity(worldState, victimId);
+  const composure = Number(live?.traits?.combat?.['Composure Under Fire']);
+  const painTolerance = Number(live?.traits?.physical?.['Pain Tolerance']);
+  if (!Number.isFinite(composure) || !Number.isFinite(painTolerance)) return null;
+  return winProbability((composure + painTolerance) / 2, 50);
+}
+
+// The shared round loop `resolveHold` and `verifyHold` both run, so the two
+// can never quietly drift apart into two different mechanics with the same
+// name. Takes the per-round CHANCES, never live traits — a verifier re-runs
+// the arithmetic that was actually claimed, not a fresh rating of a world
+// that may have moved on since (`verifyContest`'s own reasoning, applied
+// here).
+function runHoldRounds(seed, { holdChance, escapeChance, passesOut, enduranceChance }) {
+  const rounds = [];
+  let pressure = 0;
+  let outcome = 'released';
+  for (let round = 1; round <= HOLD_MAX_ROUNDS; round += 1) {
+    const escapeDraw = seededDraw([seed, 'hold-escape', round]);
+    if (escapeDraw < escapeChance) {
+      outcome = 'escaped';
+      rounds.push({ round, pressure, event: 'escaped' });
+      break;
+    }
+
+    const gainDraw = seededDraw([seed, 'hold-gain', round]);
+    const gain = gainDraw < holdChance
+      ? HOLD_BASE_PRESSURE_PER_ROUND
+      : HOLD_BASE_PRESSURE_PER_ROUND * 0.4;
+    pressure = Math.min(HOLD_PASS_OUT_THRESHOLD, pressure + gain);
+
+    if (passesOut && pressure >= HOLD_PASS_OUT_THRESHOLD) {
+      outcome = 'passed_out';
+      rounds.push({ round, pressure, event: 'passed_out' });
+      break;
+    }
+
+    if (pressure >= HOLD_SUBMIT_THRESHOLD && enduranceChance !== null) {
+      const resolveDraw = seededDraw([seed, 'hold-resolve', round]);
+      if (resolveDraw >= enduranceChance) {
+        outcome = 'submitted';
+        rounds.push({ round, pressure, event: 'submitted' });
+        break;
+      }
+    }
+
+    rounds.push({ round, pressure, event: 'held' });
+  }
+  return { rounds, outcome, finalPressure: pressure };
+}
+
+// options: holderId, victimId, technique ('choke'|'knee_on_neck'|
+//          'arm_hold'), tick (defaults to the world's), contestId (any
+//          stable id, same role `resolveContest`'s own has).
+//
+// Returns `null` on an honest unmet precondition (an unrated entity — the
+// same refusal `rateEntity`'s own callers already get), never throws for
+// that case. Throws only for a bad technique name or a holder targeting
+// themselves — the same "a bad argument throws, an unready world returns
+// null" split every `offerXMission` function in `missionVariety.js`
+// already holds.
+function resolveHold(worldState, options = {}) {
+  const {
+    holderId, victimId, technique, tick = worldState.tick, contestId = null,
+  } = options;
+
+  if (!HOLD_TECHNIQUES[technique]) {
+    throw new Error(
+      `resolveHold: "${technique}" is not a real technique. The three are: `
+      + `${HOLD_TECHNIQUE_NAMES.join(', ')}.`,
+    );
+  }
+  if (Number(holderId) === Number(victimId)) {
+    throw new Error('resolveHold: a hold needs two different people.');
+  }
+
+  const control = holderControlOf(worldState, Number(holderId));
+  const resistance = victimResistanceOf(worldState, Number(victimId), technique);
+  if (control === null || resistance === null) return null;
+
+  const seed = seedFor({
+    contestId: contestId ?? 'hold',
+    tick,
+    discipline: `hold:${technique}`,
+    participantIds: [Number(holderId), Number(victimId)],
+  });
+  // The same sigmoid `winProbability` already is, read both ways: the
+  // holder's own chance to keep building pressure, and the victim's own
+  // chance to break free outright — the complement INPUTS, not `1 -
+  // holdChance`, so both stay inside winProbability's own real floor and
+  // ceiling rather than one of them escaping it.
+  const holdChance = winProbability(control, resistance);
+  const escapeChance = winProbability(resistance, control);
+  const enduranceChance = victimEnduranceChanceOf(worldState, Number(victimId));
+
+  const passesOut = HOLD_TECHNIQUES[technique].passesOut;
+  const { rounds, outcome, finalPressure } = runHoldRounds(seed, {
+    holdChance, escapeChance, passesOut, enduranceChance,
+  });
+
+  return {
+    technique,
+    holderId: Number(holderId),
+    victimId: Number(victimId),
+    tick,
+    contestId,
+    seed,
+    holdChance,
+    escapeChance,
+    enduranceChance,
+    rounds,
+    finalPressure,
+    outcome,
+  };
+}
+
+// Re-check a hold from its own result — the identical real guarantee
+// `verifyContest` already gives a settled bout. See that function's own
+// header for why this re-derives from the RECORDED seed and chances rather
+// than re-reading the live world.
+function verifyHold(worldState, result) {
+  if (!HOLD_TECHNIQUES[result.technique]) {
+    throw new Error(`verifyHold: "${result.technique}" is not a real technique.`);
+  }
+  const seed = seedFor({
+    contestId: result.contestId ?? 'hold',
+    tick: result.tick,
+    discipline: `hold:${result.technique}`,
+    participantIds: [result.holderId, result.victimId],
+  });
+  const { rounds, outcome, finalPressure } = runHoldRounds(seed, {
+    holdChance: result.holdChance,
+    escapeChance: result.escapeChance,
+    passesOut: HOLD_TECHNIQUES[result.technique].passesOut,
+    enduranceChance: result.enduranceChance,
+  });
+  return {
+    seedMatches: seed === result.seed,
+    reproduced: seed === result.seed
+      && outcome === result.outcome
+      && finalPressure === result.finalPressure
+      && rounds.length === result.rounds.length,
+    expected: result.outcome,
+    actual: outcome,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Every weighted trait must be a real one, checked at require time.
 // ---------------------------------------------------------------------------
 // A misspelled trait name would be skipped silently by rateEntity and
@@ -424,5 +649,12 @@ module.exports = {
   winProbability,
   resolveContest,
   verifyContest,
+  HOLD_TECHNIQUES,
+  HOLD_TECHNIQUE_NAMES,
+  HOLD_PASS_OUT_THRESHOLD,
+  HOLD_SUBMIT_THRESHOLD,
+  HOLD_MAX_ROUNDS,
+  resolveHold,
+  verifyHold,
   assertDisciplinesReadRealTraits,
 };

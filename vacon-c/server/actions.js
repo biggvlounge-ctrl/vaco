@@ -482,6 +482,19 @@ const ACTIONS = {
     }),
   },
 
+  'apply-hold': {
+    summary: 'Apply a real choke, knee-on-neck, or arm hold to a named opponent -- a live, '
+      + 'round-by-round pressure bar (contest.resolveHold), not an instant result.',
+    modes: ['citizen', 'leader'],
+    requires: ['victimId', 'technique'],
+    verbs: ['applyHold'],
+    run: (verbs, actorId, body) => verbs.applyHold(actorId, {
+      victimId: Number(body.victimId),
+      technique: body.technique,
+      contestId: body.contestId ?? null,
+    }),
+  },
+
   // -- Leader mode's two genuinely new verbs — see leadership.js's own
   // header for the full design and why each one is NOT guaranteed to
   // succeed just because the actor holds the seat.

@@ -421,6 +421,11 @@ function recordCrime(worldState, options = {}) {
     tick,
     severity,
     detail,
+    // Task #136: a real, snapshotted-once force-level label
+    // ('push'|'punch'|'knee'|'choke') for the unarmed violent/domestic
+    // incidents that carry one (`recordEscalation`'s own `forceLevel`
+    // option) — null for every other category, same as `detail`.
+    force_level: options.forceLevel ?? null,
     // **Set by server/policing.js, and null here on purpose.** Null
     // means "nobody has looked at this yet", which is a third state
     // distinct from investigated-and-cleared and
@@ -617,6 +622,64 @@ function sharesFamily(worldState, aId, bId) {
 // the aggression key already ran, already wrote back, and already said
 // `escalatesToConflict`. All that was missing was a record saying what
 // kind of crime that was.
+// **Task #136: a real per-incident force-level rating — closing a gap this
+// file's own `recordEscalation` had been carrying since it was written.**
+//
+// `responseLevel` is a real, per-incident, trait-derived number
+// (`keys.resolveAggression`'s own formula) — and every call to this
+// function already received it. The bug is what happened to it next:
+// `severity: Math.max(severityFloor, responseLevel)` almost always keeps
+// the FLOOR, because `SEVERITY.violent`/`.domestic` (70/65) sit well above
+// `responseLevel`'s own real range for a FIRED escalation. So the one real
+// signal describing how hard a specific incident hit was computed and then
+// thrown away — every violent incident read as a flat 70, every domestic
+// one a flat 65, regardless of how it actually happened. "Choke, knee,
+// punch" (this task's own examples) had nowhere to attach to.
+//
+// **Measured, not guessed, and said so.** `keys.js`'s own seventeenth
+// standing rule already measured `responseLevel` over the ELIGIBLE-PAIR
+// population at one snapshot (p50 5, p95 28, max 36) — the wrong
+// population for THIS purpose, because that is everyone a flashpoint could
+// draw against, not the incidents that actually fired. Conflict keeps
+// climbing every tick until a flashpoint hits, so by the time one does,
+// `responseLevel` is usually well past the floor it needed to clear. A
+// real 400-tick world (`scripts/measure-world.mjs`'s own seeded-world
+// method, one seed) recorded every FIRED escalation's `responseLevel`
+// directly: 9 incidents, values 57, 58, 67, 67, 69, 69, 71, 76, 81 — min
+// 57, p50 69, max 81. Nothing in that real sample falls anywhere near the
+// eligible-pair snapshot's own numbers, because it is a different
+// population by construction.
+//
+// Four bands, at clean decade boundaries bracketing that real sample —
+// `push` below the cluster, `punch`/`knee` spanning the dense middle,
+// `choke` above it — not a guessed curve. Small sample (n=9, one seed);
+// recalibrate against a larger one if a later measurement disagrees, the
+// same posture the seventeenth rule's own four attempts already model.
+//
+// **The names are a real, citable ordering, not four interchangeable
+// synonyms for "hit somebody."** The National Institute of Justice's own
+// use-of-force continuum splits unarmed technique into "soft" control
+// holds and "hard" strikes, and treats neck restraints as the most
+// dangerous unarmed technique a department can authorize — which is why
+// most U.S. departments either ban or heavily restrict them. `push` is
+// the soft/control end; `punch` and `knee` are hard strikes, ascending;
+// `choke` is the neck-restraint end — the same real ordering, not an
+// invented one.
+const FORCE_LEVELS = [
+  { name: 'push', max: 60 },
+  { name: 'punch', max: 70 },
+  { name: 'knee', max: 80 },
+  { name: 'choke', max: Infinity },
+];
+
+function forceLevelFor(responseLevel) {
+  if (!Number.isFinite(responseLevel)) return null;
+  for (const band of FORCE_LEVELS) {
+    if (responseLevel < band.max) return band.name;
+  }
+  return FORCE_LEVELS[FORCE_LEVELS.length - 1].name;
+}
+
 function recordEscalation(worldState, options = {}) {
   const { perpetratorId, victimId, tick = worldState.tick ?? 0, responseLevel = null } = options;
 
@@ -652,6 +715,13 @@ function recordEscalation(worldState, options = {}) {
     ? Math.round(SEVERITY[category] * GUN_SEVERITY_RATIO)
     : SEVERITY[category];
 
+  // **Not a live gauge — a snapshot, taken once, at the moment this
+  // incident is recorded, same as `severity` on the same line below.**
+  // Null for an armed incident (push/punch/knee/choke are unarmed
+  // techniques; a shooting is not any of them) and for any escalation
+  // whose `responseLevel` was never passed in at all.
+  const forceLevel = functioning ? null : forceLevelFor(responseLevel);
+
   return recordCrime(worldState, {
     category,
     perpetratorId,
@@ -659,6 +729,7 @@ function recordEscalation(worldState, options = {}) {
     tick,
     severity: responseLevel === null ? severityFloor : Math.max(severityFloor, responseLevel),
     detail: 'escalated from standing conflict',
+    forceLevel,
   });
 }
 
@@ -1050,6 +1121,8 @@ module.exports = {
   SCARCITY_WEIGHT,
   SEVERITY,
   GUN_SEVERITY_RATIO,
+  FORCE_LEVELS,
+  forceLevelFor,
   HISTORY_SIGNIFICANCE_FLOOR,
   reseedIds,
   recordCrime,
