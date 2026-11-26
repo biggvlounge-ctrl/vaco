@@ -11,9 +11,30 @@ const assert = require('node:assert/strict');
 const engine = require('../server/engine.js');
 const inventory = require('../server/inventory.js');
 const produce = require('../server/produce.js');
+const economy = require('../server/economy.js');
 const missionVariety = require('../server/missionVariety.js');
 
 const YEAR = 365;
+
+const SKILL_DEFINITIONS = engine.TRAIT_DEFINITIONS.filter((d) => d.family === 'skills');
+
+// Real employment, the real Combat skill and Tier 2 (hunter's own real
+// requirement) -- the same standing-rule-9 discipline `produce.test
+// .js`'s own `person()` follows: `npc.traits` is the birth sheet,
+// `getLiveEntity` never reads it, only `entity_traits` rows do.
+function employAsHunter(worldState, npc) {
+  const org = engine.generateOrganization({ name: `Hunting Co ${npc.id}`, type: 'business' });
+  economy.hireEntity(worldState, {
+    entityId: npc.id, employerOrganizationId: org.id, wage: 20, position: 'hunter', tick: worldState.tick,
+  });
+  const definition = SKILL_DEFINITIONS.find((d) => d.name === 'Combat');
+  worldState.entityTraits.push({
+    entity_id: npc.id, trait_id: definition.trait_id,
+    base_value: 90, current_value: 90, key_modifier: 0, temporary_modifier: 0,
+    permanent_modifier: 0, experience_modifier: 0, environmental_modifier: 0, relationship_modifier: 0,
+  });
+  return org;
+}
 
 function landmark(worldState, id, category, communityId, significance = 80) {
   const record = { id: 95000 + id, significance, where_location_id: id };
@@ -160,6 +181,30 @@ test('offerBarterMission names a real resident holding the real scarcest surviva
   assert.equal(offer.resourceName, 'water');
   assert.equal(offer.itemName, 'clean_water');
   assert.match(offer.mission.objective, /Water Holder/);
+});
+
+test('offerHuntMission opens a real mission for a citizen genuinely employed as a hunter with the real skill/tier', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 69011;
+  npc.education = 'secondary';
+  engine.WorldState.communities.push({ id: 69011, city_id: 69911 });
+  employAsHunter(engine.WorldState, npc);
+  landmark(engine.WorldState, 69111, 'shop', 69011);
+
+  const offer = missionVariety.offerHuntMission(engine.WorldState, npc.id);
+  assert.ok(offer, 'no hunt mission was opened');
+  assert.match(offer.mission.objective, /raw_meat/);
+  assert.equal(offer.mission.reward, missionVariety.MISSION_HUNT_REWARD);
+});
+
+test('offerHuntMission returns null for a citizen not really employed as a hunter, even in a community with a real anchor', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 69012;
+  npc.education = 'secondary';
+  engine.WorldState.communities.push({ id: 69012, city_id: 69912 });
+  landmark(engine.WorldState, 69112, 'shop', 69012);
+
+  assert.equal(missionVariety.offerHuntMission(engine.WorldState, npc.id), null);
 });
 
 test('offerBarterMission returns null when the city is not really short of anything, even with a real holder present', () => {

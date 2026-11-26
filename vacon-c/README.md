@@ -2397,6 +2397,18 @@ gates it to real members of the faction that holds the block. New
 tests in `test/build-barricade.test.js`; mutation-verified. See
 CLAUDE.md's hundred-and-seventy-fourth standing rule.
 
+## Real hunting mission wrapper (closes task #133)
+`produce.harvest`/`.canHarvest` had no player-facing verb at all --
+closed first with a new, general `'harvest'` `actions.js` verb
+(citizen+leader, same check-flag shape `make-thing` already has, for
+ANY primary-produce item, not hunting-specific). `missionVariety
+.offerHuntMission` is the real mission wrapper on top of it: requires
+the citizen to be genuinely employed as a `hunter` with the real
+Combat skill and Tier 2 before ever offering the mission --
+`produce.canHarvest`'s own gate, read rather than duplicated. 2 new
+tests in `test/missionVariety.test.js`; mutation-verified. See
+CLAUDE.md's hundred-and-seventy-fifth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

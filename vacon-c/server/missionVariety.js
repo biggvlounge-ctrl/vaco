@@ -46,11 +46,13 @@ const mortality = require('./mortality.js');
 const economy = require('./economy.js');
 const inventory = require('./inventory.js');
 const items = require('./items.js');
+const produce = require('./produce.js');
 
 const MISSION_RECRUIT_REWARD = 40;
 const MISSION_ALLIANCE_REWARD = 40;
 const MISSION_SPY_REWARD = 40;
 const MISSION_BARTER_REWARD = 40;
+const MISSION_HUNT_REWARD = 40;
 
 function communityAnchor(worldState, communityId) {
   return (worldState.properties || []).find((p) => p.community_id === communityId) ?? null;
@@ -238,13 +240,49 @@ function offerBarterMission(worldState, npcId, options = {}) {
   return { mission, partnerId: holder.id, resourceName, itemName: heldItemName };
 }
 
+// **Task #133, the fifth and last of this round.** Real hunting --
+// requires the citizen to actually be employed as a `hunter` with the
+// real Combat skill and Tier 2 `occupations.tierReachable` this
+// setting demands (`produce.canHarvest`'s own gate, read here rather
+// than duplicated), because a mission "to go hunting" for someone not
+// genuinely qualified for the work would be a mission about nothing,
+// the same standard every other function in this file already holds.
+//
+// Points at the real `harvest` verb this same round added to
+// `actions.js` -- `engine.js`'s own header on it names exactly the
+// trap this closes: a mission over a generator nothing routed to,
+// same shape this file's own header already names for business/drug/
+// extortion.
+function offerHuntMission(worldState, npcId, options = {}) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`offerHuntMission: no NPC ${npcId}`);
+  if (npc.communityId == null) return null;
+
+  const check = produce.canHarvest(worldState, npcId, 'raw_meat');
+  if (!check.ok) return null;
+
+  const anchor = options.anchorPropertyId != null
+    ? (worldState.properties || []).find((p) => p.id === options.anchorPropertyId)
+    : communityAnchor(worldState, npc.communityId);
+  if (!anchor) return null;
+
+  const mission = missions.generateMission(worldState, {
+    locationId: anchor.id,
+    objective: 'Hunt -- harvest raw_meat, the real work your own hunter employment already qualifies you for',
+    reward: options.reward ?? MISSION_HUNT_REWARD,
+  });
+  return { mission };
+}
+
 module.exports = {
   MISSION_RECRUIT_REWARD,
   MISSION_ALLIANCE_REWARD,
   MISSION_SPY_REWARD,
   MISSION_BARTER_REWARD,
+  MISSION_HUNT_REWARD,
   offerRecruitMission,
   offerAllianceMission,
   offerSpyMission,
   offerBarterMission,
+  offerHuntMission,
 };

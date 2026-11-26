@@ -369,6 +369,22 @@ const ACTIONS = {
     ),
   },
 
+  // Task #133's real gap: `produce.harvest` had no player-facing verb
+  // at all — `canMakeThing`'s own check-flag shape immediately above,
+  // for the other half of "producible" (land/water/animal rather than
+  // held materials).
+  harvest: {
+    summary: 'Grow, raise, catch or gather a real primary-produce item where you already are.',
+    modes: ['citizen', 'leader'],
+    requires: ['name'],
+    verbs: ['harvest', 'canHarvest'],
+    run: (verbs, actorId, body) => (
+      body.check === true
+        ? { check: verbs.canHarvest(actorId, { name: body.name }) }
+        : verbs.harvest(actorId, { name: body.name })
+    ),
+  },
+
   // **§24, the player-facing half.** `knowledge.study()` has moved real
   // traits — the field's skill, Literacy, Self-Taught Aptitude — since
   // the file that built it, and nothing ever let a player trigger it.

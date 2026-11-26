@@ -97,6 +97,7 @@ const control = require('./control.js');
 const meetings = require('./meetings.js');
 const landmarks = require('./landmarks.js');
 const salvage = require('./salvage.js');
+const produce = require('./produce.js');
 const discovery = require('./discovery.js');
 const weapons = require('./weapons.js');
 const knowledge = require('./knowledge.js');
@@ -1376,6 +1377,8 @@ const ACTION_VERBS = {
   unlockProperty: (...args) => unlockProperty(...args),
   makeThing: (...args) => makeThing(...args),
   canMakeThing: (...args) => canMakeThing(...args),
+  harvest: (...args) => harvest(...args),
+  canHarvest: (...args) => canHarvest(...args),
   searchLocation: (...args) => searchLocation(...args),
   studySource: (...args) => studySource(...args),
   quoteTrade: (...args) => quoteTrade(...args),
@@ -1723,6 +1726,21 @@ function makeThing(entityId, options = {}) {
 
 function canMakeThing(entityId, options = {}) {
   return salvage.canMake(WorldState, entityId, options.product);
+}
+
+// Task #133's missing half — `produce.harvest`/`.canHarvest` had no
+// player-facing verb at all (`grep -rn "harvest" server/actions.js
+// server/engine.js` returned nothing before this), the identical trap
+// `missionVariety.js`'s own header already names for the business/
+// drug/extortion missions it deferred: a mission that pointed at a
+// generator nothing routes to. Same bound-wrapper shape as
+// makeThing/canMakeThing immediately above.
+function harvest(entityId, options = {}) {
+  return produce.harvest(WorldState, entityId, options.name, { tick: WorldState.tick });
+}
+
+function canHarvest(entityId, options = {}) {
+  return produce.canHarvest(WorldState, entityId, options.name);
 }
 
 // A real location always has a real propertyId, so — unlike

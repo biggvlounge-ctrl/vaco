@@ -10110,3 +10110,39 @@ row shape); and a comfortably-above/comfortably-below pair proving the
 returned status is the real resolver's own answer, not a direct
 write. Mutation-verified: removing the ownership check is caught by
 the non-member test; restored byte-identical.
+
+**A hundred-and-seventy-fifth, closing task #133 — the hunting
+mission wrapper — and it needed a real gap closed first, the same
+trap `missionVariety.js`'s own header already names for the business/
+drug/extortion missions it deferred.** The task's own framing said
+"real hunter occupation + raw_meat production already exist," and
+both do (`occupations.OCCUPATIONS.hunter`, `produce.PRIMARY_PRODUCE
+.raw_meat`) — but checked directly before writing anything, `grep -rn
+"harvest" server/actions.js server/engine.js` returned nothing.
+`produce.harvest`/`.canHarvest` had no real player-facing verb at
+all, the eleventh standing rule's trap one layer up: a mission that
+pointed at them would be pointing at a generator nothing routes to.
+
+**So this closed two things, not one.** `engine.js#harvest`/
+`#canHarvest` are new, thin bound wrappers (the identical shape
+`makeThing`/`canMakeThing` immediately above them already use), and
+`'harvest'` is a new `actions.js` verb (citizen+leader, the same
+check-flag shape `make-thing` already has) — a real, general verb for
+ANY `PRIMARY_PRODUCE` item, not hunting-specific, closing the same
+class of gap `manufacture-ammunition`/`find-contact` closed for their
+own systems. `missionVariety.js#offerHuntMission` is the actual
+mission wrapper, the fifth function in that file and built to its
+exact existing standard: requires the citizen to be REALLY employed
+as a `hunter` with the real Combat skill and Tier 2
+`occupations.tierReachable` (`produce.canHarvest`'s own gate, read
+rather than duplicated) before a hunting mission is ever offered —
+a mission to go hunting for someone not genuinely qualified for the
+work would be a mission about nothing, same as every other
+`offer*Mission` in that file already refuses.
+
+2 new tests in `test/missionVariety.test.js` (opens for a real
+qualified hunter; refuses a citizen who is not really employed as
+one), reusing `test/produce.test.js`'s own standing-rule-9 fixture
+discipline for setting a live skill trait rather than the generation-
+time birth sheet. Mutation-verified: bypassing the employment gate is
+caught by the refusal test; restored byte-identical.
