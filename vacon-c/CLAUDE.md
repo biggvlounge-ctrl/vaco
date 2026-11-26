@@ -10829,3 +10829,40 @@ history of the mistake.
 2 new tests (`test/control.test.js`, win/lose both grow
 `shared_history` by the identical real amount; `test/meetings.test.js`,
 two real meetings grow it twice).
+
+**A hundred-and-eighty-ninth, closing task #107 — a real Discipline
+modulator on production, and the fourth-modulator math checked rather
+than assumed.** `economy.productivityOf` already modulated output by
+health, focus and efficiency and never by Discipline, so a lazy and a
+hardworking NPC with identical skill produced identically — the exact
+"lazy vs. hardworking" gap the task names. `behavioral.Discipline` is
+a single named trait, the same shape `health`/`focus` already are (not
+a family mean, the way `efficiency` is), read through `getLiveEntity()`
+per the ninth standing rule, with `?? 50` so an unmeasured world or
+fixture reads as neutral rather than lazy. It joins the existing chain
+at the same `0.75 + x/200` band the other three modulators already use.
+
+**The comment this file's own earlier work left behind ("the band
+matters more than it looks... leaves skill the dominant term") was
+checked against a fourth modulator rather than carried forward
+unread.** Three modulators compound to 0.75³..1.25³ (~4.6x); a fourth
+pushes it to 0.75⁴..1.25⁴ (~7.7x), already past the 4.5x "skill gap"
+figure that comment's own illustrative example cites. Said so directly
+in `economy.js`'s own comment rather than silently repeating a now-
+stale number, and the real guard is not that ratio — it is the
+dedicated "health and focus modulate rather than gate" test, confirmed
+to still pass with discipline added (hand-verified: that fixture only
+swaps the `health`/`mental` family between its two workers and leaves
+`efficiency`/`behavioral` at each worker's own base value, so a
+discipline term moves WITH each worker's base skill rather than
+against it, and the comparison the test asserts cannot flip).
+
+A new test drew the same lesson from the opposite side: an ordinary
+(50) person's productivity is unaffected (`=== 1`), and a hardworking
+(100) person out-produces a lazy (0) one of otherwise identical skill,
+bounded at exactly the 0.75/1.25 floor and ceiling the band promises.
+The pre-existing `'skilled'` worker test's hardcoded productivity
+value moved from `3.90625` to `4.8828125` (2 × 1.25⁴) — the `worker()`
+fixture sets every trait family, `behavioral.Discipline` included, to
+the same value, so adding the fourth modulator changes that one
+specific fixture's arithmetic, not the mechanism.

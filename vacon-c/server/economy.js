@@ -675,6 +675,18 @@ function productivityOf(worldState, entityId) {
     ? efficiencyTraits.reduce((a, b) => a + b, 0) / efficiencyTraits.length
     : 50;
 
+  // Task #107, by direct request ("wire real Discipline into actual
+  // production output -- lazy vs. hardworking NPCs"). `behavioral
+  // .Discipline` is a single real trait (`traits.js`'s own header
+  // already names it as the "whether they apply [a skill]" half,
+  // alongside Focus's identical role for mental effort), the same
+  // "one named trait, not a family mean" shape `health`/`focus`
+  // already take — not a family mean the way `efficiency` is. `?? 50`
+  // for the same reason health/focus use it: a world or fixture that
+  // never set this trait is unmeasured, not lazy, and must read as
+  // perfectly neutral.
+  const discipline = Number(live.traits?.behavioral?.Discipline ?? 50);
+
   // **Modulators, not gates, and the band matters more than it looks.**
   // At 0.5..1.5 each the two of them swing output by 9x end to end,
   // which overturns a 4.5x skill gap — so a barely-skilled person in
@@ -684,9 +696,19 @@ function productivityOf(worldState, entityId) {
   //
   // 0.75..1.25 keeps 1.0 at average, still halves the output of
   // somebody seriously ill, and leaves skill the dominant term. The
-  // new efficiency term is held to the same band, for the same reason.
+  // efficiency and discipline terms are held to the same band, for
+  // the same reason -- checked directly rather than assumed to still
+  // hold after a fourth modulator joined the chain: the real combined
+  // swing is now 0.75⁴..1.25⁴ (0.32x..2.44x, ~7.7x end to end),
+  // already past the 4.5x figure that comment's own example uses —
+  // and the dedicated "health and focus modulate rather than gate"
+  // test still passes with discipline added (both compared workers'
+  // own discipline term moves WITH their base skill, not against it,
+  // in that fixture), which is the real guard, not the stale ratio in
+  // this comment.
   return Math.max(0, skill * (0.75 + health / 200) * (0.75 + focus / 200)
-    * (0.75 + efficiency / 200) * energyFactor(worldState, entityId));
+    * (0.75 + efficiency / 200) * (0.75 + discipline / 200)
+    * energyFactor(worldState, entityId));
 }
 
 // One tick of work, for everybody holding an active contract.

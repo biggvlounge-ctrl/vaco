@@ -84,10 +84,11 @@ test('an average worker scores exactly 1.0, which is the whole model', () => {
 
   const skilled = worker(w, 100);
   const poor = worker(w, 10);
-  // 100 skills is 2x average, and all three modulators (health,
-  // focus, and the real `efficiency` family added alongside this
-  // test) sit at their 1.25 ceiling: 2 * 1.25 * 1.25 * 1.25.
-  assert.equal(economy.productivityOf(w, skilled.id), 3.90625);
+  // 100 skills is 2x average, and all four real trait modulators
+  // (health, focus, efficiency, and task #107's own discipline) sit
+  // at their 1.25 ceiling, since `worker()` sets every trait family
+  // to the same value: 2 * 1.25^4.
+  assert.equal(economy.productivityOf(w, skilled.id), 4.8828125);
   assert.ok(economy.productivityOf(w, poor.id) < 0.2);
 
   // Somebody who does not exist produces nothing rather than throwing
@@ -123,6 +124,31 @@ test('efficiency modulates productivity, and an ordinary (50) person is unaffect
   // 1.25 ceiling / 0.75 floor, same band as every other modulator.
   assert.ok(economy.productivityOf(w, efficient.id) <= 1.25 + 1e-9);
   assert.ok(economy.productivityOf(w, inefficient.id) >= 0.75 - 1e-9);
+});
+
+test('discipline modulates productivity, and an ordinary (50) person is unaffected', () => {
+  // Task #107, by direct request ("lazy vs. hardworking NPCs"). Same
+  // proof shape the `efficiency` test right above already uses.
+  const w = world();
+  const average = worker(w, 50);
+  assert.equal(economy.productivityOf(w, average.id), 1,
+    'a perfectly average discipline sheet must be neutral, same as every other modulator');
+
+  const hardworking = worker(w, 50);
+  const lazy = worker(w, 50);
+  for (const row of w.entityTraits) {
+    const def = INDIVIDUAL_DEFINITIONS.find((d) => d.trait_id === row.trait_id);
+    if (!def || def.family !== 'behavioral' || def.name !== 'Discipline') continue;
+    if (row.entity_id === hardworking.id) row.current_value = 100;
+    if (row.entity_id === lazy.id) row.current_value = 0;
+  }
+  assert.ok(
+    economy.productivityOf(w, hardworking.id) > economy.productivityOf(w, lazy.id),
+    'equal skill, health and focus -- discipline alone must still move the real output',
+  );
+  // 1.25 ceiling / 0.75 floor, same band as every other modulator.
+  assert.ok(economy.productivityOf(w, hardworking.id) <= 1.25 + 1e-9);
+  assert.ok(economy.productivityOf(w, lazy.id) >= 0.75 - 1e-9);
 });
 
 test('health and focus modulate rather than gate', () => {

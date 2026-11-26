@@ -2608,6 +2608,21 @@ trust, `shared_history` never falls; history does not un-happen.
 `births.js`'s own header gets a correction appended, not rewritten. 2
 new tests. See CLAUDE.md's hundred-and-eighty-eighth standing rule.
 
+### Real Discipline modulator on production output (closes task #107)
+`economy.productivityOf` modulated output by health, focus and
+efficiency and never by Discipline, so a lazy and a hardworking NPC
+with identical skill produced identically. `behavioral.Discipline` is
+a single named trait (like health/focus, not a family mean like
+efficiency), `?? 50` neutral default, joining the existing
+`0.75 + x/200` modulator band. The fourth modulator pushes the
+combined swing to ~7.7x (0.75⁴..1.25⁴), past the file's own earlier
+"4.5x skill gap" comparison — said so directly rather than silently
+repeating a now-stale number; the real guard is the dedicated "health
+and focus modulate rather than gate" test, confirmed to still pass.
+New test: an ordinary (50) person is unaffected, a hardworking (100)
+worker out-produces a lazy (0) one, bounded at the 0.75/1.25 band. See
+CLAUDE.md's hundred-and-eighty-ninth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a
