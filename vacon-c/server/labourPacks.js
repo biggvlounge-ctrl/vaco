@@ -60,7 +60,11 @@ const SOC_GROUP_BY_OCCUPATION = {
   programmer: '15',
   engineer: '17', architect: '17',
   scientist: '19', researcher: '19', polymath: '19', agronomist: '19', linguist: '19',
-  preacher: '21',
+  // `caseworker` (21-1021) and `probationOfficer` (21-1092) are real
+  // BLS codes in the same major group 21 `preacher` already sits in
+  // (task #232) — a second and third real code alongside clergy's own,
+  // not a newly-closed group.
+  preacher: '21', caseworker: '21', probationOfficer: '21',
   // `lawyer` is SOC 23-1011 "Lawyers", major group 23 (Legal) — real
   // BLS group, previously mapped to by nothing.
   lawyer: '23',

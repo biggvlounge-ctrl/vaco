@@ -599,6 +599,45 @@ const OCCUPATIONS = {
     tier: 2, skill: 'Crafting', source: 'BLS SOC 51 (Production Occupations) -- 51-2092 Team Assemblers',
     employers: ['business', 'corporation'],
   },
+
+  // ---- task #232, by direct request: "real social-worker/caseworker/
+  // probation-parole-officer occupations". **Checked before assuming
+  // this closed an empty SOC major group, and it does not — `preacher`
+  // (`labourPacks.SOC_GROUP_BY_OCCUPATION.preacher`) already sits in
+  // major group 21 (Community and Social Service), real clergy's own
+  // code (21-2011) being part of that same group. These two are a
+  // second and third real code ALONGSIDE `preacher` in that group — the
+  // identical "a new, distinct real job title sitting alongside an
+  // occupation already in that group" relationship `guard`/`warden`/
+  // `nurse` already hold in theirs, not a first-time group closure. ---
+  caseworker: {
+    // Real SOC 21-1021 "Child, Family, and School Social Workers" --
+    // O*NET's own alternate-title list for this exact code already
+    // includes "Caseworker" and "Case Manager" directly, so "social
+    // worker" and "caseworker" are the same real occupation here rather
+    // than two invented ones for the same job. `school` is kept
+    // alongside `government` because the code's own title names school
+    // social work directly, the same "general role, named employer
+    // added" shape `clerk`'s own employer list already takes.
+    // BLS's entry requirement for this code is a bachelor's degree --
+    // the same tier class `teacher` already sits at.
+    tier: 3, skill: 'Communication', source: 'BLS SOC 21 (Community and Social Service) -- 21-1021 Child, Family, and School Social Workers',
+    employers: ['government', 'school'],
+  },
+  probationOfficer: {
+    // Real SOC 21-1092 "Probation Officers and Correctional Treatment
+    // Specialists" -- a distinct, real code in the same major group as
+    // `caseworker` above, and deliberately NOT tiered or skilled with
+    // `guard`/`officer`/`enforcer`: BLS classifies this occupation under
+    // Community and Social Service, not Protective Service, because
+    // the real job is interviewing, case management and report-writing
+    // against a supervision caseload, not enforcement duty. Employer is
+    // `government` only -- probation and parole are government
+    // functions in every real jurisdiction, no private-operator
+    // minority case the way `guard`'s own header names for corrections.
+    tier: 3, skill: 'Communication', source: 'BLS SOC 21 (Community and Social Service) -- 21-1092 Probation Officers and Correctional Treatment Specialists',
+    employers: ['government'],
+  },
 };
 
 const OCCUPATION_NAMES = Object.keys(OCCUPATIONS);

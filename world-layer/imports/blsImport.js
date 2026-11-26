@@ -64,8 +64,10 @@ const SOC_GROUP_BY_OCCUPATION = {
   engineer: '17', architect: '17',
   // 19-0000 Life, physical and social science
   scientist: '19', researcher: '19', polymath: '19', agronomist: '19', linguist: '19',
-  // 21-0000 Community and social service
-  preacher: '21',
+  // 21-0000 Community and social service. `caseworker` (21-1021) and
+  // `probationOfficer` (21-1092) are real BLS codes added alongside
+  // `preacher` in this same group (VACON-C task #232).
+  preacher: '21', caseworker: '21', probationOfficer: '21',
   // 23-0000 Legal (`lawyer` is SOC 23-1011 "Lawyers")
   lawyer: '23',
   // 25-0000 Educational instruction and library

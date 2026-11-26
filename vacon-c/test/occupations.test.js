@@ -476,3 +476,45 @@ test('every new occupation can actually be drawn at a real employer of it', () =
     assert.ok(occupations.occupationsFor(orgType).includes(name), `${name} should be drawable at a ${orgType}`);
   }
 });
+
+// ---------------------------------------------------------------------
+// Task #232 — caseworker + probationOfficer, real SOC 21 alongside preacher
+// ---------------------------------------------------------------------
+
+test('caseworker and probationOfficer are real occupations in SOC major group 21, alongside preacher rather than replacing it', () => {
+  assert.ok(occupations.OCCUPATIONS.caseworker);
+  assert.ok(occupations.OCCUPATIONS.probationOfficer);
+  assert.equal(labourPacks.SOC_GROUP_BY_OCCUPATION.caseworker, '21');
+  assert.equal(labourPacks.SOC_GROUP_BY_OCCUPATION.probationOfficer, '21');
+  assert.equal(labourPacks.SOC_GROUP_BY_OCCUPATION.preacher, '21', 'preacher must stay in group 21, not be displaced');
+});
+
+test('caseworker and probationOfficer are both drawable at a real government employer', () => {
+  assert.ok(occupations.occupationsFor('government').includes('caseworker'));
+  assert.ok(occupations.occupationsFor('government').includes('probationOfficer'));
+});
+
+test('caseworker is also drawable at a real school, per the SOC code’s own title', () => {
+  assert.ok(occupations.occupationsFor('school').includes('caseworker'));
+});
+
+test('probationOfficer is not drawable at a gang, religion, hospital or business -- government only', () => {
+  for (const orgType of ['gang', 'religion', 'hospital', 'business', 'club']) {
+    assert.ok(
+      !occupations.occupationsFor(orgType).includes('probationOfficer'),
+      `probationOfficer should not be drawable at a ${orgType}`,
+    );
+  }
+});
+
+test('caseworker and probationOfficer sit outside Combat/Protective-Service skill, unlike guard/officer/enforcer', () => {
+  // The real BLS classification difference this round's own header
+  // names: Community and Social Service, not Protective Service.
+  assert.notEqual(occupations.skillOf('probationOfficer'), 'Combat');
+  assert.notEqual(occupations.skillOf('caseworker'), 'Combat');
+});
+
+test('the two new SOC-21 entries are the same tier class as teacher, a comparable real bachelor\'s-degree occupation', () => {
+  assert.equal(occupations.tierOf('caseworker'), occupations.tierOf('teacher'));
+  assert.equal(occupations.tierOf('probationOfficer'), occupations.tierOf('teacher'));
+});

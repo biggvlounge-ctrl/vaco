@@ -2570,6 +2570,17 @@ zero, blocked by a named specialist shortfall — confirming growth
 difficulty is real rather than decorative. See CLAUDE.md's
 hundred-and-eighty-fifth standing rule.
 
+### Real caseworker/probationOfficer occupations, alongside preacher in SOC 21 (closes task #232)
+`caseworker` (SOC 21-1021, O*NET alt. title "Caseworker") and
+`probationOfficer` (SOC 21-1092) sit alongside `preacher` in SOC major
+group 21 (Community and Social Service) — checked directly before
+writing this, and the first draft wrongly claimed the group was empty.
+Tiered with `teacher`, skilled `Communication`, not `Combat`. Added to
+both copies of `SOC_GROUP_BY_OCCUPATION` (`labourPacks.js` and
+`world-layer/imports/blsImport.js`). 5 new tests in
+`test/occupations.test.js`. See CLAUDE.md's hundred-and-eighty-sixth
+standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

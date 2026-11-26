@@ -10705,3 +10705,41 @@ script itself is a one-off diagnostic, the same uncommitted shape this
 round's own hang investigation used, not a permanent addition to
 `scripts/`: a point-in-time measurement of one seed, not a reusable
 tool.
+
+**A hundred-and-eighty-sixth, closing task #232 — and the correction
+that happened before it shipped, not after.** The first draft of this
+entry claimed SOC major group 21 (Community and Social Service) had no
+occupation mapped at all — the same "empty major group" shape the
+`programmer`/`lawyer`/`custodian`/`stylist`/`salesperson`/`clerk` round
+closed six of. Checked directly before writing the comment into the
+file: `labourPacks.SOC_GROUP_BY_OCCUPATION.preacher` is already `'21'`
+— real clergy (SOC 21-2011) already sit in that group, and
+`clergyTitleFor` naming religious titles elsewhere in the same file is
+a different thing from an `OCCUPATIONS` entry with its own tier/skill/
+employer. The claim was caught and rewritten before commit, the same
+"citation is not presence" lesson this file opened with, aimed at my
+own fresh comment rather than an old one this time.
+
+`caseworker` (real SOC 21-1021 "Child, Family, and School Social
+Workers" — O*NET's own alternate-title list for this exact code
+already includes "Caseworker" and "Case Manager," so "social worker"
+and "caseworker" are the identical real occupation rather than two
+invented ones) and `probationOfficer` (real SOC 21-1092 "Probation
+Officers and Correctional Treatment Specialists") sit ALONGSIDE
+`preacher` in group 21 — the identical relationship `guard`/`warden`/
+`nurse` already hold in theirs, not a first-time closure. Both are
+tiered with `teacher` (bachelor's-degree entry bar) and skilled
+`Communication`, deliberately NOT `Combat`: BLS classifies probation
+work under Community and Social Service rather than Protective
+Service, because the real job is interviewing, case management and
+report-writing against a caseload, not enforcement duty.
+`caseworker`'s own employer list includes `school` because the SOC
+title names school social work directly; `probationOfficer`'s is
+`government` only, with no private-operator minority case the way
+`guard`'s own header names for corrections.
+
+Added to BOTH copies of `SOC_GROUP_BY_OCCUPATION` — `labourPacks.js`
+and `world-layer/imports/blsImport.js` — keeping the standing
+cross-check (`test/labour-packs.test.js`'s own identity assertion)
+honest rather than silently drifting the two apart. 5 new tests in
+`test/occupations.test.js`.
