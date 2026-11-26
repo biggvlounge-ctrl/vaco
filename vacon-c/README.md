@@ -2382,6 +2382,21 @@ nobody carrying one is unchanged -- all 33 pre-existing `media.test.js`
 tests still pass, plus 5 new ones. See CLAUDE.md's
 hundred-and-seventy-third standing rule.
 
+## Real build-barricade player verb (closes task #138)
+`territory.js`'s 'fortified' status only ever emerged from
+`resolveTerritoryControl`'s own tick-driven trait math -- no action a
+player could take toward it. `territory.buildBarricade` moves the
+real input instead of the computed output: one `applyKeyModifier`
+call raising the controlling faction's live `'territory'` trait by
+`control.SHARED_UNDERTAKING` (the same real magnitude already priced
+for one comparable meeting's trust nudge), then calls the one real
+resolver on the same block -- never a second, direct status write
+that the next tick would just overwrite. `membership.findMembership`
+gates it to real members of the faction that holds the block. New
+`'build-barricade'` verb in `actions.js` (citizen+leader). 5 new
+tests in `test/build-barricade.test.js`; mutation-verified. See
+CLAUDE.md's hundred-and-seventy-fourth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

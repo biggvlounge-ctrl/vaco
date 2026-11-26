@@ -10063,3 +10063,50 @@ enough. Mutation-verified: stubbed the new possession check to `false`
 and confirmed exactly the era-bypass test failed, nothing else —
 confirming it is this check, and only this check, that the new
 behaviour depends on.
+
+**A hundred-and-seventy-fourth, closing task #138 — a real
+build-barricade player verb for `territory.js`'s own 'fortified'
+status, which until now only ever emerged from
+`resolveTerritoryControl`'s tick-driven trait math with no action a
+player could take toward it.** `block.status` is COMPUTED, every
+time `resolveTerritoryControl` runs, from the controlling faction's
+live `organization`/`territory` and `power` traits — so a verb that
+set `block.status = 'fortified'` directly would be overwritten the
+next tick and would, until then, be the nineteenth standing rule's
+"two disagreeing answers to the same question." `territory
+.buildBarricade` instead moves the real INPUT — one
+`entityTraits.applyKeyModifier` call on the faction's own live
+`'territory'` trait, the identical write-back every Key resolver
+already uses (standing rule 1) — then calls `resolveTerritoryControl`
+itself on the same block, so the status returned is the real
+formula's own answer, never a shortcut around it.
+
+**The bump reuses `control.SHARED_UNDERTAKING` (2), not an invented
+number.** One person's labor fortifying one block is the same
+real-world-sized event `control.js` already prices a single meeting's
+trust nudge at; giving it a second, different number would assert a
+difference nobody measured, the same reasoning this file's own
+nineteenth rule already gives reusing that constant elsewhere. It is
+deliberately small against the 40-point gap between
+`CONTESTED_THRESHOLD` and `FORTIFIED_THRESHOLD` — a real nudge, not a
+guaranteed, instant fortification.
+
+Ownership is the same real check every other faction-gated action in
+this engine already uses: `membership.findMembership` refuses a
+citizen building a barricade for a faction they do not belong to,
+rather than silently crediting whichever faction holds the block.
+`'build-barricade'` is a new `actions.js` verb (`citizen`+`leader`,
+the same civic-participation posture `attempt-takeover` already has),
+routed through `engine.js#buildBarricade` the same bound-wrapper shape
+every other territory function there already uses.
+
+5 new tests in `test/build-barricade.test.js`: the reused-constant
+assertion itself; the missing-block refusal; the non-member refusal;
+the real trait raise (built on the eighth standing rule's own lesson —
+a hand-built fixture row missing a modifier column silently becomes
+`NaN` the moment `applyKeyModifier` sums it, which read as "always
+`controlled`" until the fixture was given the real generator's full
+row shape); and a comfortably-above/comfortably-below pair proving the
+returned status is the real resolver's own answer, not a direct
+write. Mutation-verified: removing the ownership check is caught by
+the non-member test; restored byte-identical.

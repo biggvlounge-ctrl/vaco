@@ -28,8 +28,11 @@
 
 const { nextAfter } = require('./nextAfter.js');
 
-const { getLiveEntity } = require('./entityTraits.js');
+const entityTraits = require('./entityTraits.js');
+const { getLiveEntity } = entityTraits;
 const { seededDraw } = require('./seeded.js');
+const membership = require('./membership.js');
+const control = require('./control.js');
 
 let nextCityId = 1;
 let nextCommunityId = 1;
@@ -254,6 +257,63 @@ function resolveTerritoryControl(worldState, block, tick) {
   }
 
   return block;
+}
+
+// ---------------------------------------------------------------------------
+// buildBarricade() — task #138's real player verb for the 'fortified'
+// status above, which until now only ever emerged from
+// `resolveTerritoryControl`'s own tick-driven trait math, with no
+// action a player could take to work toward it directly.
+//
+// **Writes through the one real path, not a second one beside it.**
+// `block.status` is computed FROM the controlling faction's live
+// 'organization'/'territory' and 'power' traits every time
+// `resolveTerritoryControl` runs, so setting `block.status =
+// 'fortified'` here directly would be overwritten the very next tick
+// and would, in the meantime, create the nineteenth standing rule's
+// "two disagreeing answers to the same question." Instead this moves
+// the real INPUT — `entityTraits.applyKeyModifier` on the faction's
+// own live 'territory' trait, the identical write-back mechanism
+// every Key resolver already uses (standing rule 1) — and then calls
+// `resolveTerritoryControl` itself on the same block, so the status
+// that comes back is the real formula's own answer to the new trait
+// value, never a shortcut around it.
+//
+// **The bump is `control.SHARED_UNDERTAKING`, not an invented
+// number.** One person spending effort fortifying one block is the
+// same order of real-world-sized event `control.js` already prices a
+// single meeting's trust nudge at — giving it a different number
+// would assert a difference nobody measured, the same reasoning the
+// nineteenth standing rule already gives for reusing that exact
+// constant elsewhere. It is deliberately small relative to the
+// 40-point gap between `CONTESTED_THRESHOLD` and
+// `FORTIFIED_THRESHOLD`: one barricade nudges the real odds, it does
+// not buy an instant, guaranteed fortification.
+//
+// **Ownership, the same real check every other faction-gated action
+// in this engine uses.** `membership.findMembership` — a citizen
+// building a barricade for a faction they do not belong to is refused
+// outright, not silently redirected to whichever faction holds the
+// block.
+const BARRICADE_TERRITORY_BONUS = control.SHARED_UNDERTAKING;
+
+function buildBarricade(worldState, options = {}) {
+  const { entityId, blockId, tick = worldState.tick ?? 0 } = options;
+  const block = (worldState.territoryBlocks || []).find((b) => b.id === blockId);
+  if (!block) {
+    throw new Error(`territory.buildBarricade: no real territory block ${blockId}`);
+  }
+  if (!membership.findMembership(worldState, entityId, block.faction_id)) {
+    throw new Error(
+      `territory.buildBarricade: ${entityId} is not a real member of the faction `
+      + `holding block ${blockId}`,
+    );
+  }
+
+  entityTraits.applyKeyModifier(
+    worldState, block.faction_id, 'organization', 'territory', BARRICADE_TERRITORY_BONUS, tick,
+  );
+  return resolveTerritoryControl(worldState, block, tick);
 }
 
 // ---------------------------------------------------------------------------
@@ -756,6 +816,8 @@ module.exports = {
   generateCommunity,
   generateTerritoryBlock,
   resolveTerritoryControl,
+  buildBarricade,
+  BARRICADE_TERRITORY_BONUS,
   nationalGuardPowerFor,
   NATIONAL_GUARD_OPPOSITION_WEIGHT,
   controlVariance,

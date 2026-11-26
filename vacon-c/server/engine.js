@@ -1206,6 +1206,14 @@ function getCityReemergence(cityId) {
   return territory.getCityReemergence(WorldState, cityId);
 }
 
+// Task #138's real player verb — see territory.js#buildBarricade's own
+// header for why this moves the controlling faction's live
+// 'territory' trait and re-runs the one real resolver, rather than
+// writing `block.status` directly.
+function buildBarricade(entityId, options = {}) {
+  return territory.buildBarricade(WorldState, { ...options, entityId });
+}
+
 // ---------------------------------------------------------------------------
 // Artifact/Mission system
 // ---------------------------------------------------------------------------
@@ -1358,6 +1366,7 @@ const ACTION_VERBS = {
   resolveContest: (...args) => resolveContest(...args),
   assessTakeover: (...args) => assessTakeover(...args),
   attemptTakeover: (...args) => attemptTakeover(...args),
+  buildBarricade: (...args) => buildBarricade(...args),
   holdMeeting: (...args) => holdMeeting(...args),
   sendMessage: (...args) => sendMessage(...args),
   repurposeProperty: (...args) => repurposeProperty(...args),

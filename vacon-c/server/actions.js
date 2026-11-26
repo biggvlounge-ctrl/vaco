@@ -217,6 +217,16 @@ const ACTIONS = {
     }),
   },
 
+  'build-barricade': {
+    summary: 'Fortify a block your own faction holds — a real, bounded nudge toward "fortified," not an instant win.',
+    modes: ['citizen', 'leader'],
+    requires: ['blockId'],
+    verbs: ['buildBarricade'],
+    run: (verbs, actorId, body) => verbs.buildBarricade(actorId, {
+      blockId: Number(body.blockId),
+    }),
+  },
+
   // **Salvage, as three verbs.** `server/salvage.js` is the one system
   // in the engine a player is meant to touch constantly rather than at
   // a turning point — you take things apart and make things all day —
