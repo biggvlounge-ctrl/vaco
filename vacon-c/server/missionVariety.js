@@ -50,6 +50,8 @@ const produce = require('./produce.js');
 const travel = require('./travel.js');
 const vehicles = require('./vehicles.js');
 const geo = require('./geo.js');
+const nomadic = require('./nomadic.js');
+const camps = require('./camps.js');
 
 const MISSION_RECRUIT_REWARD = 40;
 const MISSION_ALLIANCE_REWARD = 40;
@@ -57,6 +59,7 @@ const MISSION_SPY_REWARD = 40;
 const MISSION_BARTER_REWARD = 40;
 const MISSION_HUNT_REWARD = 40;
 const MISSION_TRAVEL_REWARD = 40;
+const MISSION_NOMADIC_REWARD = 40;
 
 function communityAnchor(worldState, communityId) {
   return (worldState.properties || []).find((p) => p.community_id === communityId) ?? null;
@@ -346,6 +349,82 @@ function offerTravelMission(worldState, npcId, options = {}) {
   };
 }
 
+// **Task #125 — the real nomadic/travel wrapper, reusing
+// `nomadic.js` and `travel.js` directly rather than inventing a third
+// "becoming nomadic" mechanic beside them.** `nomadic.js`'s own
+// header is explicit that this engine already has exactly two real
+// nomadic mechanisms — an active real journey (`travel.js`) or an
+// active real camp (`camps.js`) — and nothing else. A citizen whose
+// own family/organization head is CURRENTLY at a real camp (the
+// `reason: 'camp'` half of `nomadic.nomadicStatusOf`) is living the
+// nomadic life this round is named for; the real next step is the
+// OTHER of the two mechanisms — breaking camp and setting out for a
+// real city — which is exactly what `begin-journey` already does.
+//
+// **Deliberately scoped to the camp case only, not the journey
+// case.** A head already on a real journey cannot begin a second one
+// (`travel.beginJourney`'s own "already on a real journey" refusal)
+// , so there is no real resolution verb to point a journey-in-
+// progress mission at — the eleventh standing rule's trap, avoided
+// before writing the branch rather than discovered by a failing call.
+//
+// Picks the real NEAREST other city, not the worst case
+// `offerTravelMission` picks — that function is about a real fuel
+// shortfall biting; this one is about getting a nomadic group back to
+// settled life as soon as honestly possible, a different real
+// question even though both scan `worldState.cities` with the same
+// real `geo.distanceMetres`.
+function offerNomadicMission(worldState, npcId, options = {}) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`offerNomadicMission: no NPC ${npcId}`);
+
+  const organizationId = ownOrganizationIdOf(worldState, npcId);
+  const familyId = organizationId == null ? ownFamilyIdOf(worldState, npcId) : null;
+  if (organizationId == null && familyId == null) return null;
+
+  const headId = organizationId != null
+    ? (worldState.organizations || []).find((o) => o.id === organizationId)?.leader_id
+    : (worldState.families || []).find((f) => f.id === familyId)?.head_npc_id;
+  if (headId == null) return null;
+
+  const status = nomadic.nomadicStatusOf(worldState, headId);
+  if (!status.nomadic || status.reason !== 'camp') return null;
+
+  const camp = camps.campOf(worldState, status.campId);
+  if (!camp) return null;
+
+  const originCityId = (worldState.communities || [])
+    .find((c) => c.id === camp.communityId)?.city_id ?? null;
+  if (originCityId == null) return null;
+  const originCity = (worldState.cities || []).find((c) => c.id === originCityId);
+  if (!originCity) return null;
+
+  let nearest = null;
+  for (const destinationCity of (worldState.cities || [])) {
+    if (destinationCity.id === originCityId) continue;
+    const distanceMetres = geo.distanceMetres(geo.positionOf(originCity), geo.positionOf(destinationCity));
+    if (distanceMetres === null) continue;
+    if (nearest === null || distanceMetres < nearest.distanceMetres) {
+      nearest = { destinationCity, distanceMetres };
+    }
+  }
+  if (!nearest) return null;
+  const { destinationCity } = nearest;
+
+  const anchor = options.anchorPropertyId != null
+    ? (worldState.properties || []).find((p) => p.id === options.anchorPropertyId)
+    : communityAnchor(worldState, camp.communityId);
+  if (!anchor) return null;
+
+  const mission = missions.generateMission(worldState, {
+    locationId: anchor.id,
+    objective: `Break camp and travel to ${destinationCity.name ?? `city ${destinationCity.id}`} — `
+      + 'the nearest real place to actually resettle',
+    reward: options.reward ?? MISSION_NOMADIC_REWARD,
+  });
+  return { mission, campId: camp.id, destinationCityId: destinationCity.id };
+}
+
 module.exports = {
   MISSION_RECRUIT_REWARD,
   MISSION_ALLIANCE_REWARD,
@@ -353,10 +432,12 @@ module.exports = {
   MISSION_BARTER_REWARD,
   MISSION_HUNT_REWARD,
   MISSION_TRAVEL_REWARD,
+  MISSION_NOMADIC_REWARD,
   offerRecruitMission,
   offerAllianceMission,
   offerSpyMission,
   offerBarterMission,
   offerHuntMission,
   offerTravelMission,
+  offerNomadicMission,
 };

@@ -10180,3 +10180,42 @@ a real but smaller shortfall, pushed before the real worst one in
 the fixture array. Mutation-verified against the corrected test:
 reducing the comparison to "first qualifying" is now caught; restored
 byte-identical.
+
+**A hundred-and-seventy-seventh, closing task #125 — the nomadic/
+travel mission wrapper, and the seventh `missionVariety.js`
+function.** `nomadic.js`'s own header is explicit that this engine
+has exactly two real nomadic mechanisms, a real active journey
+(`travel.js`) or a real active camp (`camps.js`), and nothing else.
+`offerNomadicMission` composes both directly: it reads whether a
+citizen's own family/organization head is CURRENTLY at a real camp
+(`nomadic.nomadicStatusOf`'s `reason: 'camp'`) and, only then, offers
+a mission to break camp and travel to the real nearest other city —
+the other of the two mechanisms, exactly what `begin-journey` already
+does.
+
+**Deliberately scoped to the camp case, not the journey case, and
+said so before writing the branch.** A head already on a real
+journey cannot start a second one (`travel.beginJourney`'s own
+"already on a real journey" refusal), so there is no real resolution
+verb a journey-in-progress mission could point at — the eleventh
+standing rule's trap, avoided rather than discovered. Picks the real
+NEAREST other city, not the worst-case `offerTravelMission` picks —
+getting a nomadic group back to settled life as soon as honestly
+possible is a different real question from a fuel shortfall biting,
+even though both scan `worldState.cities` with the same real
+`geo.distanceMetres`.
+
+4 new tests. One of them could not actually verify what it claimed:
+asserting null for a head on a real journey passed even with the
+explicit `reason !== 'camp'` check removed, because a journey status
+carries no `campId` at all and `camps.campOf` already returns null
+for that — the eighth standing rule's cousin, a passing assertion
+that is not testing what its own name says. Relabelled honestly
+rather than left looking like a guarded design decision it is not;
+the real "picks nearest, not first" comparison was mutation-verified
+instead, and caught. A second, separate bug would have shipped too:
+the first version of the positive test reused an earlier test's exact
+origin coordinates (`worldState.cities` accumulates across every test
+in this file with no reset between them), so an unrelated, zero-
+distance city from a prior test silently won "nearest" — fixed with
+genuinely distinct coordinates.

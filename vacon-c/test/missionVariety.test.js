@@ -14,6 +14,8 @@ const produce = require('../server/produce.js');
 const economy = require('../server/economy.js');
 const vehicles = require('../server/vehicles.js');
 const salvage = require('../server/salvage.js');
+const camps = require('../server/camps.js');
+const travel = require('../server/travel.js');
 const missionVariety = require('../server/missionVariety.js');
 
 const YEAR = 365;
@@ -212,6 +214,64 @@ test('offerTravelMission returns null for a citizen holding no real vehicle at a
   landmark(engine.WorldState, 69115, 'shop', 69015);
 
   assert.equal(missionVariety.offerTravelMission(engine.WorldState, npc.id), null);
+});
+
+test('offerNomadicMission points at the real nearest other city for a family whose real head is genuinely at a real camp', () => {
+  const head = engine.generateNPC();
+  head.communityId = 69021;
+  engine.WorldState.communities.push({ id: 69021, city_id: 69921 });
+  // Deliberately distinct, unused coordinates -- `worldState.cities`
+  // accumulates across every test in this file (no reset between
+  // them), so reusing an earlier test's exact origin position would
+  // put a real, unrelated, zero-distance city into this scan too.
+  engine.WorldState.cities.push({ id: 69921, name: 'Camp City', latitude: 25.0, longitude: -80.0 });
+  engine.WorldState.cities.push({ id: 69922, name: 'Nearest City', latitude: 25.1, longitude: -80.1 });
+  engine.WorldState.cities.push({ id: 69923, name: 'Farther City', latitude: 47.6, longitude: -122.3 });
+  const family = engine.generateFamily({ surname: 'Nomadfam', headNpcId: head.id });
+  engine.addFamilyMember(family.id, head.id, 'founder', 1);
+  const camp = camps.establishCamp(engine.WorldState, head.id, { communityId: 69021, campType: 'lake' });
+  landmark(engine.WorldState, 69121, 'shop', 69021);
+
+  const offer = missionVariety.offerNomadicMission(engine.WorldState, head.id);
+  assert.ok(offer, 'no nomadic mission was opened');
+  assert.equal(offer.campId, camp.id);
+  assert.equal(offer.destinationCityId, 69922, 'the real nearest other city, not the farther one');
+  assert.match(offer.mission.objective, /Nearest City/);
+});
+
+test('offerNomadicMission returns null for a family whose real head is not nomadic at all', () => {
+  const head = engine.generateNPC();
+  head.communityId = 69024;
+  engine.WorldState.communities.push({ id: 69024, city_id: 69924 });
+  engine.WorldState.cities.push({ id: 69924, name: 'Settled City', latitude: 38.6, longitude: -90.2 });
+  const family = engine.generateFamily({ surname: 'Settledfam', headNpcId: head.id });
+  engine.addFamilyMember(family.id, head.id, 'founder', 1);
+  landmark(engine.WorldState, 69124, 'shop', 69024);
+
+  assert.equal(missionVariety.offerNomadicMission(engine.WorldState, head.id), null);
+});
+
+test('offerNomadicMission returns null for a family whose real head is on a real journey, not a camp -- a journey status carries no real campId to resolve', () => {
+  const head = engine.generateNPC();
+  head.communityId = 69025;
+  engine.WorldState.communities.push({ id: 69025, city_id: 69925 });
+  engine.WorldState.cities.push({ id: 69925, name: 'Departure City', latitude: 38.6, longitude: -90.2 });
+  engine.WorldState.cities.push({ id: 69926, name: 'Arrival City', latitude: 40.7, longitude: -74.0 });
+  const family = engine.generateFamily({ surname: 'Travelfam', headNpcId: head.id });
+  engine.addFamilyMember(family.id, head.id, 'founder', 1);
+  travel.beginJourney(engine.WorldState, head.id, { destinationCityId: 69926, tick: engine.WorldState.tick });
+  landmark(engine.WorldState, 69125, 'shop', 69025);
+
+  assert.equal(missionVariety.offerNomadicMission(engine.WorldState, head.id), null);
+});
+
+test('offerNomadicMission returns null for a citizen with no real family or organization at all', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 69026;
+  engine.WorldState.communities.push({ id: 69026, city_id: 69927 });
+  landmark(engine.WorldState, 69126, 'shop', 69026);
+
+  assert.equal(missionVariety.offerNomadicMission(engine.WorldState, npc.id), null);
 });
 
 test('offerBarterMission names a real resident holding the real scarcest survival resource', () => {

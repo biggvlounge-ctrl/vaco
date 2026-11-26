@@ -2421,6 +2421,19 @@ day count with the identical formula `beginJourney` itself uses
 greatest real fuel shortfall. 3 new tests; mutation-verified. See
 CLAUDE.md's hundred-and-seventy-sixth standing rule.
 
+## Real nomadic/travel mission (closes task #125)
+`nomadic.js` already names the engine's exact two real nomadic
+mechanisms -- an active real journey or an active real camp --
+and nothing else. `missionVariety.offerNomadicMission` composes both
+directly: when a citizen's own family/organization head is genuinely
+at a real camp, it offers a mission to break camp and travel to the
+real nearest other city, reusing `geo.distanceMetres` the same way
+`offerTravelMission` does. Deliberately scoped to the camp case only
+-- a head already on a real journey cannot start a second one, so
+there is no real resolution verb to point a journey-in-progress
+mission at. 4 new tests. See CLAUDE.md's hundred-and-seventy-seventh
+standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a
