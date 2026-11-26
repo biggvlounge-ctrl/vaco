@@ -168,6 +168,20 @@ test('everybody at the table ends up closer to everybody else', () => {
   }
 });
 
+test('task #122: a real meeting grows shared_history between two different people', () => {
+  // Before this task, shared_history was written only on SELF-
+  // relationships (keys.js's Resilience/Adaptability/
+  // ScarcityResponse) — between two different people it was 0
+  // forever. A real meeting two people both attended is the
+  // ordinary, non-risky half this task asks for (control.attempt's
+  // own takeover participants are the risky half).
+  const w = room({ people: 2 });
+  meetings.hold(w, { attendeeIds: [1, 2], purpose: 'sit-down' });
+  assert.equal(w.relationships[0].shared_history, 1);
+  meetings.hold(w, { attendeeIds: [1, 2], purpose: 'sit-down' });
+  assert.equal(w.relationships[0].shared_history, 2, 'a second real meeting should grow it again');
+});
+
 test('trust cannot be pushed past the top of the scale', () => {
   // `worldStore.adjustRelationship` adds and does not clamp, which is
   // right for `interaction_count` and wrong for a 0-100 index.

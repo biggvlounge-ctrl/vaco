@@ -2595,6 +2595,19 @@ identical by `test/landmark-packs.test.js`'s cross-repository
 assertion. 3 new tests in `test/landmarks.test.js`. See CLAUDE.md's
 hundred-and-eighty-seventh standing rule.
 
+### Real shared_history by real interaction and real risk, not self only (closes task #122)
+`shared_history` was real but written ONLY on SELF-relationships
+(`keys.js`'s Resilience/Adaptability/ScarcityResponse) — between two
+different people it was 0 forever, a finding `births.js`'s own header
+had already recorded. Two real, pre-existing "did something together"
+sites now write it for real: `meetings.js`'s attendee-pair loop (`+1`
+per real meeting, the ordinary half) and `control.js#attempt`'s
+takeover-participant loop (`+SHARED_UNDERTAKING`, the risky half named
+directly in the task) — both regardless of outcome, since unlike
+trust, `shared_history` never falls; history does not un-happen.
+`births.js`'s own header gets a correction appended, not rewritten. 2
+new tests. See CLAUDE.md's hundred-and-eighty-eighth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

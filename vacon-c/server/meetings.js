@@ -243,11 +243,22 @@ function hold(worldState, options = {}) {
     for (let j = i + 1; j < attendees.length; j += 1) {
       const delta = trustDelta(worldState, attendees[i].id, attendees[j].id, definition);
       if (delta === 0) continue;
+      // Task #122. `shared_history` is real but was written only on
+      // SELF-relationships before this — between two different
+      // people it was 0 forever. A real meeting two people both
+      // attended is the ordinary, non-risky half this task asks for
+      // (`control.attempt`'s own takeover participants are the risky
+      // half) — it grows by 1 regardless of whether the meeting's
+      // own trust delta was positive or negative, because the two of
+      // them were still there together either way.
       const rel = worldStore.adjustRelationship(
-        worldState, attendees[i].id, attendees[j].id, 'social', { trust: delta },
+        worldState, attendees[i].id, attendees[j].id, 'social',
+        { trust: delta, shared_history: 1 },
       );
       // `adjustRelationship` adds and does not clamp — the same guard
-      // `control.attempt` needs, for the same reason.
+      // `control.attempt` needs, for the same reason. `shared_history`
+      // is an unbounded running count, the same class
+      // `interaction_count` already is — no clamp applies to it.
       rel.trust = Math.max(0, Math.min(100, rel.trust));
       moved.relationships += 1;
 

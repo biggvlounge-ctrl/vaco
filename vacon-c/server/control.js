@@ -1119,17 +1119,33 @@ function attempt(worldState, options = {}) {
   // each other; failing at it moves them apart. A small, symmetric
   // nudge — not a rewrite — because `advanceCohesion` is what turns
   // this into the tribe's unity and it is deliberately slow.
+  //
+  // Task #122. `shared_history` is real but was written ONLY on
+  // SELF-relationships (`keys.js`'s Resilience/Adaptability/
+  // ScarcityResponse) — between two different people it was 0
+  // forever, a fact `births.js`'s own header already names as a
+  // mistake caught before it shipped there. A takeover attempt is the
+  // RISKY half this task asks for: unlike trust, `shared_history`
+  // grows on success AND failure — the two of you went through it
+  // either way, and history does not un-happen — so it reuses
+  // `SHARED_UNDERTAKING`'s own magnitude rather than a second,
+  // invented number for the identical event.
   for (let i = 0; i < participants.length; i += 1) {
     for (let j = i + 1; j < participants.length; j += 1) {
       const rel = worldStore.adjustRelationship(
         worldState, participants[i].id, participants[j].id, 'family',
-        { trust: succeeded ? SHARED_UNDERTAKING : -SHARED_UNDERTAKING },
+        {
+          trust: succeeded ? SHARED_UNDERTAKING : -SHARED_UNDERTAKING,
+          shared_history: SHARED_UNDERTAKING,
+        },
       );
       // **`adjustRelationship` adds and does not clamp**, which is
       // fine for `interaction_count` and wrong for a 0-100 index:
       // `keys.resolveTrust` clamps its own writes for exactly this
       // reason, so a caller that nudges trust directly has to do the
       // same or a tribe that keeps winning ends up above the scale.
+      // `shared_history` is an unbounded running count, the same
+      // class `interaction_count` already is — no clamp applies.
       rel.trust = Math.max(0, Math.min(100, rel.trust));
     }
   }

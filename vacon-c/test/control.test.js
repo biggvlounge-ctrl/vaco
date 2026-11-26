@@ -461,6 +461,61 @@ test('doing it together moves the people who did it', () => {
   assert.notEqual(rel.trust, 0);
 });
 
+test('task #122: a real takeover grows shared_history between two different people, win or lose', () => {
+  // Before this task, shared_history was written only on SELF-
+  // relationships (keys.js's Resilience/Adaptability/
+  // ScarcityResponse) — between two different people it was 0
+  // forever. A takeover is the real, risky half this task asks for.
+  const win = () => {
+    nextNpcId = 1;
+    const w = world();
+    w.organizations.push({ id: 500, type: 'club', leader_id: null });
+    const a = member(w, { years: 30 });
+    const b = member(w, { years: 30 });
+    w.families[0].unity = 100;
+    let result = null;
+    for (let t = 0; t < 40 && (result === null || !result.succeeded); t += 1) {
+      result = control.attempt(w, {
+        scale: 'organization', locationId: 500, tribeId: 900, tick: 10000 + t, seed: 's',
+      });
+    }
+    assert.ok(result.succeeded, 'forty attempts at p=1.0 cohesion never succeeded');
+    return { w, a, b };
+  };
+  const lose = () => {
+    nextNpcId = 1;
+    // `tribeAgainstAHospital()` needs a real physician the tribe
+    // never has, so `compositionRequirementMet` is false on every
+    // call -- a guaranteed, deterministic failure, never a draw this
+    // test would have to get lucky on.
+    const w = tribeAgainstAHospital();
+    const a = member(w, { years: 30 });
+    const b = member(w, { years: 30 });
+    const result = control.attempt(w, {
+      scale: 'organization', locationId: 500, tribeId: 900, tick: 10000, seed: 's',
+    });
+    assert.equal(result.succeeded, false, 'this fixture must actually fail');
+    return { w, a, b };
+  };
+
+  const relOf = (w, a, b) => w.relationships.find(
+    (r) => (r.entity_a_id === a && r.entity_b_id === b) || (r.entity_a_id === b && r.entity_b_id === a),
+  );
+
+  const { w: wonWorld, a: wa, b: wb } = win();
+  const won = relOf(wonWorld, wa, wb);
+  assert.ok(won, 'no relationship between two people who won a takeover together');
+  assert.equal(won.shared_history, control.SHARED_UNDERTAKING);
+
+  const { w: lostWorld, a: la, b: lb } = lose();
+  const lost = relOf(lostWorld, la, lb);
+  assert.ok(lost, 'no relationship between two people who failed a takeover together');
+  // Trust falls on a loss; shared_history still grows by the same
+  // real amount, because history does not un-happen.
+  assert.equal(lost.shared_history, control.SHARED_UNDERTAKING);
+  assert.ok(lost.trust < 50, 'trust should have fallen on a real failure');
+});
+
 // ---------------------------------------------------------------------
 // viableTargetsFor — TribeGrowthOptionsExpansion
 // ---------------------------------------------------------------------

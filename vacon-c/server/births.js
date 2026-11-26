@@ -145,6 +145,17 @@ const PARTNER_BOND_FLOOR = 60;
 //: ScarcityResponse — so between two different people it is 0 forever.
 //: Reading it fixed nothing and would have looked fixed.
 //:
+//: **Correction (task #122): `shared_history` is no longer 0 forever
+//: between two different people** — `control.attempt`'s takeover
+//: participants and `meetings.js`'s own attendee pairs both write it
+//: now, the real "doing something together, risky or ordinary" shape
+//: this file's own `interaction_count`/trust combination already used
+//: as the honest substitute. This paragraph is left exactly as
+//: written rather than edited, because the reasoning in it (gating a
+//: births bond on a field two different people could never move) was
+//: correct AT THE TIME and the bond still correctly does not read
+//: `shared_history` today — it remains flagged, same posture.
+//:
 //: `interaction_count` is the field that genuinely records repeated
 //: contact: `worldStore.adjustRelationship` increments it on every
 //: write-back, and the Social phase resolves Trust for every

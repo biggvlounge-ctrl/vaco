@@ -10782,3 +10782,50 @@ real guard remains the cross-repository assertion, not that count.
 3 new tests in `test/landmarks.test.js`, plus two pre-existing literal
 counts in `test/landmarks.test.js` and `test/discovery.test.js`
 updated (39→41 hero categories, 58→60 total categories).
+
+**A hundred-and-eighty-eighth, closing task #122 — `shared_history`
+by real interaction and real risk, not self only.** `births.js`'s own
+header already recorded the finding and the honest reason it was not
+fixed at the time: `shared_history` was written ONLY on
+SELF-relationships — `keys.js`'s Resilience, Adaptability and
+ScarcityResponse, each required by standing rule 1 to write back a
+relationship even though there is no second party, so they nudge a
+relationship with oneself. Between two DIFFERENT people it was 0
+forever, confirmed directly (`grep -n "shared_history" server/*.js`)
+rather than assumed from that old note.
+
+**Two real, pre-existing "did something together" sites, not an
+invented third mechanism.** `meetings.js`'s own attendee-pair loop and
+`control.js#attempt`'s own takeover-participant loop both already
+nudge `trust` for two different real people who did a real thing
+together — the identical real substrate this task needed, not a new
+one. Each now also writes `shared_history`:
+
+- **`meetings.js`** is the real, ORDINARY half — `+1` per real
+  meeting two people both attended, written only when the purpose's
+  own `trustDelta` is nonzero (the loop's existing `continue` guard),
+  regardless of whether that delta was positive or negative: the two
+  of them were still there together either way.
+- **`control.js#attempt`** is the real, RISKY half the task's own
+  wording names directly — a takeover attempt can fail, can leave
+  participants hurt or captured, and "+ risk" means doing it anyway.
+  It writes `SHARED_UNDERTAKING` (the same magnitude `trust` already
+  moves by, reused rather than inventing a second number for the
+  identical event) regardless of success or failure — **unlike
+  trust, `shared_history` never falls.** History does not un-happen:
+  losing a takeover together is still a real thing two people went
+  through, and the right real analogy is `interaction_count`, an
+  unbounded running count, not a 0-100 bounded index needing a clamp.
+
+**`births.js`'s own correction is appended to its existing paragraph
+rather than silently rewritten**, per this file's own rule for
+exactly that: the reasoning that gated a births bond OFF
+`shared_history` was correct at the time it was written, and the bond
+still correctly does not read `shared_history` today — only the "0
+forever between two different people" half of that paragraph is now
+out of date, and the correction says so rather than deleting the
+history of the mistake.
+
+2 new tests (`test/control.test.js`, win/lose both grow
+`shared_history` by the identical real amount; `test/meetings.test.js`,
+two real meetings grow it twice).
