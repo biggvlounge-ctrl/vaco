@@ -16,6 +16,8 @@ const vehicles = require('../server/vehicles.js');
 const salvage = require('../server/salvage.js');
 const inventory = require('../server/inventory.js');
 const heistTools = require('../server/heistTools.js');
+const entityTraits = require('../server/entityTraits.js');
+const { INDIVIDUAL_DEFINITIONS } = require('../server/traitDefinitions.js');
 
 const w = engine.WorldState;
 
@@ -69,11 +71,61 @@ test('kmPerDayFor: null for an entity that does not really hold the vehicle; sca
   const owner = mechanic();
   assert.equal(vehicles.kmPerDayFor(w, owner.id, 'scooter'), null);
   craftScooter(owner.id);
-  assert.equal(vehicles.kmPerDayFor(w, owner.id, 'scooter'), vehicles.KM_PER_DAY_BY_TYPE.scooter);
+  // Task #127: `mechanic()`'s own `traitValueFor: () => 80` sets EVERY
+  // individual trait to 80, `skills.Driving` included, so the real
+  // driving modulator (0.75 + 80/200 = 1.15) applies here too — not a
+  // bug this test is working around, the real mechanism this fixture
+  // happens to also exercise.
+  const drivingModulator = vehicles.drivingModulatorFor(w, owner.id);
+  assert.equal(drivingModulator, 1.15);
+  assert.equal(vehicles.kmPerDayFor(w, owner.id, 'scooter'), vehicles.KM_PER_DAY_BY_TYPE.scooter * drivingModulator);
 
   const holding = inventory.findHolding(w, owner.id, 'scooter');
   holding.condition = 50;
-  assert.equal(vehicles.kmPerDayFor(w, owner.id, 'scooter'), vehicles.KM_PER_DAY_BY_TYPE.scooter * 0.5);
+  assert.equal(
+    vehicles.kmPerDayFor(w, owner.id, 'scooter'),
+    vehicles.KM_PER_DAY_BY_TYPE.scooter * 0.5 * drivingModulator,
+  );
+});
+
+// Task #127: a real Driving skill modulates pace, and an unmeasured
+// or average (50) driver is unaffected -- the same "modulator, not a
+// gate" shape task #107 established for Discipline on production.
+test('kmPerDayFor: Driving modulates pace, and an average (50) driver gets the vehicle\'s unmodified rated pace', () => {
+  // Direct `inventory.give` rather than `craftScooter`/`salvage.make`
+  // -- this test is about the DRIVER's own skill, not about who can
+  // craft a vehicle (Tier 3 work `person()`'s plain fixture does not
+  // qualify for), the same shape `test/travel.test.js`'s own vehicle
+  // test already uses.
+  salvage.registerItems(w);
+  function give(entityId) {
+    inventory.give(w, { entityId, itemName: 'scooter', quantity: 1, condition: 100, tick: 0 });
+  }
+
+  const average = person();
+  give(average.id);
+  assert.equal(vehicles.drivingModulatorFor(w, average.id), 1);
+  assert.equal(vehicles.kmPerDayFor(w, average.id, 'scooter'), vehicles.KM_PER_DAY_BY_TYPE.scooter);
+
+  const skilled = person();
+  const unskilled = person();
+  give(skilled.id);
+  give(unskilled.id);
+  const drivingDef = INDIVIDUAL_DEFINITIONS.find((d) => d.family === 'skills' && d.name === 'Driving');
+  for (const row of w.entityTraits) {
+    if (row.trait_id !== drivingDef.trait_id) continue;
+    if (row.entity_id === skilled.id) row.current_value = 100;
+    if (row.entity_id === unskilled.id) row.current_value = 0;
+  }
+  assert.equal(entityTraits.getLiveEntity(w, skilled.id).traits.skills.Driving, 100);
+  assert.equal(entityTraits.getLiveEntity(w, unskilled.id).traits.skills.Driving, 0);
+
+  assert.ok(
+    vehicles.kmPerDayFor(w, skilled.id, 'scooter') > vehicles.kmPerDayFor(w, unskilled.id, 'scooter'),
+    'a skilled driver should out-pace an unskilled one in the identical vehicle',
+  );
+  assert.ok(vehicles.kmPerDayFor(w, skilled.id, 'scooter') <= vehicles.KM_PER_DAY_BY_TYPE.scooter * 1.25 + 1e-9);
+  assert.ok(vehicles.kmPerDayFor(w, unskilled.id, 'scooter') >= vehicles.KM_PER_DAY_BY_TYPE.scooter * 0.75 - 1e-9);
 });
 
 test('kmPerDayFor refuses an unreal vehicle type', () => {

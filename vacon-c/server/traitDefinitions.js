@@ -60,9 +60,10 @@ function schemaDefaults(name, family) {
 
 const TRAIT_DEFINITIONS = [];
 
-// Individual tier — 21 families, 122 traits (20/114 per
+// Individual tier — 21 families, 123 traits (20/114 per
 // dev-docs/phase-1-trait-split/, plus the real `efficiency` family
-// added 9 Oct 2026 — see traits.js's own header).
+// added 9 Oct 2026, plus `skills.Driving` added for task #127 — see
+// traits.js's own header).
 for (const [family, traitNames] of Object.entries(TRAIT_FAMILIES)) {
   for (const name of traitNames) {
     TRAIT_DEFINITIONS.push({ trait_id: TRAIT_DEFINITIONS.length + 1, ...schemaDefaults(name, family) });

@@ -23,7 +23,9 @@
 // in that doc's own prose undercounts its own listed array by one
 // family; that's a pre-existing off-by-one in the docs' summary text,
 // not a data mismatch — the literal data was
-// correct here all along.
+// correct here all along. A 123rd individual trait (`skills.Driving`,
+// task #127) joined on top of that same 122, for the identical reason
+// `efficiency` did — see the `skills` family's own comment above.
 
 'use strict';
 
@@ -73,7 +75,21 @@ const TRAIT_FAMILIES = {
   skills: ['Communication', 'Leadership', 'Engineering', 'Medicine',
            'Science', 'Technology', 'Art', 'Music', 'Business', 'Agriculture',
            'Construction', 'Combat', 'Athletics', 'Crafting', 'Research',
-           'Management'],
+           'Management',
+           // Task #127, by direct backlog instruction ("real Driving
+           // skill/trait, currently missing entirely"). Checked
+           // directly before adding: no spec document in this repo
+           // (VACANCY_TRAIT_DATABASE_ATTACHMENT.md,
+           // VACANCY_CONSOLIDATED_MASTER_SPEC.md,
+           // VACANCY_MASTER_SESSION_INDEX.md) names a driving-related
+           // trait anywhere — `vehicles.js`'s own comment calling out
+           // the missing km/day figure is about PACE, not about a
+           // skill. Same shape as this file's own `efficiency` family
+           // below: a real, named gap this sheet never covered, added
+           // here rather than left absent, with a real reader the
+           // same day (`vehicles.kmPerDayFor`'s new modulator — see
+           // that file's own header).
+           'Driving'],
   // Family #21, added per direct instruction ("add any traits... that
   // would make it more efficient"). A real, missing dimension, checked
   // for first rather than assumed absent: no existing family or

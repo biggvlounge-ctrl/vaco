@@ -117,7 +117,14 @@ test('beginJourney, given a real vehicleType the leader actually holds, uses its
 
   const journey = travel.beginJourney(w, leader.id, { destinationCityId: cities[1].id, tick: 0, vehicleType: 'scooter' });
   const realDistance = geo.distanceMetres(geo.positionOf(cities[0]), geo.positionOf(cities[1]));
-  const expectedMetresPerDay = vehicles.KM_PER_DAY_BY_TYPE.scooter * 1000;
+  // Task #127: a real, generated leader's own real `skills.Driving`
+  // now modulates pace too (`vehicles.kmPerDayFor`'s own header), so
+  // the expected figure has to read that leader's REAL, seeded value
+  // rather than assume the unmodulated base rate -- the same
+  // read-it-back-rather-than-hardcode fix this file's own siblings
+  // already use for a trait the code under test reads live.
+  const expectedMetresPerDay = vehicles.KM_PER_DAY_BY_TYPE.scooter * 1000
+    * vehicles.drivingModulatorFor(w, leader.id);
   assert.equal(journey.metresPerDay, expectedMetresPerDay);
   assert.equal(journey.totalDays, Math.max(1, Math.ceil(realDistance / expectedMetresPerDay)));
   assert.equal(journey.vehicleType, 'scooter');

@@ -108,6 +108,25 @@
 // to multiply. Declared here rather than invented: this file's real
 // contribution is pace and fuel cost, honestly, not a capacity bonus
 // grafted onto a cap that does not exist.
+//
+// ---------------------------------------------------------------------
+// Driving is a real skill now (task #127), modulating pace, not
+// gating it
+// ---------------------------------------------------------------------
+// `kmPerDayFor` scaled a vehicle's rated pace by its own real
+// inventory condition and nothing else — the driver's own competence
+// never entered it, even though `entityId` (the holder) already IS
+// the driver. `skills.Driving` (traits.js's own header on why it was
+// added — no spec document in this repo names a driving trait
+// anywhere) closes that: `drivingModulatorFor` reads it live through
+// `salvage.skillOf` and applies the identical `0.75 + x/200`
+// neutral-at-50 band `economy.productivityOf` already established for
+// Discipline/efficiency/health/focus, reused rather than invented
+// fresh. A modulator, never a gate: an unmeasured or unskilled driver
+// still gets the vehicle moving, just not as fast — the same posture
+// every other modulator in this engine takes, and the right one here
+// since nothing about a parked vehicle's base rating should be
+// unreachable to a below-average driver.
 
 'use strict';
 
@@ -175,15 +194,37 @@ function assertVehicleType(type, who) {
   }
 }
 
+// Task #127, by direct backlog instruction ("real Driving skill/
+// trait, currently missing entirely"). `skills.Driving` (traits.js's
+// own header on why it was added) is read here, the one real place a
+// driver's own skill could change a real outcome in this file — the
+// SAME `0.75 + x/200` neutral-at-50 band `economy.productivityOf`
+// already established for Discipline/efficiency/health/focus, reused
+// rather than inventing a second modulator shape. `?? 50` for the
+// identical reason those use it: an unmeasured driver is neutral, not
+// penalised, and every NPC generated after this trait exists gets a
+// real value anyway. A modulator, not a gate — nobody is refused a
+// vehicle's base pace for being an unmeasured or below-average driver,
+// the same posture every other modulator in this engine takes.
+const DRIVING_MODULATOR_FLOOR = 0.75;
+const DRIVING_MODULATOR_SPAN = 200;
+function drivingModulatorFor(worldState, entityId) {
+  const driving = Number(salvage.skillOf(worldState, entityId, 'Driving') ?? 50);
+  return DRIVING_MODULATOR_FLOOR + driving / DRIVING_MODULATOR_SPAN;
+}
+
 // The real km/day a specific held vehicle can cover right now, scaled
-// by its own real inventory condition. Null when the entity does not
+// by its own real inventory condition and the real driver's own real
+// Driving skill (task #127) — the one ALREADY-REAL argument to this
+// function, `entityId`, doubling as the driver, since that is also
+// whoever the vehicle is held by. Null when the entity does not
 // really hold one.
 function kmPerDayFor(worldState, entityId, type) {
   assertVehicleType(type, 'kmPerDayFor');
   const holding = inventory.findHolding(worldState, Number(entityId), type);
   if (!holding || Number(holding.quantity) <= 0) return null;
   const conditionFactor = Math.max(0, Math.min(100, Number(holding.condition))) / 100;
-  return KM_PER_DAY_BY_TYPE[type] * conditionFactor;
+  return KM_PER_DAY_BY_TYPE[type] * conditionFactor * drivingModulatorFor(worldState, entityId);
 }
 
 function currentHolderOf(worldState, type, entityId) {
@@ -340,7 +381,10 @@ module.exports = {
   LEGACY_TECHNIQUE_PENALTY,
   RESTORATION_CONDITION_GAIN,
   WEAR_PER_TRAVEL_DAY,
+  DRIVING_MODULATOR_FLOOR,
+  DRIVING_MODULATOR_SPAN,
   registerFuelItem,
+  drivingModulatorFor,
   kmPerDayFor,
   currentHolderOf,
   applyDailyWear,

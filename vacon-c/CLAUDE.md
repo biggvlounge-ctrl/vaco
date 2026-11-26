@@ -10866,3 +10866,66 @@ value moved from `3.90625` to `4.8828125` (2 × 1.25⁴) — the `worker()`
 fixture sets every trait family, `behavioral.Discipline` included, to
 the same value, so adding the fourth modulator changes that one
 specific fixture's arithmetic, not the mechanism.
+
+**A hundred-and-ninetieth, closing task #127 — a real Driving skill,
+checked against every spec document before being added, with a real
+reader the same day.** No document in this repo
+(`VACANCY_TRAIT_DATABASE_ATTACHMENT.md`,
+`VACANCY_CONSOLIDATED_MASTER_SPEC.md`,
+`VACANCY_MASTER_SESSION_INDEX.md`) names a driving-related trait
+anywhere — `vehicles.js`'s own header comment calling out a missing
+km/day figure is about PACE, never about a skill, so this was
+genuinely absent rather than mis-filed. `skills.Driving` joins
+`traits.js`'s existing 16-entry `skills` family as a 17th entry (123rd
+individual trait overall), the identical shape the `efficiency` family
+already took: a real, named gap this sheet never covered, added here
+rather than left absent.
+
+**The real reader is the one place a driver's own competence could
+already change a real outcome and never did.** `vehicles.kmPerDayFor`
+already scaled a held vehicle's rated km/day by its own real inventory
+`condition` — but its `entityId` argument is already the DRIVER (the
+holder), and the driver's own skill never entered the computation.
+`drivingModulatorFor` closes it, reading `skills.Driving` live through
+`salvage.skillOf` (itself already `getLiveEntity`-backed, standing
+rule 9) and applying the SAME `0.75 + x/200` neutral-at-50 band
+`economy.productivityOf` already established for
+Discipline/efficiency/health/focus — reused rather than inventing a
+second modulator shape for an adjacent concept. A modulator, never a
+gate: an unmeasured or below-average driver still gets the vehicle
+moving, just not as fast, the same posture every other modulator in
+this engine takes.
+
+**Measured before adding, the same discipline the hundred-and-eighty-
+seventh standing rule's `CREW_BY_CATEGORY` completeness check already
+used.** `gifts.SUPPORT` maps every one of the 16 pre-existing skills
+to a real set of supporting traits, and `test/gifts.test.js`'s own
+exact-length assertion against `TRAIT_FAMILIES.skills` would have
+failed the moment Driving joined that family with no entry of its
+own — caught by running the suite, not foreseen first. `Driving`'s own
+entry (Reflexes, Vision Acuity, Risk Assessment, Coordination) draws
+on reaction time and hazard judgment rather than reusing Combat's or
+Crafting's own lists verbatim.
+
+**Two pre-existing tests asserted an exact, unmodulated km/day figure
+against a REAL fixture, and both had to be read back rather than
+patched with a guessed number.** `test/vehicles.test.js`'s own
+`mechanic()` fixture sets every individual trait (Driving included) to
+80 via `traitValueFor`, so its existing `kmPerDayFor` assertions were
+quietly asserting the OLD, unmodulated figure the moment this
+modulator existed — fixed by computing the real `drivingModulatorFor`
+value (1.15) and multiplying by it, rather than hand-deriving 1.15 and
+risking the same arithmetic slip task #107's own `3.90625` fix was
+written to avoid repeating. `test/travel.test.js`'s own vehicle-
+journey test uses a REAL, seeded `worldgen.generateWorld()` leader
+whose `Driving` value cannot be predicted by hand at all — fixed by
+reading `vehicles.drivingModulatorFor(w, leader.id)` back from the
+real world and folding it into the expected figure, rather than
+hardcoding a number that would only be right for one seed by luck.
+
+A new dedicated test (`test/vehicles.test.js`) asserts the same shape
+task #107's discipline test established: an average (50, or
+unmeasured) driver gets the vehicle's unmodified rated pace, and a
+skilled (100) driver measurably out-paces an unskilled (0) one in the
+identical vehicle, bounded at exactly the 0.75/1.25 floor and ceiling
+the band promises.

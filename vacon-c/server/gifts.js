@@ -197,6 +197,19 @@ const SUPPORT = {
     ['leadership', 'Delegation'], ['leadership', 'Strategic Vision'],
     ['behavioral', 'Discipline'], ['social', 'Group Loyalty'], ['mental', 'Risk Assessment'],
   ],
+  // Task #127's new `skills.Driving` — measured before adding: every
+  // one of the 16 pre-existing skills already has a support entry, so
+  // a 17th skill with none would be the eleventh standing rule's own
+  // shape, a trait in the vocabulary and unreachable by this
+  // mechanism. Reaction time and hazard judgment, not raw strength or
+  // learned trivia, so this draws from Reflexes/Vision Acuity
+  // (physical reaction), Risk Assessment (mental judgment) and
+  // Coordination (sports) rather than reusing Combat's or Crafting's
+  // own lists verbatim.
+  Driving: [
+    ['physical', 'Reflexes'], ['physical', 'Vision Acuity'],
+    ['mental', 'Risk Assessment'], ['sports', 'Coordination'],
+  ],
 };
 
 const SKILL_NAMES = Object.keys(SUPPORT);

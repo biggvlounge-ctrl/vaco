@@ -2623,6 +2623,24 @@ New test: an ordinary (50) person is unaffected, a hardworking (100)
 worker out-produces a lazy (0) one, bounded at the 0.75/1.25 band. See
 CLAUDE.md's hundred-and-eighty-ninth standing rule.
 
+### Real Driving skill, modulating real vehicle pace (closes task #127)
+No spec document in this repo names a driving-related trait anywhere,
+so `skills.Driving` is a genuinely new, 17th skill (123rd individual
+trait), added the same shape `efficiency` already was. The real reader
+is `vehicles.kmPerDayFor`, whose `entityId` argument is already the
+vehicle's driver: `drivingModulatorFor` reads `skills.Driving` live
+and applies the same `0.75 + x/200` neutral-at-50 band
+`economy.productivityOf` already uses for Discipline/efficiency/
+health/focus — a modulator, never a gate. `gifts.SUPPORT.Driving`
+(Reflexes/Vision Acuity/Risk Assessment/Coordination) closes the
+"every skill can be a gift" completeness check `test/gifts.test.js`
+already holds. Two pre-existing tests that asserted an exact,
+unmodulated km/day figure against a real fixture/real generated leader
+now read the real modulator value back rather than hardcode a guess;
+a new test asserts the same average-unaffected/skilled-beats-unskilled
+shape task #107 established for Discipline. See CLAUDE.md's
+hundred-and-ninetieth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a
