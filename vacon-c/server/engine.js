@@ -96,6 +96,7 @@ const contest = require('./contest.js');
 const control = require('./control.js');
 const savedLocations = require('./savedLocations.js');
 const extortion = require('./extortion.js');
+const businesses = require('./businesses.js');
 const meetings = require('./meetings.js');
 const landmarks = require('./landmarks.js');
 const salvage = require('./salvage.js');
@@ -885,6 +886,20 @@ function applyHold(holderId, options = {}) {
   return contest.resolveHold(WorldState, { ...options, holderId });
 }
 
+// Task #128: the real player-facing half of businesses.js's own
+// mechanism. `businesses.runBusinessFormation` is a world-tick
+// generator -- a real working-age person with enough real savings
+// should be able to found a business RIGHT NOW rather than only ever
+// waiting on `FOUNDING_CHANCE_PER_TICK`'s own random draw. Reuses
+// the exact real mechanism, including its own real refusal (not
+// enough savings) -- never a looser gate for the player path.
+// `generateOrganization` is this same module's own function, the
+// identical injection seam `tick.js`'s own `runBusinessFormation`
+// call already uses to avoid businesses.js requiring engine.js back.
+function foundBusiness(founderId, options = {}) {
+  return businesses.foundBusiness(WorldState, { ...options, founderId, generateOrganization });
+}
+
 // Task #130: the real player-facing half of extortion.js's own
 // mechanism. The actor's own real LEADERSHIP of the demanding
 // organization is checked here, not just passed through — the same
@@ -1378,6 +1393,7 @@ const ACTION_VERBS = {
   captureEntity: (...args) => captureEntity(...args),
   disposeOfCapture: (...args) => disposeOfCapture(...args),
   demandTribute: (...args) => demandTribute(...args),
+  foundBusiness: (...args) => foundBusiness(...args),
   assignRole: (...args) => assignRole(...args),
   sendSpy: (...args) => sendSpy(...args),
   attemptHeist: (...args) => attemptHeist(...args),

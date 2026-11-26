@@ -2520,6 +2520,21 @@ New `['citizen','leader']` verb: `demand-tribute`. 18 tests extended
 in `test/extortion.test.js`, 5 new in `test/missionVariety.test.js`.
 See CLAUDE.md's hundred-and-eighty-first standing rule.
 
+### Real found-business player verb (closes task #128)
+`businesses.js#foundBusiness` already existed as a real, callable
+function — real startup capital out of the founder's own real
+savings, their own first real job at the new organization — but had
+no player-facing route. `engine.js#foundBusiness` is a thin wrapper
+injecting `generateOrganization` through the same seam `businesses
+.js#runBusinessFormation`'s own `tick.js` caller already uses, to
+avoid a require cycle. `offerBusinessMission` is the tenth
+`missionVariety.js` wrapper, reading the IDENTICAL real precondition
+`businesses.foundBusiness` itself re-checks (working age, not
+imprisoned, real savings covering `economy.goingWage`-derived startup
+capital) — mutation-verified across all three gates. New
+`['citizen','leader']` verb: `found-business`. 5 new tests in
+`test/missionVariety.test.js`. See CLAUDE.md's
+hundred-and-eighty-second standing rule.
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

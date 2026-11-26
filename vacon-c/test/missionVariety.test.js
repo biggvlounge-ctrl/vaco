@@ -17,6 +17,7 @@ const salvage = require('../server/salvage.js');
 const camps = require('../server/camps.js');
 const travel = require('../server/travel.js');
 const missionVariety = require('../server/missionVariety.js');
+const businesses = require('../server/businesses.js');
 
 const YEAR = 365;
 
@@ -672,3 +673,113 @@ test('offerExtortionMission returns null when the held community has no real ext
   assert.equal(missionVariety.offerExtortionMission(w, 1), null);
 });
 
+// ---------------------------------------------------------------------
+// Task #128 -- the tenth offer*Mission, closing the business verb gap
+// this file's own header named alongside the extortion one. A
+// hand-built, isolated world again, for the same reason: `economy
+// .goingWage` reads EVERY active employment record in the whole
+// world, and the shared `engine.WorldState` accumulates them across
+// every earlier test in this file.
+// ---------------------------------------------------------------------
+
+function businessMissionWorld(tick = 10000) {
+  return {
+    tick,
+    npcs: [],
+    organizations: [],
+    properties: [],
+    communities: [],
+    cities: [],
+    employmentRecords: [],
+    individualFinances: [],
+    missions: [],
+  };
+}
+
+function businessMissionPerson(w, { id, communityId, savings = 0, createdTick }) {
+  w.npcs.push({ id, status: 'active', communityId, createdTick });
+  economy.generateIndividualFinances(w, id, { savings, tick: w.tick });
+}
+
+// A real going wage for `economy.goingWage` to read -- one other real
+// organization with one real employee, the identical minimal shape
+// `test/businesses.test.js`'s own `foundBusiness` tests already use.
+function businessMissionGoingWage(w, wage) {
+  w.organizations.push({ id: 9000, type: 'business', assets: 0, income: 0, expenses: 0 });
+  businessMissionPerson(w, { id: 9001, communityId: null, createdTick: w.tick - 10000 });
+  w.employmentRecords.push({
+    id: 9000, entity_id: 9001, employer_organization_id: 9000, wage, status: 'active', position: null,
+  });
+}
+
+const BUSINESS_WORKING_AGE_CREATED_TICK = (tick) => tick - Math.round((economy.WORKING_AGE + 5) * 365);
+
+test('offerBusinessMission points at founding a real business for a real citizen with real savings to cover it', () => {
+  const w = businessMissionWorld();
+  businessMissionGoingWage(w, 50);
+  w.communities.push({ id: 10, city_id: 100 });
+  w.cities.push({ id: 100 });
+  w.properties.push({ id: 1000, community_id: 10 });
+  const capital = 50 * businesses.STARTUP_CAPITAL_WAGE_MULTIPLE;
+  businessMissionPerson(w, {
+    id: 1, communityId: 10, savings: capital + 1000, createdTick: BUSINESS_WORKING_AGE_CREATED_TICK(w.tick),
+  });
+
+  const result = missionVariety.offerBusinessMission(w, 1);
+  assert.ok(result, 'a real eligible citizen with real covering savings returned null');
+  assert.equal(result.capital, capital);
+  assert.match(result.mission.objective, /Found a real business/);
+});
+
+test('offerBusinessMission returns null without enough real savings to cover the real startup capital', () => {
+  const w = businessMissionWorld();
+  businessMissionGoingWage(w, 50);
+  w.communities.push({ id: 10, city_id: 100 });
+  w.cities.push({ id: 100 });
+  w.properties.push({ id: 1000, community_id: 10 });
+  businessMissionPerson(w, {
+    id: 1, communityId: 10, savings: 10, createdTick: BUSINESS_WORKING_AGE_CREATED_TICK(w.tick),
+  });
+
+  assert.equal(missionVariety.offerBusinessMission(w, 1), null);
+});
+
+test('offerBusinessMission returns null for a real citizen under working age, however rich', () => {
+  const w = businessMissionWorld();
+  businessMissionGoingWage(w, 50);
+  w.communities.push({ id: 10, city_id: 100 });
+  w.cities.push({ id: 100 });
+  w.properties.push({ id: 1000, community_id: 10 });
+  // A real 5-year-old, well under economy.WORKING_AGE (16).
+  businessMissionPerson(w, {
+    id: 1, communityId: 10, savings: 1000000, createdTick: w.tick - Math.round(5 * 365),
+  });
+
+  assert.equal(missionVariety.offerBusinessMission(w, 1), null);
+});
+
+test('offerBusinessMission returns null for an imprisoned citizen, however rich and however old', () => {
+  const w = businessMissionWorld();
+  businessMissionGoingWage(w, 50);
+  w.communities.push({ id: 10, city_id: 100 });
+  w.cities.push({ id: 100 });
+  w.properties.push({ id: 1000, community_id: 10 });
+  businessMissionPerson(w, {
+    id: 1, communityId: 10, savings: 1000000, createdTick: BUSINESS_WORKING_AGE_CREATED_TICK(w.tick),
+  });
+  w.npcs.find((n) => n.id === 1).status = 'imprisoned';
+
+  assert.equal(missionVariety.offerBusinessMission(w, 1), null);
+});
+
+test('offerBusinessMission returns null with no real going wage anywhere (no labour market yet)', () => {
+  const w = businessMissionWorld();
+  w.communities.push({ id: 10, city_id: 100 });
+  w.cities.push({ id: 100 });
+  w.properties.push({ id: 1000, community_id: 10 });
+  businessMissionPerson(w, {
+    id: 1, communityId: 10, savings: 1000000, createdTick: BUSINESS_WORKING_AGE_CREATED_TICK(w.tick),
+  });
+
+  assert.equal(missionVariety.offerBusinessMission(w, 1), null);
+});

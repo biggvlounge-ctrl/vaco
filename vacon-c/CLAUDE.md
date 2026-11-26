@@ -10495,3 +10495,51 @@ checks: the governed-regime gate and the real-holder gate, both
 re-verified against `demandTribute` specifically, not only against
 `runExtortion`), 5 new in `test/missionVariety.test.js`. New
 `['citizen','leader']` verb: `demand-tribute`.
+
+**A hundred-and-eighty-second, closing task #128 and the same task
+#118 backlog note the hundred-and-eighty-first rule just closed one
+third of** ("business/drug/extortion split out as their own
+real-verb gaps"). `businesses.js#foundBusiness` — a real founder, real
+startup capital moved out of their own real savings, their own first
+real job at the new organization — already existed as a real,
+callable function; what was missing was the player-facing half, the
+identical gap `extortion.js` had.
+
+**`engine.js#foundBusiness` is a thin wrapper, not a new mechanism,**
+injecting `generateOrganization` the same way `businesses.js#run
+BusinessFormation`'s own `tick.js` caller already does — the real
+seam that avoids `businesses.js` requiring `engine.js` back, the same
+one `missions.js#resolveMission`'s own `payReward`/`orgArchetypes
+.found` already use. No new authority check was needed here the way
+`demandTribute` needed one: `foundBusiness` acts on the founder's own
+account, never someone else's organization, so the fourth standing
+Phase-3 rule ("a player acts as themselves") is already satisfied by
+the body never naming anyone but the real actor.
+
+**`offerBusinessMission` is the tenth `missionVariety.js` wrapper,
+same build-the-verb-then-wrap-it shape task #130's extortion mission
+and task #133's hunting mission already took — except here the real
+verb (`foundBusiness`) was already built, so this round is wrapping
+only.** Reads the IDENTICAL real precondition `businesses.found
+Business` itself re-checks — working age (`economy.WORKING_AGE`), not
+imprisoned, real savings at or above `economy.goingWage`-derived
+startup capital (`businesses.STARTUP_CAPITAL_WAGE_MULTIPLE`) — rather
+than inventing a second, looser gate. Mutation-verified three times:
+the age gate, the imprisoned gate, and the savings gate each isolate
+to exactly one test failure when disabled, confirmed, then restored.
+
+**One age-arithmetic mistake caught before it shipped, not after,
+worth naming because it is this project's own age-arithmetic rule
+(the twenty-fourth and others) found again in a fixture rather than
+in the engine.** The first "under working age" test used
+`createdTick: 0` at `tick: 10000` — with a tick as a day, that is
+roughly 27.4 years old, not a newborn. Fixed to
+`createdTick: w.tick - Math.round(5 * 365)`, a genuine 5-year-old.
+
+New `['citizen','leader']` verb: `found-business`. 5 new tests in
+`test/missionVariety.test.js`; `businesses.js` itself needed no new
+test, since `foundBusiness` was already covered by `test/businesses
+.test.js` before this round. `demandTribute`/`foundBusiness` are both
+`ACTION_VERBS`-only, same posture `captureEntity`/`disposeOfCapture`
+already hold — no dedicated engine-level wrapper test, confirmed by
+hand instead.

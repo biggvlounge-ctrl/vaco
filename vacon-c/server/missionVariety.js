@@ -55,6 +55,7 @@ const camps = require('./camps.js');
 const control = require('./control.js');
 const authority = require('./authority.js');
 const extortion = require('./extortion.js');
+const businesses = require('./businesses.js');
 
 const MISSION_RECRUIT_REWARD = 40;
 const MISSION_ALLIANCE_REWARD = 40;
@@ -65,6 +66,7 @@ const MISSION_TRAVEL_REWARD = 40;
 const MISSION_NOMADIC_REWARD = 40;
 const MISSION_EXPANSION_REWARD = 40;
 const MISSION_EXTORTION_REWARD = 40;
+const MISSION_BUSINESS_REWARD = 40;
 
 function communityAnchor(worldState, communityId) {
   return (worldState.properties || []).find((p) => p.community_id === communityId) ?? null;
@@ -580,6 +582,49 @@ function offerExtortionMission(worldState, npcId, options = {}) {
   return null;
 }
 
+// **Task #128, closing the business verb gap this file's own header
+// named when business/drug/extortion were split out of task #118.**
+// Same shape task #130 already used for extortion: build the missing
+// real verb first (`engine.js`'s own `foundBusiness`, wired to
+// `businesses.foundBusiness`), then wrap it.
+//
+// Reads the IDENTICAL real precondition `businesses.foundBusiness`
+// itself re-checks — a real working-age citizen with real savings at
+// or above the real startup capital `economy.goingWage` implies right
+// now — so this never offers a mission the real verb would then
+// refuse. Does not check `eligibleFounders`' age/imprisoned gate a
+// second time with invented logic; it is read directly below instead.
+function offerBusinessMission(worldState, npcId, options = {}) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`offerBusinessMission: no NPC ${npcId}`);
+  if (npc.communityId == null) return null;
+  if (npc.status === 'imprisoned') return null;
+
+  const tick = options.tick ?? worldState.tick ?? 0;
+  const age = (tick - (npc.createdTick ?? 0)) / 365;
+  if (age < economy.WORKING_AGE) return null;
+
+  const wage = economy.goingWage(worldState, null);
+  if (wage === null) return null;
+  const capital = Math.round(wage * businesses.STARTUP_CAPITAL_WAGE_MULTIPLE);
+  const finances = economy.getLatestFinances(worldState, npcId);
+  const savings = Number(finances?.savings ?? 0);
+  if (!(capital > 0) || savings < capital) return null;
+
+  const anchor = options.anchorPropertyId != null
+    ? (worldState.properties || []).find((p) => p.id === options.anchorPropertyId)
+    : communityAnchor(worldState, npc.communityId);
+  if (!anchor) return null;
+
+  const mission = missions.generateMission(worldState, {
+    locationId: anchor.id,
+    objective: 'Found a real business — your own real savings genuinely cover the real '
+      + `startup capital this requires (${capital})`,
+    reward: options.reward ?? MISSION_BUSINESS_REWARD,
+  });
+  return { mission, capital };
+}
+
 module.exports = {
   MISSION_RECRUIT_REWARD,
   MISSION_ALLIANCE_REWARD,
@@ -590,6 +635,7 @@ module.exports = {
   MISSION_NOMADIC_REWARD,
   MISSION_EXPANSION_REWARD,
   MISSION_EXTORTION_REWARD,
+  MISSION_BUSINESS_REWARD,
   offerRecruitMission,
   offerAllianceMission,
   offerSpyMission,
@@ -599,4 +645,5 @@ module.exports = {
   offerNomadicMission,
   offerExpansionMission,
   offerExtortionMission,
+  offerBusinessMission,
 };

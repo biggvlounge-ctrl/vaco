@@ -482,6 +482,15 @@ const ACTIONS = {
     }),
   },
 
+  'found-business': {
+    summary: 'Found a real business -- real startup capital moved from your own real savings, '
+      + 'your own first real job at it, quitting any existing job to do it.',
+    modes: ['citizen', 'leader'],
+    requires: ['name'],
+    verbs: ['foundBusiness'],
+    run: (verbs, actorId, body) => verbs.foundBusiness(actorId, { name: body.name }),
+  },
+
   'demand-tribute': {
     summary: 'Demand tribute from a real, specific business your own organization genuinely holds '
       + 'ground over -- right now, rather than waiting on the random per-tick sweep.',
