@@ -53,6 +53,8 @@ const geo = require('./geo.js');
 const nomadic = require('./nomadic.js');
 const camps = require('./camps.js');
 const control = require('./control.js');
+const authority = require('./authority.js');
+const extortion = require('./extortion.js');
 
 const MISSION_RECRUIT_REWARD = 40;
 const MISSION_ALLIANCE_REWARD = 40;
@@ -62,6 +64,7 @@ const MISSION_HUNT_REWARD = 40;
 const MISSION_TRAVEL_REWARD = 40;
 const MISSION_NOMADIC_REWARD = 40;
 const MISSION_EXPANSION_REWARD = 40;
+const MISSION_EXTORTION_REWARD = 40;
 
 function communityAnchor(worldState, communityId) {
   return (worldState.properties || []).find((p) => p.community_id === communityId) ?? null;
@@ -529,6 +532,54 @@ function offerExpansionMission(worldState, npcId, options = {}) {
   };
 }
 
+// **Task #130, closing the extortion verb gap this file's own header
+// named when business/drug/extortion were split out of task #118.**
+// Same shape task #133 already used for hunting: build the missing
+// real verb first (`extortion.demandTribute`), then wrap it.
+//
+// Requires the npc to actually LEAD a real organization — membership
+// alone (`ownOrganizationIdOf`) is not enough, because
+// `demandTribute`'s own real authority check requires leadership too,
+// and offering a mission a player could never actually resolve would
+// be a mission about nothing. Scans every real community this led
+// organization genuinely holds (`authority.holderOf`, never
+// `governed`) for a real other organization operating a property
+// there with positive real assets — the identical real precondition
+// `demandTribute` itself re-checks, read here rather than duplicated.
+function offerExtortionMission(worldState, npcId, options = {}) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`offerExtortionMission: no NPC ${npcId}`);
+
+  const ledOrg = (worldState.organizations || []).find((o) => o.leader_id === npcId);
+  if (!ledOrg) return null;
+
+  for (const community of (worldState.communities || [])) {
+    const writ = authority.writOf(worldState, community.id);
+    if (writ.regime === 'governed') continue;
+    if (authority.holderOf(worldState, community.id) !== ledOrg.id) continue;
+
+    const target = extortion.operatingBusinessesIn(worldState, community.id, ledOrg.id)
+      .find((org) => (Number(org.assets) || 0) > 0);
+    if (!target) continue;
+
+    const anchor = options.anchorPropertyId != null
+      ? (worldState.properties || []).find((p) => p.id === options.anchorPropertyId)
+      : communityAnchor(worldState, community.id);
+    if (!anchor) continue;
+
+    const mission = missions.generateMission(worldState, {
+      locationId: anchor.id,
+      objective: `Demand tribute from organization ${target.id} — your own organization `
+        + `${ledOrg.id} genuinely holds this ground`,
+      reward: options.reward ?? MISSION_EXTORTION_REWARD,
+    });
+    return {
+      mission, targetOrganizationId: target.id, factionOrganizationId: ledOrg.id, communityId: community.id,
+    };
+  }
+  return null;
+}
+
 module.exports = {
   MISSION_RECRUIT_REWARD,
   MISSION_ALLIANCE_REWARD,
@@ -538,6 +589,7 @@ module.exports = {
   MISSION_TRAVEL_REWARD,
   MISSION_NOMADIC_REWARD,
   MISSION_EXPANSION_REWARD,
+  MISSION_EXTORTION_REWARD,
   offerRecruitMission,
   offerAllianceMission,
   offerSpyMission,
@@ -546,4 +598,5 @@ module.exports = {
   offerTravelMission,
   offerNomadicMission,
   offerExpansionMission,
+  offerExtortionMission,
 };

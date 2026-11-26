@@ -549,3 +549,126 @@ test('offerExpansionMission returns null for a world with only the organization\
 
   assert.equal(missionVariety.offerExpansionMission(w, 1), null);
 });
+
+// ---------------------------------------------------------------------
+// Task #130 -- the ninth offer*Mission, closing the extortion verb gap
+// this file's own header named when business/drug/extortion were split
+// out of task #118. Same hand-built-isolated-world reasoning as
+// `offerExpansionMission` above: `authority.writOf`/`holderOf` read
+// REAL territory blocks and infrastructure, and the shared
+// `engine.WorldState` accumulates both across every earlier test in
+// this file.
+// ---------------------------------------------------------------------
+
+const { ORGANIZATION_DEFINITIONS } = require('../server/traitDefinitions.js');
+const { generateEntityTraits } = require('../server/entityTraits.js');
+
+function extortionWorld(tick = 10000) {
+  return {
+    tick,
+    npcs: [],
+    entityOrganizationMemberships: [],
+    organizations: [],
+    properties: [],
+    communities: [],
+    cities: [],
+    territoryBlocks: [],
+    infrastructure: [],
+    entityTraits: [],
+    missions: [],
+  };
+}
+
+// A real organization with real, live `organization` traits —
+// `authority.holderOf` reads `territory`/`power` through
+// `getLiveEntity`, never a static field, the identical real
+// substrate `test/extortion.test.js`'s own `organization()` helper
+// already builds.
+function extortionOrg(w, { id, leaderId = null }) {
+  const org = { id, type: 'business', leader_id: leaderId };
+  w.organizations.push(org);
+  w.entityTraits.push(...generateEntityTraits(id, w.tick, ORGANIZATION_DEFINITIONS, () => 50));
+  return org;
+}
+
+// A real, fortified territory block this faction holds, with no real
+// `public_safety` infrastructure at all — the honest `contested`/
+// `lawless` substrate `test/extortion.test.js`'s own `heldCommunity`
+// helper already establishes, built again here rather than required
+// across test files.
+function extortionHeldCommunity(w, factionId, { communityId, cityId }) {
+  w.cities.push({ id: cityId });
+  w.communities.push({ id: communityId, city_id: cityId });
+  w.infrastructure.push({
+    id: communityId * 10, city_id: cityId, type: 'public_safety', capacity: 1, condition: 0, maintenance_level: 0, age: 0,
+  });
+  w.territoryBlocks.push({
+    id: communityId * 10 + 1, community_id: communityId, faction_id: factionId, status: 'fortified',
+  });
+}
+
+function extortionTargetProperty(w, { id, communityId, operatingOrganizationId }) {
+  w.properties.push({ id, community_id: communityId, operating_organization_id: operatingOrganizationId, condition: 80 });
+}
+
+test('offerExtortionMission points at a real target business in a real community the npc\'s own organization genuinely holds', () => {
+  const w = extortionWorld();
+  w.npcs.push({ id: 1, status: 'alive' });
+  const faction = extortionOrg(w, { id: 500, leaderId: 1 });
+  extortionHeldCommunity(w, faction.id, { communityId: 10, cityId: 100 });
+  const target = extortionOrg(w, { id: 600 });
+  target.assets = 1000;
+  extortionTargetProperty(w, { id: 1000, communityId: 10, operatingOrganizationId: target.id });
+
+  const result = missionVariety.offerExtortionMission(w, 1);
+  assert.ok(result, 'a real leader with a real held community and a real target returned null');
+  assert.equal(result.targetOrganizationId, target.id);
+  assert.equal(result.factionOrganizationId, faction.id);
+  assert.equal(result.communityId, 10);
+  assert.match(result.mission.objective, /Demand tribute/);
+});
+
+test('offerExtortionMission returns null for an npc who is a real MEMBER but not the real LEADER of an organization', () => {
+  // Membership alone (`ownOrganizationIdOf`) is not enough here --
+  // `demandTribute`'s own real authority check requires leadership,
+  // and offering a mission a player could never actually resolve
+  // would be a mission about nothing, this file's own standing rule.
+  const w = extortionWorld();
+  w.npcs.push({ id: 1, status: 'alive' });
+  const faction = extortionOrg(w, { id: 500, leaderId: 2 });
+  w.entityOrganizationMemberships.push({ id: 1, entity_id: 1, organization_id: 500, status: 'active' });
+  extortionHeldCommunity(w, faction.id, { communityId: 10, cityId: 100 });
+  const target = extortionOrg(w, { id: 600 });
+  target.assets = 1000;
+  extortionTargetProperty(w, { id: 1000, communityId: 10, operatingOrganizationId: target.id });
+
+  assert.equal(missionVariety.offerExtortionMission(w, 1), null);
+});
+
+test('offerExtortionMission returns null when the npc\'s organization holds no real ground anywhere', () => {
+  const w = extortionWorld();
+  w.npcs.push({ id: 1, status: 'alive' });
+  extortionOrg(w, { id: 500, leaderId: 1 });
+  w.communities.push({ id: 10, city_id: 100 });
+  w.cities.push({ id: 100 });
+  const target = extortionOrg(w, { id: 600 });
+  target.assets = 1000;
+  extortionTargetProperty(w, { id: 1000, communityId: 10, operatingOrganizationId: target.id });
+
+  assert.equal(missionVariety.offerExtortionMission(w, 1), null);
+});
+
+test('offerExtortionMission returns null when the held community has no real extortable target', () => {
+  const w = extortionWorld();
+  w.npcs.push({ id: 1, status: 'alive' });
+  const faction = extortionOrg(w, { id: 500, leaderId: 1 });
+  extortionHeldCommunity(w, faction.id, { communityId: 10, cityId: 100 });
+  // A real target with zero assets -- extortion.operatingBusinessesIn
+  // finds it, but nothing real to demand.
+  const target = extortionOrg(w, { id: 600 });
+  target.assets = 0;
+  extortionTargetProperty(w, { id: 1000, communityId: 10, operatingOrganizationId: target.id });
+
+  assert.equal(missionVariety.offerExtortionMission(w, 1), null);
+});
+

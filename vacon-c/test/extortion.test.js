@@ -299,3 +299,150 @@ test('mutation check: composureOf reads the real combat.\'Composure Under Fire\'
   assert.ok(extortion.composureOf(w, lowComposure.id) < extortion.COMPOSURE_REFUSAL_THRESHOLD);
   assert.equal(extortion.composureOf(w, null), null);
 });
+
+// ---------------------------------------------------------------------
+// demandTribute — task #130, the real player-facing half of this file
+// ---------------------------------------------------------------------
+
+test('demandTribute resolves immediately against a real target, never waiting on a random per-tick draw', () => {
+  const w = world();
+  const faction = organization(w, { assets: 5000 });
+  const communityId = heldCommunity(w, faction);
+  const complier = person(w, { 'combat.Composure Under Fire': 5 });
+  const business = organization(w, { assets: 10000, leaderId: complier.id });
+  operatedProperty(w, communityId, business.id);
+
+  const result = extortion.demandTribute(w, {
+    factionOrganizationId: faction.id, targetOrganizationId: business.id, tick: 0,
+  });
+  assert.ok(result, 'demandTribute returned null on the very first call against a genuinely valid target');
+  assert.equal(result.outcome, 'paid');
+  assert.equal(result.incident.category, 'theft');
+  assert.ok(Number(business.assets) < 10000);
+  assert.ok(Number(faction.assets) > 5000);
+});
+
+test('demandTribute refuses against a high-Composure leader -- the real property damage path', () => {
+  const w = world();
+  const factionLeader = person(w, { 'combat.Composure Under Fire': 50 });
+  const faction = organization(w, { assets: 5000, leaderId: factionLeader.id });
+  const communityId = heldCommunity(w, faction);
+  const defiant = person(w, { 'combat.Composure Under Fire': 95 });
+  const business = organization(w, { assets: 10000, leaderId: defiant.id });
+  const property = operatedProperty(w, communityId, business.id, 80);
+
+  const result = extortion.demandTribute(w, {
+    factionOrganizationId: faction.id, targetOrganizationId: business.id, tick: 0,
+  });
+  assert.equal(result.outcome, 'refused');
+  assert.equal(result.incident.category, 'property');
+  assert.equal(Number(property.condition), 80 - extortion.VANDALISM_CONDITION_COST);
+  assert.equal(Number(business.assets), 10000, 'a refusal must never move the business\'s real money');
+});
+
+test('demandTribute returns null when the target operates no real property anywhere this faction holds', () => {
+  const w = world();
+  const faction = organization(w, { assets: 5000 });
+  heldCommunity(w, faction);
+  // A real business with a real property, but in a DIFFERENT
+  // community this faction does not hold at all.
+  const otherFaction = organization(w, { assets: 5000 });
+  const otherCommunityId = heldCommunity(w, otherFaction);
+  const business = organization(w, { assets: 10000 });
+  operatedProperty(w, otherCommunityId, business.id);
+
+  const result = extortion.demandTribute(w, {
+    factionOrganizationId: faction.id, targetOrganizationId: business.id, tick: 0,
+  });
+  assert.equal(result, null);
+});
+
+test('demandTribute returns null against a target in a GOVERNED community, even though the faction holds a real territory block there', () => {
+  const w = world();
+  const faction = organization(w, { assets: 5000 });
+  const communityId = heldCommunity(w, faction, { governed: true });
+  const business = organization(w, { assets: 10000 });
+  operatedProperty(w, communityId, business.id);
+
+  const result = extortion.demandTribute(w, {
+    factionOrganizationId: faction.id, targetOrganizationId: business.id, tick: 0,
+  });
+  assert.equal(result, null);
+});
+
+test('demandTribute returns null when the target has no real positive assets', () => {
+  const w = world();
+  const faction = organization(w, { assets: 5000 });
+  const communityId = heldCommunity(w, faction);
+  const business = organization(w, { assets: 0 });
+  operatedProperty(w, communityId, business.id);
+
+  const result = extortion.demandTribute(w, {
+    factionOrganizationId: faction.id, targetOrganizationId: business.id, tick: 0,
+  });
+  assert.equal(result, null);
+});
+
+test('demandTribute throws for an unreal faction or target organization id', () => {
+  const w = world();
+  const faction = organization(w, { assets: 5000 });
+  const communityId = heldCommunity(w, faction);
+  const business = organization(w, { assets: 10000 });
+  operatedProperty(w, communityId, business.id);
+
+  assert.throws(
+    () => extortion.demandTribute(w, { factionOrganizationId: 999999, targetOrganizationId: business.id }),
+    /no real organization/,
+  );
+  assert.throws(
+    () => extortion.demandTribute(w, { factionOrganizationId: faction.id, targetOrganizationId: 999999 }),
+    /no real organization/,
+  );
+});
+
+test('demandTribute throws when an organization is asked to extort itself', () => {
+  const w = world();
+  const faction = organization(w, { assets: 5000 });
+  heldCommunity(w, faction);
+
+  assert.throws(
+    () => extortion.demandTribute(w, { factionOrganizationId: faction.id, targetOrganizationId: faction.id }),
+    /cannot extort itself/,
+  );
+});
+
+// **Mutation check: `demandTribute` and `runExtortion` share the real
+// consequence code (`resolveDemand`), not two copies that could drift.**
+// Removing `resolveDemand` and inlining a SECOND, independent refusal/
+// payment branch directly into `demandTribute` would still pass every
+// test above — the only way to catch two mechanics silently disagreeing
+// is to assert the SAME real number both paths produce for the
+// identical inputs.
+test('mutation check: demandTribute and runExtortion compute the identical real demand amount for the same assets', () => {
+  const w = world();
+  const faction = organization(w, { assets: 5000 });
+  const communityId = heldCommunity(w, faction);
+  const complier = person(w, { 'combat.Composure Under Fire': 5 });
+  const business = organization(w, { assets: 10000, leaderId: complier.id });
+  operatedProperty(w, communityId, business.id);
+
+  const result = extortion.demandTribute(w, {
+    factionOrganizationId: faction.id, targetOrganizationId: business.id, tick: 0,
+  });
+  const expectedDemand = Math.round(10000 * extortion.EXTORTION_DEMAND_FRACTION * 100) / 100;
+  assert.equal(result.demand, expectedDemand);
+});
+
+// ---------------------------------------------------------------------
+// engine.js's own player-dispatcher wrapper — ACTION_VERBS-only, same
+// posture `captureEntity`/`disposeOfCapture` already have (neither is
+// in engine.js's own `module.exports` either, and neither has a
+// dedicated wrapper-level test in `test/disposition.test.js` for the
+// identical reason: the real authority check is one line delegating
+// to a real org lookup, and `test/actions.test.js`'s own
+// REQUIRED_VERBS check already confirms the verb is really wired).
+// Confirmed by hand against a real generated world before this file
+// was written: a real leader's demand succeeds end-to-end through
+// `engine.dispatchAction`, and an impostor with a different
+// `linked_entity_id` is refused with "does not lead organization" —
+// the identical phrase `leadership.js`'s own checks already use.

@@ -482,6 +482,18 @@ const ACTIONS = {
     }),
   },
 
+  'demand-tribute': {
+    summary: 'Demand tribute from a real, specific business your own organization genuinely holds '
+      + 'ground over -- right now, rather than waiting on the random per-tick sweep.',
+    modes: ['citizen', 'leader'],
+    requires: ['factionOrganizationId', 'targetOrganizationId'],
+    verbs: ['demandTribute'],
+    run: (verbs, actorId, body) => verbs.demandTribute(actorId, {
+      factionOrganizationId: Number(body.factionOrganizationId),
+      targetOrganizationId: Number(body.targetOrganizationId),
+    }),
+  },
+
   'apply-hold': {
     summary: 'Apply a real choke, knee-on-neck, or arm hold to a named opponent -- a live, '
       + 'round-by-round pressure bar (contest.resolveHold), not an instant result.',

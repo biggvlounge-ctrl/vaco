@@ -10449,3 +10449,49 @@ victim is at least as capturable as one merely `'defeated'`.
 follow `resolveContest`'s/`'enter-contest'`'s own identical wiring
 shape. 17 tests in `test/contest-hold.test.js`, 8 in `test/crime-
 force-level.test.js`.
+
+**A hundred-and-eighty-first, closing task #130 and the task #118
+backlog note it came from** ("business/drug/extortion split out as
+their own real-verb gaps"). `extortion.js#runExtortion` was always
+an automatic, unattended per-tick sweep — a real player holding real
+ground had no way to act on it directly, only to wait on a random
+draw.
+
+**The fix shares its real consequence code with the sweep rather than
+risking two mechanics quietly disagreeing.** `resolveDemand` is the
+one real refuse-or-pay branch (property damage + heat on refusal,
+asset transfer on payment, both already real) that `runExtortion`'s
+own loop body used to inline; it now calls the same function
+`extortion.demandTribute` does. The one real difference is
+deliberate: a player who chose to act does not also need to clear
+`EXTORTION_RATE`'s own random trigger, which exists only to pace the
+unattended sweep.
+
+**`demandTribute` re-enforces every real precondition the sweep's own
+loop already checks, never a looser gate for the player path** — not
+governed, the faction genuinely holds the target's own community
+(`authority.holderOf`), the target is a different real organization
+with real positive assets. `engine.js`'s own wrapper adds the fourth
+standing Phase-3 rule's real authority check: `organizations
+.leader_id !== actorId` — caught and fixed before it shipped that
+`leader_id == null` and `actorId == null` would otherwise compare
+equal and let an unassigned-leader organization be used by anyone
+with no linked entity at all, a real gap a hand-run smoke test
+surfaced rather than a formal test (the fix is the explicit `== null`
+guard alongside the identity check).
+
+**`offerExtortionMission` is the ninth `missionVariety.js` wrapper,
+same shape task #133's hunting verb already took: build the missing
+real verb first, then wrap it.** Requires the npc to actually LEAD a
+real organization — membership alone is not enough, because
+`demandTribute`'s own authority check requires leadership too, and a
+mission a player could never resolve would be a mission about
+nothing. Mutation-verified: swapping the leadership check for mere
+membership (`ownOrganizationIdOf`) made the "real member but not real
+leader" test fail, confirmed, then reverted.
+
+18 tests extended in `test/extortion.test.js` (two more mutation
+checks: the governed-regime gate and the real-holder gate, both
+re-verified against `demandTribute` specifically, not only against
+`runExtortion`), 5 new in `test/missionVariety.test.js`. New
+`['citizen','leader']` verb: `demand-tribute`.

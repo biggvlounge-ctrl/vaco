@@ -95,6 +95,7 @@ const flows = require('./flows.js');
 const contest = require('./contest.js');
 const control = require('./control.js');
 const savedLocations = require('./savedLocations.js');
+const extortion = require('./extortion.js');
 const meetings = require('./meetings.js');
 const landmarks = require('./landmarks.js');
 const salvage = require('./salvage.js');
@@ -884,6 +885,24 @@ function applyHold(holderId, options = {}) {
   return contest.resolveHold(WorldState, { ...options, holderId });
 }
 
+// Task #130: the real player-facing half of extortion.js's own
+// mechanism. The actor's own real LEADERSHIP of the demanding
+// organization is checked here, not just passed through — the same
+// fourth standing Phase-3 rule every other actor-performing verb
+// already holds, now against `organizations.leader_id` rather than
+// a player's own linked family/tribe.
+function demandTribute(actorId, options = {}) {
+  const factionOrg = (WorldState.organizations || [])
+    .find((o) => o.id === Number(options.factionOrganizationId));
+  if (!factionOrg) {
+    throw new Error(`demandTribute: no real organization ${options.factionOrganizationId}.`);
+  }
+  if (factionOrg.leader_id == null || factionOrg.leader_id !== actorId) {
+    throw new Error(`demandTribute: entity ${actorId} does not lead organization ${factionOrg.id}.`);
+  }
+  return extortion.demandTribute(WorldState, { ...options, factionOrganizationId: factionOrg.id });
+}
+
 function disposeOfCapture(capturedByEntityId, captureId, options = {}) {
   const record = disposition.capturesOf(WorldState, { capturedByEntityId })
     .find((c) => c.id === Number(captureId));
@@ -1358,6 +1377,7 @@ const ACTION_VERBS = {
   runPlay: (...args) => runPlay(...args),
   captureEntity: (...args) => captureEntity(...args),
   disposeOfCapture: (...args) => disposeOfCapture(...args),
+  demandTribute: (...args) => demandTribute(...args),
   assignRole: (...args) => assignRole(...args),
   sendSpy: (...args) => sendSpy(...args),
   attemptHeist: (...args) => attemptHeist(...args),

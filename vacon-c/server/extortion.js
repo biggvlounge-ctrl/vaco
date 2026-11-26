@@ -147,6 +147,53 @@ function propertyOperatedBy(worldState, communityId, organizationId) {
     && p.operating_organization_id === organizationId) || null;
 }
 
+// The one real decision an extortion demand resolves to, shared by
+// the automatic per-tick sweep (`runExtortion`) and the real
+// player-facing verb (`demandTribute`, task #130) below — refactored
+// out so the two can never quietly drift into two different
+// mechanics under the same name. See this file's own header for why
+// refusal damages the property and pays raises heat, rather than the
+// other way round.
+function resolveDemand(worldState, { community, factionOrg, org, tick }) {
+  const assets = Number(org.assets) || 0;
+  const demand = Math.round(assets * EXTORTION_DEMAND_FRACTION * 100) / 100;
+  if (demand <= 0) return null;
+
+  const composure = composureOf(worldState, org.leader_id);
+  const refuses = composure !== null && composure >= COMPOSURE_REFUSAL_THRESHOLD;
+
+  if (refuses) {
+    const target = propertyOperatedBy(worldState, community.id, org.id);
+    if (target) {
+      target.condition = Math.max(0, Number(target.condition ?? 0) - VANDALISM_CONDITION_COST);
+    }
+    heat.raiseHeat(worldState, { entityId: org.leader_id, factionOrganizationId: factionOrg.id });
+    const incident = crime.recordCrime(worldState, {
+      category: 'property',
+      perpetratorId: factionOrg.leader_id ?? null,
+      victimId: org.leader_id ?? null,
+      communityId: community.id,
+      tick,
+      detail: `organization ${factionOrg.id} vandalized property of organization ${org.id} `
+        + `after a refused extortion demand of ${demand}`,
+    });
+    return { outcome: 'refused', demand, incident };
+  }
+
+  org.assets = Math.round((assets - demand) * 100) / 100;
+  factionOrg.assets = Math.round(((Number(factionOrg.assets) || 0) + demand) * 100) / 100;
+  const incident = crime.recordCrime(worldState, {
+    category: 'theft',
+    perpetratorId: factionOrg.leader_id ?? null,
+    victimId: org.leader_id ?? null,
+    communityId: community.id,
+    tick,
+    detail: `organization ${org.id} paid ${demand} to organization ${factionOrg.id} `
+      + 'under an extortion demand',
+  });
+  return { outcome: 'paid', demand, incident };
+}
+
 function runExtortion(worldState, tick = worldState.tick ?? 0) {
   const incidents = [];
   for (const community of worldState.communities || []) {
@@ -168,43 +215,58 @@ function runExtortion(worldState, tick = worldState.tick ?? 0) {
       const draw = seededDraw([worldState.seed ?? 'world', 'extortion-demand', factionId, org.id, tick]);
       if (draw >= EXTORTION_RATE) continue;
 
-      const demand = Math.round(assets * EXTORTION_DEMAND_FRACTION * 100) / 100;
-      if (demand <= 0) continue;
-
-      const composure = composureOf(worldState, org.leader_id);
-      const refuses = composure !== null && composure >= COMPOSURE_REFUSAL_THRESHOLD;
-
-      if (refuses) {
-        const target = propertyOperatedBy(worldState, community.id, org.id);
-        if (target) {
-          target.condition = Math.max(0, Number(target.condition ?? 0) - VANDALISM_CONDITION_COST);
-        }
-        heat.raiseHeat(worldState, { entityId: org.leader_id, factionOrganizationId: factionId });
-        incidents.push(crime.recordCrime(worldState, {
-          category: 'property',
-          perpetratorId: factionOrg.leader_id ?? null,
-          victimId: org.leader_id ?? null,
-          communityId: community.id,
-          tick,
-          detail: `organization ${factionId} vandalized property of organization ${org.id} `
-            + `after a refused extortion demand of ${demand}`,
-        }));
-      } else {
-        org.assets = Math.round((assets - demand) * 100) / 100;
-        factionOrg.assets = Math.round(((Number(factionOrg.assets) || 0) + demand) * 100) / 100;
-        incidents.push(crime.recordCrime(worldState, {
-          category: 'theft',
-          perpetratorId: factionOrg.leader_id ?? null,
-          victimId: org.leader_id ?? null,
-          communityId: community.id,
-          tick,
-          detail: `organization ${org.id} paid ${demand} to organization ${factionId} `
-            + 'under an extortion demand',
-        }));
-      }
+      const result = resolveDemand(worldState, { community, factionOrg, org, tick });
+      if (result) incidents.push(result.incident);
     }
   }
   return incidents;
+}
+
+// Task #130 — the real player-facing half of this file's own
+// mechanism: a faction's own real leader chooses a specific real
+// target business to demand tribute from RIGHT NOW, rather than only
+// ever waiting on `runExtortion`'s own random per-tick draw. Every
+// real precondition that loop already enforces is enforced here too
+// — never a second, looser gate for the player path. The one
+// difference is deliberate: a player who chose to act does not need
+// to also clear `EXTORTION_RATE`'s own random trigger, which exists
+// only to pace the UNATTENDED sweep.
+//
+// Scans every real property the target organization operates, and
+// resolves against the first one whose community this faction
+// genuinely holds (`authority.holderOf`) and is not `governed` — a
+// target with no such community returns `null`, the honest "you do
+// not actually have standing to extort this organization anywhere"
+// refusal, never a thrown error for an unmet precondition.
+function demandTribute(worldState, options = {}) {
+  const { factionOrganizationId, targetOrganizationId, tick = worldState.tick ?? 0 } = options;
+
+  const factionOrg = (worldState.organizations || [])
+    .find((o) => o.id === Number(factionOrganizationId));
+  if (!factionOrg) throw new Error(`demandTribute: no real organization ${factionOrganizationId}.`);
+  const org = (worldState.organizations || []).find((o) => o.id === Number(targetOrganizationId));
+  if (!org) throw new Error(`demandTribute: no real organization ${targetOrganizationId}.`);
+  if (org.id === factionOrg.id) {
+    throw new Error('demandTribute: an organization cannot extort itself.');
+  }
+
+  let community = null;
+  for (const property of worldState.properties || []) {
+    if (property.operating_organization_id !== org.id) continue;
+    const candidate = (worldState.communities || [])
+      .find((c) => c.id === property.community_id);
+    if (!candidate) continue;
+    if (authority.writOf(worldState, candidate.id).regime === 'governed') continue;
+    if (authority.holderOf(worldState, candidate.id) !== factionOrg.id) continue;
+    community = candidate;
+    break;
+  }
+  if (!community) return null;
+
+  const assets = Number(org.assets) || 0;
+  if (assets <= 0) return null;
+
+  return resolveDemand(worldState, { community, factionOrg, org, tick });
 }
 
 module.exports = {
@@ -215,5 +277,7 @@ module.exports = {
   composureOf,
   operatingBusinessesIn,
   propertyOperatedBy,
+  resolveDemand,
   runExtortion,
+  demandTribute,
 };

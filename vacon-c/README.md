@@ -2501,6 +2501,25 @@ player verb: `'apply-hold'`. 17 tests in `test/contest-hold.test.js`,
 8 in `test/crime-force-level.test.js`. See CLAUDE.md's
 hundred-and-eightieth standing rule.
 
+### Real demand-tribute player verb (closes task #130)
+`extortion.js#runExtortion` was an automatic, unattended per-tick
+sweep with no way for a player holding real ground to act on it
+directly. `extortion.demandTribute` shares the exact real
+refuse-or-pay consequence code (`resolveDemand`) the sweep's own loop
+already had, rather than risking two mechanics quietly disagreeing,
+and re-enforces every real precondition the sweep checks (not
+governed, the faction genuinely holds the target's own community,
+real positive assets). `engine.js`'s own authority check
+(`leader_id !== actorId`) was fixed before shipping to also require
+`leader_id != null`, closing a real gap where an organization with no
+assigned leader could be used by anyone with no linked entity at all.
+`offerExtortionMission` is the ninth `missionVariety.js` wrapper,
+same build-the-verb-then-wrap-it shape task #133 already used; its
+leadership requirement (not mere membership) is mutation-verified.
+New `['citizen','leader']` verb: `demand-tribute`. 18 tests extended
+in `test/extortion.test.js`, 5 new in `test/missionVariety.test.js`.
+See CLAUDE.md's hundred-and-eighty-first standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a
