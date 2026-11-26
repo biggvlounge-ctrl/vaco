@@ -10867,6 +10867,106 @@ fixture sets every trait family, `behavioral.Discipline` included, to
 the same value, so adding the fourth modulator changes that one
 specific fixture's arithmetic, not the mechanism.
 
+**A hundred-and-ninety-first, closing tasks #150 and #235 together —
+two real gaps in `influenceRatingOf` the same batch named, checked
+against the real vocabulary before either was built.** `grep -rln
+"aura" server/*.js` before this hit `landmarks.js`/`discovery.js` only
+by matching the substring inside "restaurant," never a real concept —
+task #206 had already built the batch's FEAR half (into
+`leadership.js#directMission`'s compliance chance), never the real
+word-of-mouth/fame half task #235 names, and `influenceRatingOf`
+itself carried no such term at all.
+
+**Task #235's aura is `reputation.Notoriety`, read the identical way
+every other component here already reads a trait, kept deliberately
+separate from `SOCIAL_TRAITS`.** This file's own header already
+splits Charisma/Persuasion (moving people) from Reputation/Network
+Reach (how many people there are to move); Notoriety is a third,
+different claim — whether people who have never met this person have
+still heard of them — and averaging it into `SOCIAL_TRAITS` would
+have quietly diluted a concept that already has its own home.
+
+**Task #150's local prominence maps the task's own six named
+archetypes onto what this taxonomy actually has, rather than
+inventing new occupations.** Athletes/entertainers/preachers/
+politicians map onto real existing `occupations.js` entries at this
+taxonomy's own grain; "business wealth" reuses `manager`, checked
+directly first — this taxonomy has no dedicated "owner"/
+"entrepreneur" role, so the closest real leadership occupation
+substitutes rather than a new one being invented for one archetype.
+"Criminal hierarchy" needed no new entry at all: leading ANY real
+organization (`ledOrgs`, already computed above for the org
+component) already identifies that hierarchy, reused rather than
+re-derived a second way.
+
+**Local prominence is population-SCALED, not flat, and the reference
+is measured from this engine's own default rather than picked to
+sound right.** `worldgen.js`'s own `populationPerCommunity: 30` is the
+"normal" community size; a visible local figure there gets the
+neutral ×1 multiplier, a real `areaStats.residentsOf` count smaller
+than that scales up (capped at `LOCAL_PROMINENCE_CAP = 3`, the same
+bounded-multiplier shape `nightLightsPacks.ACTIVITY_MULTIPLIER_BOUNDS`
+already uses), a larger one scales down. **Local prominence is
+genuinely 0, not a neutral default, with no real `communityId` at
+all** — "local" prominence with no real locality to be prominent
+WITHIN is a different claim than this file makes anywhere else, where
+every other unmeasured input reads as the trait scale's own neutral
+centre (standing rule 12). This file's own tests fixtures (`person()`
+in `test/influence.test.js`) already default to `communityId: null`,
+so this had to be checked, not assumed, to keep every existing exact-
+equality assertion in that file true.
+
+**Youth popularity (the task's own "star athlete, prom king/queen"
+pair) is a real trait-value read, not an invented ranking system.**
+This engine has no per-school student roster (checked directly —
+`schoolSystem.js` tracks school BUILDINGS, `students.js` tracks only
+UNIVERSITY enrollment; `tutorialMissions.js`'s own "school-age
+children" anchor to a real school by CITY, never by a specific
+building), so a percentile-rank-among-schoolmates mechanic would have
+had nothing real to compute over. The real substitute: a school-age
+(5 through 18, mirroring `tutorialMissions.CHILD_SCHOOL_AGE_MAX` by
+value rather than by import, to avoid a backwards low-level-to-
+high-level dependency; deliberately NOT `statecraft.SCHOOL_AGE_MAX`
+(30), which answers a different real question — "could still
+realistically be in school during the reemergence era" — not "is a
+literal teenager") resident with no real occupation yet gets the
+identical local-prominence population scaling applied to the higher of
+their real `sports` trait average (star athlete) or real
+`social.Charisma` specifically, not the whole `SOCIAL_TRAITS` list
+(prom king/queen is a narrower, more on-topic claim than "persuasive"
+or "well-connected" for someone with no real occupation or
+organization yet to be judged by).
+
+**Re-weighted rather than appended on top, so the rating stays on its
+own 0-100 scale without a rescale step — carved out of OCCUPATION_
+WEIGHT and SOCIAL_WEIGHT, never ORG_WEIGHT**, because leading a real
+organization is already this rating's single strongest, most concrete
+signal, and diluting it to make room for two smaller, newer terms
+would be backwards. 0.3/0.4/0.3 became 0.25/0.4/0.25/0.07/0.03
+(occupation/org/social/aura/local), still summing to 1.0.
+
+**One pre-existing exact-equality test had to be updated, not
+patched around, and one other file's "maximally influential" fixture
+had to be extended to actually still reach the cap.** `test/
+influence.test.js`'s own flat-janitor test asserted `=== 50 *
+SOCIAL_WEIGHT` for a person with nothing else set — true before this
+round, false the moment AURA defaults to a neutral 50 too, fixed by
+adding the exact second term rather than loosening the assertion.
+`test/plays.test.js`'s own `maxOccupation`/`maxSocialTraits` comment
+already said outright that maxing the (then three) components was
+"the only way to actually reach the real cap" — with two more real
+components now in the sum, that comment's own claim had to be made
+true again: `maxAura` (sets `reputation.Notoriety` to 100) and
+`placeInTinyCommunity` (a real, otherwise-empty community, hitting
+`LOCAL_PROMINENCE_CAP`) were added so the fixture's own stated claim
+keeps being true rather than silently falling three points short of
+`MAX_PLAY_SIZE`. 11 new tests across both real components, including
+the local-prominence/youth-popularity isolation test that calls
+`localProminenceOf` directly rather than the full `influenceRatingOf`
+— an unrelated real OCCUPATION component on one side of that specific
+comparison would otherwise move the total and say nothing specific
+about local prominence at all.
+
 **A hundred-and-ninetieth, closing task #127 — a real Driving skill,
 checked against every spec document before being added, with a real
 reader the same day.** No document in this repo

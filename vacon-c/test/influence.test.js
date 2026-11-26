@@ -21,6 +21,7 @@ const membership = require('../server/membership.js');
 const worldStore = require('../server/worldStore.js');
 const occupations = require('../server/occupations.js');
 const { getTraitId } = require('../server/traitDefinitions.js');
+const { getLiveEntity } = require('../server/entityTraits.js');
 const influence = require('../server/influence.js');
 
 let nextId = 950000;
@@ -94,23 +95,57 @@ function hire(worldState, entityId, org, position, { tick = worldState.tick } = 
   });
 }
 
-function setSocialTrait(worldState, entityId, name, value) {
-  const traitId = getTraitId('social', name);
-  if (!traitId) throw new Error(`fixture names a trait that does not exist: social.${name}`);
+function setTrait(worldState, entityId, family, name, value) {
+  const traitId = getTraitId(family, name);
+  if (!traitId) throw new Error(`fixture names a trait that does not exist: ${family}.${name}`);
   worldState.entityTraits.push({
     entity_id: entityId, trait_id: traitId, current_value: value, base_value: value, key_modifier: 0,
   });
+}
+
+function setSocialTrait(worldState, entityId, name, value) {
+  setTrait(worldState, entityId, 'social', name, value);
+}
+
+// A real community with a given population, for tasks #150's own
+// local-prominence component -- `areaStats.residentsOf` counts real
+// `npc.communityId` matches, so "population" here means real people
+// actually placed in it, not a label.
+function communityWithResidents(worldState, count) {
+  const community = { id: nextId++, city_id: nextId, population: 0 };
+  worldState.communities.push(community);
+  for (let i = 0; i < count; i += 1) {
+    const resident = person(worldState);
+    resident.communityId = community.id;
+  }
+  return community;
+}
+
+// A school-age (task #150's own 5..18 youth-popularity band) resident
+// of a real community, `createdTick` set the identical way `person()`
+// itself derives a 30-year-old, scaled to the real requested age.
+function youthResident(worldState, communityId, ageYears) {
+  const npc = person(worldState);
+  npc.communityId = communityId;
+  npc.createdTick = worldState.tick - 365 * ageYears;
+  return npc;
 }
 
 // ---------------------------------------------------------------------
 // influenceRatingOf
 // ---------------------------------------------------------------------
 
-test('influenceRatingOf gives a flat janitor no occupation bump, no org bump, and the trait scale\'s own centre for unmeasured social traits', () => {
+test('influenceRatingOf gives a flat janitor no occupation bump, no org bump, and the trait scale\'s own centre for unmeasured social and aura traits', () => {
   const w = world();
   const nobody = person(w);
-  // Nothing hired, no org led, no traits generated at all.
-  assert.equal(influence.influenceRatingOf(w, nobody.id), 50 * influence.SOCIAL_WEIGHT);
+  // Nothing hired, no org led, no traits generated at all, and
+  // `communityId: null` (this fixture's own default) means the real
+  // local-prominence component (task #150) has no real community to
+  // scale against, so it is genuinely 0, not a third neutral-50 term.
+  assert.equal(
+    influence.influenceRatingOf(w, nobody.id),
+    50 * influence.SOCIAL_WEIGHT + 50 * influence.AURA_WEIGHT,
+  );
 });
 
 test('a gang leader starts with meaningfully more real influence than a janitor -- occupation tier is the first real driver', () => {
@@ -193,6 +228,177 @@ test('real social traits (Charisma, Persuasion, Reputation, Network Reach) move 
     });
     assert.equal(influence.influenceRatingOf(w, unaffected.id), plainRating);
   }
+});
+
+// ---------------------------------------------------------------------
+// Task #235: a real word-of-mouth/fame "aura" component
+// ---------------------------------------------------------------------
+
+test('reputation.Notoriety is a real aura component, and only Notoriety', () => {
+  const w = world();
+  const famous = person(w);
+  setTrait(w, famous.id, 'reputation', 'Notoriety', 100);
+  const plain = person(w);
+
+  const famousRating = influence.influenceRatingOf(w, famous.id);
+  const plainRating = influence.influenceRatingOf(w, plain.id);
+  const expectedDelta = (100 - 50) * influence.AURA_WEIGHT;
+  assert.ok(Math.abs((famousRating - plainRating) - expectedDelta) < 1e-9);
+
+  // An unrelated reputation trait (Trustworthiness, say) does nothing.
+  const unaffected = person(w);
+  setTrait(w, unaffected.id, 'reputation', 'Trustworthiness', 100);
+  assert.equal(influence.influenceRatingOf(w, unaffected.id), plainRating);
+});
+
+// ---------------------------------------------------------------------
+// Task #150: a real per-community local-prominence boost
+// ---------------------------------------------------------------------
+
+test('a visible occupation (the task\'s own named archetypes) carries more local prominence in a small real community than a large one', () => {
+  const w = world();
+  const smallTown = communityWithResidents(w, 5);
+  const bigCity = communityWithResidents(w, 300);
+
+  const localPreacher = person(w);
+  localPreacher.communityId = smallTown.id;
+  const bigCityPreacher = person(w);
+  bigCityPreacher.communityId = bigCity.id;
+  const church = organization(w, { type: 'religion' });
+  hire(w, localPreacher.id, church, 'preacher');
+  hire(w, bigCityPreacher.id, church, 'preacher');
+
+  assert.ok(
+    influence.influenceRatingOf(w, localPreacher.id) > influence.influenceRatingOf(w, bigCityPreacher.id),
+    'the identical real occupation should carry further in a smaller real community',
+  );
+});
+
+test('an occupation outside the task\'s own named list gets no local-prominence boost, however small the real community', () => {
+  const w = world();
+  const tinyTown = communityWithResidents(w, 2);
+  const labourer = person(w);
+  labourer.communityId = tinyTown.id;
+  const employer = organization(w, { type: 'business' });
+  hire(w, labourer.id, employer, 'labourer');
+
+  const unplaced = person(w);
+  const employerElsewhere = organization(w, { type: 'business' });
+  hire(w, unplaced.id, employerElsewhere, 'labourer');
+
+  assert.equal(influence.influenceRatingOf(w, labourer.id), influence.influenceRatingOf(w, unplaced.id));
+});
+
+test('leading a real organization (the task\'s own "criminal hierarchy") also carries local prominence, scaled the same way', () => {
+  const w = world();
+  const tinyTown = communityWithResidents(w, 3);
+  const localBoss = person(w);
+  localBoss.communityId = tinyTown.id;
+  organization(w, { type: 'gang', leaderId: localBoss.id, influenceColumn: 10 });
+
+  const bigCity = communityWithResidents(w, 300);
+  const bigCityBoss = person(w);
+  bigCityBoss.communityId = bigCity.id;
+  organization(w, { type: 'gang', leaderId: bigCityBoss.id, influenceColumn: 10 });
+
+  assert.ok(
+    influence.influenceRatingOf(w, localBoss.id) > influence.influenceRatingOf(w, bigCityBoss.id),
+    'the identical real org leadership should carry further in a smaller real community',
+  );
+});
+
+test('local prominence is genuinely 0 with no real community, never a neutral default', () => {
+  const w = world();
+  const noCommunity = person(w); // communityId: null, the fixture's own default
+  const church = organization(w, { type: 'religion' });
+  hire(w, noCommunity.id, church, 'preacher');
+
+  const sameOccupationWithCommunity = person(w);
+  const smallTown = communityWithResidents(w, 5);
+  sameOccupationWithCommunity.communityId = smallTown.id;
+  hire(w, sameOccupationWithCommunity.id, church, 'preacher');
+
+  assert.ok(
+    influence.influenceRatingOf(w, noCommunity.id) < influence.influenceRatingOf(w, sameOccupationWithCommunity.id),
+    'the one with no real community to be prominent within must not match the one with a real small community',
+  );
+});
+
+test('youth popularity: a school-age resident with real standout sports traits out-rates a flat peer in the same small real community', () => {
+  const w = world();
+  const smallTown = communityWithResidents(w, 5);
+  const starAthlete = youthResident(w, smallTown.id, 15);
+  for (const name of influence.YOUTH_SPORTS_TRAITS) {
+    setTrait(w, starAthlete.id, 'sports', name, 100);
+  }
+  const ordinaryTeen = youthResident(w, smallTown.id, 15);
+
+  assert.ok(
+    influence.influenceRatingOf(w, starAthlete.id) > influence.influenceRatingOf(w, ordinaryTeen.id),
+    'real standout sports traits should move a school-age resident\'s rating',
+  );
+});
+
+test('youth popularity: real Charisma alone (the "prom king/queen" half) is enough, with no real sports traits at all', () => {
+  const w = world();
+  const smallTown = communityWithResidents(w, 5);
+  const popular = youthResident(w, smallTown.id, 16);
+  setSocialTrait(w, popular.id, 'Charisma', 100);
+  const ordinaryTeen = youthResident(w, smallTown.id, 16);
+
+  assert.ok(influence.influenceRatingOf(w, popular.id) > influence.influenceRatingOf(w, ordinaryTeen.id));
+});
+
+test('youth popularity does not apply to a real adult, however standout their real sports traits', () => {
+  const w = world();
+  const smallTown = communityWithResidents(w, 5);
+  const adultAthlete = person(w); // the fixture's own default age, 30
+  adultAthlete.communityId = smallTown.id;
+  for (const name of influence.YOUTH_SPORTS_TRAITS) {
+    setTrait(w, adultAthlete.id, 'sports', name, 100);
+  }
+  const ordinaryAdult = person(w);
+  ordinaryAdult.communityId = smallTown.id;
+
+  assert.equal(influence.influenceRatingOf(w, adultAthlete.id), influence.influenceRatingOf(w, ordinaryAdult.id));
+});
+
+test('youth popularity does not apply to a school-age resident who already holds a real occupation', () => {
+  const w = world();
+  const smallTown = communityWithResidents(w, 5);
+
+  // Identical real standout sports traits on both -- the only real
+  // difference is whether this teen already holds a real occupation.
+  // Isolated via `localProminenceOf` directly rather than the full
+  // `influenceRatingOf`, since `workingTeen`'s real OCCUPATION
+  // component (a different, unrelated term) would otherwise move the
+  // total rating too and make the comparison say nothing specific
+  // about local prominence.
+  const workingTeen = youthResident(w, smallTown.id, 16);
+  const employer = organization(w, { type: 'business' });
+  hire(w, workingTeen.id, employer, 'labourer');
+  for (const name of influence.YOUTH_SPORTS_TRAITS) {
+    setTrait(w, workingTeen.id, 'sports', name, 100);
+  }
+
+  const idleTeen = youthResident(w, smallTown.id, 16);
+  for (const name of influence.YOUTH_SPORTS_TRAITS) {
+    setTrait(w, idleTeen.id, 'sports', name, 100);
+  }
+
+  const workingTeenLocal = influence.localProminenceOf(w, workingTeen.id, {
+    occupation: occupations.occupationOf(w, workingTeen.id),
+    hasOrgLeadership: false,
+    live: getLiveEntity(w, workingTeen.id),
+  });
+  const idleTeenLocal = influence.localProminenceOf(w, idleTeen.id, {
+    occupation: occupations.occupationOf(w, idleTeen.id),
+    hasOrgLeadership: false,
+    live: getLiveEntity(w, idleTeen.id),
+  });
+
+  assert.equal(workingTeenLocal, 0, 'a real occupation (even one not in VISIBLE_OCCUPATIONS) closes off the youth path');
+  assert.ok(idleTeenLocal > 0, 'the identical real sports traits should still count with no real occupation at all');
 });
 
 // ---------------------------------------------------------------------

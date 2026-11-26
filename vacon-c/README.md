@@ -2641,6 +2641,32 @@ a new test asserts the same average-unaffected/skilled-beats-unskilled
 shape task #107 established for Discipline. See CLAUDE.md's
 hundred-and-ninetieth standing rule.
 
+### Real aura + local-prominence components in influenceRatingOf (closes tasks #150 and #235)
+`influenceRatingOf` had no word-of-mouth/fame term at all (task #206
+had already built the batch's fear half, into `leadership.js`'s
+compliance chance, never this one) and no per-community prominence
+term either. `AURA_WEIGHT` reads `reputation.Notoriety`, kept
+separate from `SOCIAL_TRAITS` (a third, different claim: whether
+people who've never met this person have still heard of them).
+`LOCAL_PROMINENCE_WEIGHT` maps the task's six named archetypes
+(athletes/entertainers/preachers/politicians/`manager` for "business
+wealth"/any real org leader for "criminal hierarchy") onto this
+taxonomy's real occupations, scaled by a real `areaStats.residentsOf`
+community-size measurement against `worldgen.js`'s own default
+(`populationPerCommunity: 30`, so a visible figure in a "normal"
+community gets the neutral ×1, smaller communities scale up, bounded
+at `LOCAL_PROMINENCE_CAP = 3`) — genuinely 0, not a neutral default,
+with no real community to be prominent within. Youth popularity
+(star athlete, prom king/queen) is the same population scaling
+applied to a real school-age (5-18) resident's `sports` trait average
+or `social.Charisma` specifically, since this engine has no per-
+school student roster to rank against. Weights re-balanced
+0.3/0.4/0.3 → 0.25/0.4/0.25/0.07/0.03 (occupation/org/social/aura/
+local), carved out of occupation and social, never org. 11 new tests;
+one pre-existing exact-equality test and one other file's "maximally
+influential" fixture updated to account for the two new real terms.
+See CLAUDE.md's hundred-and-ninety-first standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

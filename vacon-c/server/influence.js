@@ -127,6 +127,8 @@
 const occupations = require('./occupations.js');
 const membership = require('./membership.js');
 const worldStore = require('./worldStore.js');
+const areaStats = require('./areaStats.js');
+const mortality = require('./mortality.js');
 const { getLiveEntity } = require('./entityTraits.js');
 
 function clamp0to100(x) {
@@ -136,11 +138,19 @@ function clamp0to100(x) {
 // ---------------------------------------------------------------------
 // Weights — sum to 1.0, so influenceRatingOf stays on the same 0-100
 // scale as every other relationship dimension without a separate
-// rescale step.
+// rescale step. Re-balanced for tasks #150/#235 (closing this file's
+// own real "aura"/local-prominence gap): the original three weighted
+// 0.3/0.4/0.3; AURA_WEIGHT and LOCAL_PROMINENCE_WEIGHT are carved out
+// of OCCUPATION_WEIGHT and SOCIAL_WEIGHT rather than ORG_WEIGHT,
+// because leading a real organization is already the single strongest,
+// most concrete real signal this rating has, and diluting it to make
+// room for two smaller, newer terms would be backwards.
 // ---------------------------------------------------------------------
-const OCCUPATION_WEIGHT = 0.3;
+const OCCUPATION_WEIGHT = 0.25;
 const ORG_WEIGHT = 0.4;
-const SOCIAL_WEIGHT = 0.3;
+const SOCIAL_WEIGHT = 0.25;
+const AURA_WEIGHT = 0.07;
+const LOCAL_PROMINENCE_WEIGHT = 0.03;
 
 // A leader's own organization contributes by its real influence column
 // (0-100, already wired and correct — see media.js's outletReach for
@@ -168,6 +178,81 @@ const ORG_REACH_SHARE = 1 - ORG_SIZE_SHARE;
 // out rather than averaged in and quietly diluting the four that are
 // actually on-topic.
 const SOCIAL_TRAITS = ['Charisma', 'Persuasion', 'Reputation', 'Network Reach'];
+
+// ---------------------------------------------------------------------
+// Task #235 — a real word-of-mouth/fame "aura" component, distinct
+// from SOCIAL_TRAITS above
+// ---------------------------------------------------------------------
+// Checked directly before building: `grep -rln "aura" server/*.js`
+// before this hit `landmarks.js`/`discovery.js` only by matching
+// "restaurant", never a real concept — task #206 built fear (into
+// `leadership.js#directMission`'s compliance chance), not the
+// word-of-mouth/fame half this task names, and `influenceRatingOf`
+// itself had no such term. `reputation.Notoriety` is the real,
+// already-generated trait that means exactly this — how KNOWN
+// somebody is, independent of whether that fame is earned by charm
+// (already SOCIAL_TRAITS' job) or by something else entirely. Reusing
+// it rather than averaging it into SOCIAL_TRAITS keeps the two
+// concepts separate the way this file's own header already keeps
+// Charisma/Persuasion (moving people) apart from Reputation/Network
+// Reach (how many people there are to move) — Notoriety is a third,
+// different thing: whether people who have never met this person have
+// still heard of them.
+const AURA_TRAIT = 'Notoriety';
+
+// ---------------------------------------------------------------------
+// Task #150 — a real per-community "local prominence" boost, for the
+// task's own named archetypes, plus a youth-popularity analogue
+// ---------------------------------------------------------------------
+// The task names six archetypes (athletes, musicians, business wealth,
+// clergy, politicians, criminal hierarchy) and a youth-specific pair
+// (star athlete, prom king/queen). Five of the six map onto real,
+// already-existing `occupations.js` entries at this taxonomy's own
+// grain — `manager` is the honest substitute for "business wealth":
+// this taxonomy has no dedicated "owner"/"entrepreneur" occupation,
+// checked directly rather than assumed, so the closest real leadership
+// role in a business is reused instead of inventing one. "Criminal
+// hierarchy" needs no new entry at all — leading ANY real organization
+// (already `ledOrgs` above, gang/cartel included) already identifies
+// that hierarchy; this file does not re-derive it a second way.
+const VISIBLE_OCCUPATIONS = ['athlete', 'entertainer', 'preacher', 'politician', 'manager'];
+
+// The real default `worldgen.js` config (`populationPerCommunity: 30`)
+// is the reference population a "normal" community has — a visible
+// local figure in a community at that size gets the neutral ×1
+// multiplier, smaller communities scale up (same person, same real
+// visibility, carries further in a town of ten than a town of thirty),
+// larger ones scale down. Measured from this engine's own real
+// default rather than picked to sound right.
+const LOCAL_PROMINENCE_REFERENCE_POPULATION = 30;
+// Bounded the same way every other real multiplier in this registry
+// is (`nightLightsPacks.ACTIVITY_MULTIPLIER_BOUNDS`,
+// `crimeHotspotPacks.weightFor`) — a tiny hamlet does not get
+// unbounded local fame, it gets a real, capped boost.
+const LOCAL_PROMINENCE_CAP = 3;
+
+// Youth popularity: the task's own two named examples (star athlete,
+// prom king/queen) map onto `sports` (Speed/Coordination/Competitive
+// Drive/Team Chemistry/Injury Resistance, averaged the same way
+// `efficiency`/SOCIAL_TRAITS already are) and `social.Charisma`
+// specifically — Charisma alone, not the whole SOCIAL_TRAITS list,
+// because "well-liked" is a narrower, more on-topic claim than
+// "persuasive" or "well-connected" for a teenager with no real
+// occupation or organization yet to be judged by. Either real measure
+// above the trait scale's own centre (standing rule 12) counts — a
+// kid does not need to be both to be the one people talk about.
+const YOUTH_SPORTS_TRAITS = ['Speed', 'Coordination', 'Competitive Drive', 'Team Chemistry', 'Injury Resistance'];
+// 5 is `statecraft.SCHOOL_AGE_MIN`, reused by value rather than by
+// import to avoid a backwards dependency (an economy-tier file
+// requiring a higher-level statecraft module); 18 mirrors
+// `tutorialMissions.CHILD_SCHOOL_AGE_MAX` for the identical real
+// reason that file states it — the question here is "a literal
+// school-age teenager", not `statecraft.SCHOOL_AGE_MAX` (30)'s much
+// broader "could still realistically be in school during the
+// reemergence era," which is a different real question this
+// component is not asking.
+const YOUTH_POPULARITY_MIN_AGE = 5;
+const YOUTH_POPULARITY_MAX_AGE = 18;
 
 //: How much one real event moves one relationship's influence. Reused
 //: from `meetings.js`'s own `PURPOSES` table / `control.SHARED_
@@ -230,7 +315,69 @@ function influenceRatingOf(worldState, entityId) {
     : 50;
   const socialComponent = socialAvg * SOCIAL_WEIGHT;
 
-  return clamp0to100(occupationComponent + orgComponent + socialComponent);
+  // Task #235's aura component — see the constant's own comment.
+  const auraValue = Number(live?.traits?.reputation?.[AURA_TRAIT] ?? 50);
+  const auraComponent = auraValue * AURA_WEIGHT;
+
+  // Task #150's local-prominence component — see VISIBLE_OCCUPATIONS'
+  // own comment. Reuses `occupation`/`ledOrgs` already computed above
+  // rather than re-deriving either.
+  const localProminenceComponent = localProminenceOf(
+    worldState, entityId, { occupation, hasOrgLeadership: ledOrgs.length > 0, live },
+  ) * LOCAL_PROMINENCE_WEIGHT;
+
+  return clamp0to100(
+    occupationComponent + orgComponent + socialComponent + auraComponent + localProminenceComponent,
+  );
+}
+
+// A real community population to scale against is required for ANY
+// local prominence at all — declared 0, not defaulted to neutral,
+// when an entity has no real `communityId` (this file's own test
+// fixtures included) or that community genuinely has nobody in it.
+// "Local" prominence with no real locality to be prominent WITHIN is
+// not a smaller version of the real thing, it is a different claim
+// this file does not make.
+function localProminenceOf(worldState, entityId, { occupation, hasOrgLeadership, live }) {
+  const npc = (worldState.npcs || []).find((n) => n.id === Number(entityId));
+  if (!npc || npc.communityId == null) return 0;
+  const population = areaStats.residentsOf(worldState, npc.communityId).length;
+  if (population <= 0) return 0;
+  const populationScale = Math.min(
+    LOCAL_PROMINENCE_CAP,
+    LOCAL_PROMINENCE_REFERENCE_POPULATION / population,
+  );
+
+  // Adult (or occupied) path: a real visible occupation or real
+  // organization leadership, scaled by how small the real community
+  // is — the task's own six named archetypes.
+  if ((occupation && VISIBLE_OCCUPATIONS.includes(occupation)) || hasOrgLeadership) {
+    return Math.min(100, 100 * populationScale);
+  }
+
+  // Youth path: a school-age resident with no real occupation yet
+  // (nothing to be visible THROUGH otherwise) — the task's own
+  // "star athlete, prom king/queen" examples.
+  if (!occupation) {
+    const age = mortality.ageInYears(worldState, npc, worldState.tick ?? 0);
+    if (age !== null && age >= YOUTH_POPULARITY_MIN_AGE && age < YOUTH_POPULARITY_MAX_AGE) {
+      const sports = live?.traits?.sports ?? {};
+      const sportsValues = YOUTH_SPORTS_TRAITS
+        .map((name) => Number(sports[name]))
+        .filter(Number.isFinite);
+      const sportsAvg = sportsValues.length > 0
+        ? sportsValues.reduce((a, b) => a + b, 0) / sportsValues.length
+        : 50;
+      const charisma = Number(live?.traits?.social?.Charisma ?? 50);
+      const youthScore = Math.max(sportsAvg, charisma);
+      // Centred on 50 (standing rule 12), 0..1, same shape every other
+      // modulator in this engine normalises a trait average into.
+      const normalized = Math.max(0, (youthScore - 50) / 50);
+      return Math.min(100, normalized * 100 * populationScale);
+    }
+  }
+
+  return 0;
 }
 
 // ---------------------------------------------------------------------
@@ -323,8 +470,18 @@ module.exports = {
   OCCUPATION_WEIGHT,
   ORG_WEIGHT,
   SOCIAL_WEIGHT,
+  AURA_WEIGHT,
+  LOCAL_PROMINENCE_WEIGHT,
   ORG_SIZE_CAP,
   SOCIAL_TRAITS,
+  AURA_TRAIT,
+  VISIBLE_OCCUPATIONS,
+  LOCAL_PROMINENCE_REFERENCE_POPULATION,
+  LOCAL_PROMINENCE_CAP,
+  YOUTH_SPORTS_TRAITS,
+  YOUTH_POPULARITY_MIN_AGE,
+  YOUTH_POPULARITY_MAX_AGE,
+  localProminenceOf,
   INFLUENCE_DELTA,
   BROADCAST_INFLUENCE_DELTA,
   IMMEDIATE_FAMILY_BOND_BONUS,

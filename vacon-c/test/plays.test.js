@@ -80,17 +80,40 @@ function maxSocialTraits(w, entityId) {
   }
 }
 
-// `influenceRatingOf`'s three components (occupation tier, real
-// org leadership scaled by member count, real social traits) each
-// weight to at most 30/40/30 -- maxing only two of the three (as
-// `maxSocialTraits` plus a maxed organization already do) still
-// leaves real headroom below 100. This pushes the occupation
-// component to its own real maximum too (occupations.js's one real
-// tier-7 occupation), the only way to actually reach the real cap.
+// `influenceRatingOf`'s five components (occupation tier, real org
+// leadership scaled by member count, real social traits, real
+// word-of-mouth/fame aura -- task #235, and real local prominence --
+// task #150) weight to at most 25/40/25/7/3 -- maxing only three of
+// the five (as `maxSocialTraits` plus a maxed organization already
+// do) still leaves real headroom below 100. This pushes the
+// occupation component to its own real maximum too (occupations.js's
+// one real tier-7 occupation), the only way to actually reach the
+// real cap.
 function maxOccupation(w, entityId) {
   w.employmentRecords.push({
     entity_id: entityId, status: 'active', position: 'polymath',
   });
+}
+
+// Task #235's real aura component -- `Notoriety`, not one of
+// `maxSocialTraits`' four.
+function maxAura(w, entityId) {
+  w.entityTraits.push({
+    id: w.entityTraits.length + 1, entity_id: entityId,
+    trait_id: getTraitId('reputation', 'Notoriety'), current_value: 100,
+  });
+}
+
+// Task #150's real local-prominence component needs a real, tiny
+// community to scale against -- this leader already leads a real
+// organization (`hasOrgLeadership`), so placing them in one small
+// enough to hit `LOCAL_PROMINENCE_CAP` is the only piece still
+// missing.
+function placeInTinyCommunity(w, entityId) {
+  const communityId = nextId++;
+  w.communities = w.communities || [];
+  w.communities.push({ id: communityId });
+  w.npcs.find((n) => n.id === entityId).communityId = communityId;
 }
 
 test('capacityFor is low for an ordinary, untraited leader and reaches MAX_PLAY_SIZE for a highly influential one', () => {
@@ -99,8 +122,10 @@ test('capacityFor is low for an ordinary, untraited leader and reaches MAX_PLAY_
   const influentialLeader = person(w);
   maxSocialTraits(w, influentialLeader);
   maxOccupation(w, influentialLeader);
+  maxAura(w, influentialLeader);
   organization(w, { leaderId: influentialLeader, influenceScore: 100 });
   for (let i = 0; i < 20; i += 1) joinOrg(w, person(w), w.organizations[0].id);
+  placeInTinyCommunity(w, influentialLeader);
 
   const low = plays.capacityFor(w, ordinaryLeader);
   const high = plays.capacityFor(w, influentialLeader);
