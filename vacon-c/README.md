@@ -2553,6 +2553,23 @@ reading the IDENTICAL real precondition `dealDrugs` itself re-checks
 `test/drugTrade.test.js`, 4 new in `test/missionVariety.test.js`. See
 CLAUDE.md's hundred-and-eighty-third standing rule.
 
+### Real coalition takeovers + a real org-growth-difficulty measurement (closes task #143)
+`control.assess`/`attempt` take an optional `allyTribeIds` — a
+coalition pools `rosterOf`/`materielOf` across every REAL ally (a
+pre-existing `relationships` row to the initiator, trusted at or above
+the schema's own neutral default, never one created by the check
+itself), while success probability stays on the INITIATOR's own
+`familyTraits.cohesionOf` and the seized prize stays with the
+initiator — mutation-verified that an ally's own conflict never moves
+the odds. `engine.js#assessTakeover`/`attemptTakeover` and
+`actions.js`'s `assess-takeover`/`attempt-takeover` verbs both pass
+`allyTribeIds` through. 9 new tests in `test/control.test.js`. A real
+generated-world measurement (18 families, one city) found only 55.6%
+of families have any real viable target right now and the weakest has
+zero, blocked by a named specialist shortfall — confirming growth
+difficulty is real rather than decorative. See CLAUDE.md's
+hundred-and-eighty-fifth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

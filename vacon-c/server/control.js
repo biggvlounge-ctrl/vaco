@@ -176,6 +176,18 @@ const PROTECTION_PER_FIGHTER = 1;
 //: friendship.
 const SHARED_UNDERTAKING = 2;
 
+//: Task #143. A coalition ally's trust toward the initiator has to be
+//: real, not assumed — `worldStore.findRelationship` returns nothing
+//: for two tribes that have never interacted, and nothing is excluded
+//: outright, never defaulted. 50 is not a cutoff chosen for the
+//: occasion: it is `worldStore.getOrCreateRelationship`'s own neutral
+//: starting trust, the same number a brand-new stranger relationship
+//: holds. So the gate reads as "an ally has to have a REAL,
+//: already-existing relationship with the initiator, trusted at least
+//: as much as a stranger would be" — and a stranger is excluded first,
+//: by having no row at all.
+const COALITION_TRUST_THRESHOLD = 50;
+
 //: Where a takeover stops being a neighbourhood matter. Sixteen is the
 //: document's own example composition — 5 + 10 + 1 — so a takeover that
 //: needs more people than the document's worked example is logged as
@@ -238,6 +250,88 @@ function rosterOf(worldState, tribeId, options = {}) {
     occupations: Object.fromEntries(held),
     fielded: ROLE_NAMES.reduce((sum, r) => sum + roles[r], 0),
   };
+}
+
+// ---------------------------------------------------------------------
+// Coalitions — task #143
+// ---------------------------------------------------------------------
+// "A gang or group or organization joins another gang or group to
+// complete a mission." The real gap was never the pooling arithmetic
+// — `rosterOf`/`materielOf` already sum one tribe's own people and
+// kit — it was that `assess`/`attempt` only ever read ONE tribe, so a
+// tribe short a specialist or a crew had no real way to bring in a
+// tribe that has one.
+//
+// Three design decisions, none of them an invented number:
+//
+//   who counts as an ally    a REAL, pre-existing `relationships` row
+//                             to the initiator (never created by this
+//                             check — `findRelationship`, not
+//                             `getOrCreateRelationship`), trusted at
+//                             least as much as `COALITION_TRUST_
+//                             THRESHOLD`. A tribe that has never dealt
+//                             with the initiator is not an ally that
+//                             showed up asking to be invented one.
+//   whose cohesion decides    the INITIATOR's own, unchanged. Cohesion
+//   the odds                  is `familyTraits.cohesionOf` reading ONE
+//                             tribe's own unity/conflict — there is no
+//                             real number for how well two tribes that
+//                             have never had to act as one would
+//                             cohere, and averaging their two scores
+//                             would be exactly that invention.
+//   who keeps the prize       the initiator, unchanged — `attempt`'s
+//                             own `seize` call already takes only
+//                             `tribeId`, never an ally's id, so a
+//                             coalition needs no new write-back here.
+//
+// Pooled roster/materiel is a straight SUM across every real ally,
+// never an average — a coalition fields everybody who actually shows
+// up, the same "the three roles partition a tribe's adults" logic
+// `rosterOf` already applies to one tribe, run once per participant.
+function coalitionAllies(worldState, tribeId, allyTribeIds) {
+  const requested = Array.isArray(allyTribeIds) ? allyTribeIds : [];
+  const out = [];
+  for (const allyId of requested) {
+    if (allyId === tribeId) continue; // a tribe is not its own ally
+    const ally = (worldState.families || []).find((f) => f.id === allyId);
+    if (!ally) continue;
+    const rel = worldStore.findRelationship(worldState, tribeId, allyId);
+    if (!rel || (rel.trust ?? 0) < COALITION_TRUST_THRESHOLD) continue;
+    out.push(ally);
+  }
+  return out;
+}
+
+function poolRoster(worldState, tribeIds, options = {}) {
+  const { tick = worldState.tick ?? 0 } = options;
+  const roles = Object.fromEntries(ROLE_NAMES.map((r) => [r, 0]));
+  const occupationsHeld = {};
+  let members = 0;
+  for (const id of tribeIds) {
+    const roster = rosterOf(worldState, id, { tick });
+    members += roster.members;
+    for (const role of ROLE_NAMES) roles[role] += roster.roles[role];
+    for (const [occupation, count] of Object.entries(roster.occupations)) {
+      occupationsHeld[occupation] = (occupationsHeld[occupation] ?? 0) + count;
+    }
+  }
+  return {
+    tribeIds,
+    members,
+    roles,
+    occupations: occupationsHeld,
+    fielded: ROLE_NAMES.reduce((sum, r) => sum + roles[r], 0),
+  };
+}
+
+function poolMateriel(worldState, tribeIds) {
+  const held = {};
+  for (const id of tribeIds) {
+    for (const [category, quantity] of Object.entries(materielOf(worldState, id))) {
+      held[category] = (held[category] ?? 0) + quantity;
+    }
+  }
+  return held;
 }
 
 // ---------------------------------------------------------------------
@@ -853,6 +947,7 @@ function materielOf(worldState, tribeId) {
 function assess(worldState, options = {}) {
   const {
     scale = null, locationId = null, tribeId = null, tick = worldState.tick ?? 0,
+    allyTribeIds = [],
   } = options;
 
   const composition = compositionFor(worldState, { scale, locationId, tick });
@@ -860,7 +955,15 @@ function assess(worldState, options = {}) {
   const tribe = (worldState.families || []).find((f) => f.id === tribeId);
   if (!tribe) return null;
 
-  const roster = rosterOf(worldState, tribeId, { tick });
+  // Task #143. `allies` is the REAL subset of what was asked for — see
+  // `coalitionAllies`'s own header for why a requested id can drop out
+  // silently rather than erroring: asking for an ally who does not
+  // actually trust you is a real, answerable outcome, not a mistake.
+  const allies = coalitionAllies(worldState, tribeId, allyTribeIds);
+  const participantTribeIds = [tribeId, ...allies.map((a) => a.id)];
+  const roster = allies.length === 0
+    ? rosterOf(worldState, tribeId, { tick })
+    : poolRoster(worldState, participantTribeIds, { tick });
 
   const shortfalls = [];
   for (const requirement of composition.requiredRoles) {
@@ -877,7 +980,9 @@ function assess(worldState, options = {}) {
   }
   // **What they are carrying**, which `assess` did not read at all: a
   // tribe of twenty could take a government building barehanded.
-  const carried = materielOf(worldState, tribeId);
+  const carried = allies.length === 0
+    ? materielOf(worldState, tribeId)
+    : poolMateriel(worldState, participantTribeIds);
   for (const requirement of composition.requiredMateriel ?? []) {
     const have = carried[requirement.category] ?? 0;
     if (have < requirement.count) {
@@ -886,6 +991,8 @@ function assess(worldState, options = {}) {
   }
 
   const compositionRequirementMet = shortfalls.length === 0;
+  // The INITIATOR's own cohesion, never a blend — see this section's
+  // own header for why averaging across tribes would be an invention.
   const tribeCohesionScore = familyTraits.cohesionOf(worldState, tribeId);
   const margin = composition.total === 0
     ? 1
@@ -895,6 +1002,9 @@ function assess(worldState, options = {}) {
     locationId,
     scale,
     tribeId,
+    // The real, eligible subset — never the raw request — so a caller
+    // can see exactly who actually showed up.
+    allyTribeIds: allies.map((a) => a.id),
     compositionRequirementMet,
     tribeCohesionScore,
     finalSuccessProbability: compositionRequirementMet
@@ -930,23 +1040,35 @@ function assess(worldState, options = {}) {
 function attempt(worldState, options = {}) {
   const {
     scale = null, locationId = null, tribeId = null, tick = worldState.tick ?? 0,
-    seed = worldState.seed ?? 'world',
+    seed = worldState.seed ?? 'world', allyTribeIds = [],
   } = options;
 
-  const resolution = assess(worldState, { scale, locationId, tribeId, tick });
+  const resolution = assess(worldState, { scale, locationId, tribeId, tick, allyTribeIds });
   if (resolution === null) return null;
 
   const draw = seededDraw([seed, 'takeover', scale, locationId, tribeId, tick]);
   const succeeded = resolution.compositionRequirementMet
     && draw < resolution.finalSuccessProbability;
 
-  const participants = familyTraits.livingMembers(worldState, tribeId)
-    .filter((n) => roleOf(worldState, n, tick) !== null);
+  // Task #143. Every real ally's own fielded people are participants
+  // too — they did the shared undertaking, so they get the same
+  // memory and the same trust move everybody in the initiator's own
+  // tribe already got. `resolution.allyTribeIds` is the REAL, eligible
+  // subset `assess` already resolved, never the raw request.
+  const participantTribeIds = [tribeId, ...resolution.allyTribeIds];
+  const participants = participantTribeIds.flatMap(
+    (id) => familyTraits.livingMembers(worldState, id)
+      .filter((n) => roleOf(worldState, n, tick) !== null),
+  );
 
   let seized = null;
   let merchandise = null;
   if (succeeded) {
     const target = SCALES[scale].find(worldState, locationId);
+    // **The prize stays with the initiator, never split with an
+    // ally.** `seize` takes only `tribeId` here, exactly as it always
+    // has — a coalition changes who can bring the force, not who
+    // keeps what the force wins.
     seized = SCALES[scale].seize(worldState, target, tribeId, tick);
 
     // **`merchandiseAccessGranted`**, which
@@ -1012,17 +1134,25 @@ function attempt(worldState, options = {}) {
     }
   }
 
+  const allyNote = resolution.allyTribeIds.length > 0
+    ? ` with ${resolution.allyTribeIds.length} allied `
+      + `${resolution.allyTribeIds.length === 1 ? 'tribe' : 'tribes'}`
+    : '';
   const event = {
     type: succeeded ? 'takeover_succeeded' : 'takeover_failed',
     severity: resolution.composition.total >= SIGNIFICANT_FORCE ? 'high' : 'medium',
     note: `the ${(worldState.families || []).find((f) => f.id === tribeId)?.surname ?? tribeId} `
-      + `${succeeded ? 'took' : 'failed to take'} ${scale} ${locationId}`,
+      + `${succeeded ? 'took' : 'failed to take'} ${scale} ${locationId}${allyNote}`,
     tick,
     affected_entity_ids: participants.map((n) => n.id),
     global_effects: {
       scale,
       locationId,
       tribeId,
+      // The real, eligible allies, not the raw request — empty for an
+      // ordinary single-tribe attempt, same shape every other event
+      // here already keeps.
+      allyTribeIds: resolution.allyTribeIds,
       compositionRequirementMet: resolution.compositionRequirementMet,
       tribeCohesionScore: resolution.tribeCohesionScore,
       finalSuccessProbability: resolution.finalSuccessProbability,
@@ -1313,6 +1443,7 @@ module.exports = {
   SPECIALISTS_REQUIRED,
   TOOLS_PER_HAND,
   PROTECTION_PER_FIGHTER,
+  COALITION_TRUST_THRESHOLD,
   materielOf,
   SHARED_UNDERTAKING,
   SIGNIFICANT_FORCE,

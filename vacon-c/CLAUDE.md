@@ -10632,3 +10632,76 @@ sixty-third rule's own treatment and a valid basis for committing
 unrelated work. Left as its own real, separate, future task — the
 seven-file scope is the new information worth keeping, not a reason
 to widen this round to cover it.
+
+**A hundred-and-eighty-fifth, closing task #143: a coalition takeover
+by direct instruction** ("a gang or group or organization joins
+another gang or group to complete a mission"), **plus the measurement
+half of the same task** ("confirm org-growth difficulty is real").
+
+**The pooling arithmetic was never the gap — `rosterOf`/`materielOf`
+already sum one tribe's own people and kit.** The gap was that
+`control.assess`/`attempt` only ever read ONE tribe, so a tribe short
+a specialist or a crew had no real way to bring in a tribe that has
+one. `coalitionAllies`/`poolRoster`/`poolMateriel` close it with three
+decisions, none of them an invented number:
+
+- **Who counts as an ally is a REAL, pre-existing relationship, never
+  one created by the check.** `worldStore.findRelationship` — not
+  `getOrCreateRelationship` — returns nothing for two tribes that have
+  never interacted, and nothing is excluded, never defaulted. The
+  trust floor (`COALITION_TRUST_THRESHOLD = 50`) is not a cutoff
+  chosen for the occasion: it is `getOrCreateRelationship`'s own
+  neutral starting trust, the same number a brand-new stranger
+  relationship holds. Both organizations and families draw their ids
+  from the same `nextId()` counter as every NPC (confirmed directly in
+  `engine.js#generateOrganization`/`generateFamily`), so a
+  family-to-family `relationships` row is the identical real
+  substrate `heat.js` already uses for a person-to-organization one —
+  no new table, no new column.
+- **Whose cohesion decides the odds is the INITIATOR's own, unchanged.**
+  `familyTraits.cohesionOf` reads one tribe's own unity/conflict; there
+  is no real number for how well two tribes that have never had to act
+  as one would cohere, and averaging their two scores would be exactly
+  that invention. Mutation-verified: the same real ally relationship,
+  pooled against an ally family whose OWN `conflict` is set to 90 (an
+  ally at war with itself) produces an IDENTICAL `tribeCohesionScore`
+  and `finalSuccessProbability` to the same ally at `conflict: 0` —
+  the ally's own cohesion never enters the number.
+- **Who keeps the prize is the initiator, unchanged.** `attempt`'s own
+  `seize` call already took only `tribeId`, never an ally's id — a
+  coalition changes who can bring the force, not who keeps what the
+  force wins, and this needed no new write-back at all.
+
+Pooled participants (both tribes' real fielded members) share in the
+memory and trust write-backs exactly as the initiator's own always
+did — a coalition takeover is a shared undertaking for everyone who
+showed up, not only the tribe that called it in.
+
+`engine.js#assessTakeover`/`attemptTakeover` and `actions.js`'s
+`assess-takeover`/`attempt-takeover` verbs both gained an optional
+`allyTribeIds` — the one real exception to "the tribe is not a
+parameter" the latter verb's own header already states, because an
+ally is somebody else's tribe by definition. Naming a tribe with no
+real, sufficiently-trusted relationship is never refused — it is
+simply not an ally, the same "a real, eligible subset, never the raw
+request" shape `control.assess` already returns for everything else
+it resolves. 9 new tests in `test/control.test.js`.
+
+**The second half measured a real generated world rather than arguing
+from the mechanism's own description.** `node /scratch/measure-org-
+growth.mjs` against an 18-family, one-city world (seed
+`org-growth-measure`): only **10 of 18 families (55.6%) have even ONE
+real viable target right now**, mean viable-target coverage across
+every family is **35.8% of all real targets in the world**, and the
+family with the FEWEST viable targets has **zero** — blocked by a
+real, named, identified specialist shortfall (`diplomat`). Growth is
+not decorative: close to half the population of tribes in a freshly
+generated world cannot yet take anything, and the one with nothing has
+a concrete, nameable reason why. This is the eleventh standing rule's
+own discipline — measure a built world rather than trust what a
+mechanism's own description claims — applied to a question this round
+needed answered rather than a gap this round needed closing. The
+script itself is a one-off diagnostic, the same uncommitted shape this
+round's own hang investigation used, not a permanent addition to
+`scripts/`: a point-in-time measurement of one seed, not a reusable
+tool.

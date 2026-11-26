@@ -705,3 +705,199 @@ test('a place with no crew still has a requirement', () => {
   assert.ok(maintain.requiredRoles.length > 0);
   assert.equal(maintain.total, 1);
 });
+
+// ---------------------------------------------------------------------
+// Coalitions — task #143. "A gang or group or organization joins
+// another gang or group to complete a mission."
+// ---------------------------------------------------------------------
+// A second, real family, so a coalition has somebody real to ally
+// with. `allyMember` is `member`'s own shape with the family id made a
+// parameter, rather than changing `member` itself and risking every
+// test above it.
+let nextAllyFamilyId = 901;
+
+function allyTribe(w, options = {}) {
+  const { unity = 50, conflict = 0 } = options;
+  const id = nextAllyFamilyId++;
+  w.families.push({ id, surname: `Ally${id}`, unity, conflict, head_npc_id: null });
+  return id;
+}
+
+function allyMember(w, tribeId, options = {}) {
+  const { years = 30, position = null, organizationId = 500 } = options;
+  const id = nextNpcId++;
+  w.npcs.push({ id, status: 'alive', createdTick: w.age(years) });
+  w.familyMemberships.push({
+    entity_id: id, family_id: tribeId, role: 'sibling', generation_number: 1,
+  });
+  if (position) {
+    w.employmentRecords.push({
+      id, entity_id: id, employer_organization_id: organizationId, status: 'active', wage: 20, position,
+    });
+  }
+  return id;
+}
+
+test('an ally with no real relationship to the initiator does not count', () => {
+  const w = tribeAgainstAHospital();
+  member(w, { years: 30 });
+  const allyId = allyTribe(w);
+  allyMember(w, allyId, { years: 40, position: 'physician', organizationId: 501 });
+  // No relationship pushed at all — `findRelationship` returns nothing
+  // for two tribes that have never interacted.
+
+  const resolution = control.assess(w, {
+    scale: 'organization', locationId: 500, tribeId: 900, allyTribeIds: [allyId],
+  });
+  assert.deepEqual(resolution.allyTribeIds, []);
+  assert.equal(resolution.compositionRequirementMet, false);
+  assert.equal(resolution.roster.occupations.physician, undefined);
+});
+
+test('an ally trusted below the schema’s own neutral default does not count', () => {
+  const w = tribeAgainstAHospital();
+  member(w, { years: 30 });
+  const allyId = allyTribe(w);
+  allyMember(w, allyId, { years: 40, position: 'physician', organizationId: 501 });
+  w.relationships.push({ entity_a_id: 900, entity_b_id: allyId, trust: 49 });
+
+  const resolution = control.assess(w, {
+    scale: 'organization', locationId: 500, tribeId: 900, allyTribeIds: [allyId],
+  });
+  assert.deepEqual(resolution.allyTribeIds, []);
+  assert.equal(resolution.compositionRequirementMet, false);
+});
+
+test('an ally trusted at the schema’s own neutral default counts', () => {
+  const w = tribeAgainstAHospital();
+  member(w, { years: 30 });
+  const allyId = allyTribe(w);
+  const physician = allyMember(w, allyId, { years: 40, position: 'physician', organizationId: 501 });
+  w.relationships.push({ entity_a_id: 900, entity_b_id: allyId, trust: 50 });
+
+  const alone = control.assess(w, { scale: 'organization', locationId: 500, tribeId: 900 });
+  assert.equal(alone.compositionRequirementMet, false, 'the initiator alone has no physician');
+
+  const resolution = control.assess(w, {
+    scale: 'organization', locationId: 500, tribeId: 900, allyTribeIds: [allyId],
+  });
+  assert.deepEqual(resolution.allyTribeIds, [allyId]);
+  assert.equal(resolution.compositionRequirementMet, true, 'the real ally supplies the real specialist');
+  assert.equal(resolution.roster.occupations.physician, 1);
+  void physician;
+});
+
+test('a coalition’s roster and materiel are a real sum across every real ally, never an average', () => {
+  const w = tribeAgainstAHospital();
+  member(w, { years: 30 }); // the initiator's own tools ride with this member
+  const allyId = allyTribe(w);
+  const physician = allyMember(w, allyId, { years: 40, position: 'physician', organizationId: 501 });
+  kit(w, physician, 50); // the ally brings its own real tools too
+  w.relationships.push({ entity_a_id: 900, entity_b_id: allyId, trust: 60 });
+
+  const soloRoster = control.rosterOf(w, 900);
+  const allyRoster = control.rosterOf(w, allyId);
+  const soloMateriel = control.materielOf(w, 900);
+  const allyMateriel = control.materielOf(w, allyId);
+
+  const resolution = control.assess(w, {
+    scale: 'organization', locationId: 500, tribeId: 900, allyTribeIds: [allyId],
+  });
+  assert.equal(resolution.roster.fielded, soloRoster.fielded + allyRoster.fielded);
+  assert.equal(
+    resolution.materiel.tools,
+    (soloMateriel.tools ?? 0) + (allyMateriel.tools ?? 0),
+  );
+});
+
+test('a coalition’s success probability still rides on the initiator’s own cohesion, never a blend', () => {
+  const build = (allyConflict) => {
+    nextNpcId = 1;
+    const w = tribeAgainstAHospital();
+    member(w, { years: 30 });
+    const allyId = allyTribe(w, { conflict: allyConflict });
+    allyMember(w, allyId, { years: 40, position: 'physician', organizationId: 501 });
+    w.relationships.push({ entity_a_id: 900, entity_b_id: allyId, trust: 60 });
+    return { w, allyId };
+  };
+
+  const { w: calm, allyId: calmAlly } = build(0);
+  const calmResolution = control.assess(calm, {
+    scale: 'organization', locationId: 500, tribeId: 900, allyTribeIds: [calmAlly],
+  });
+
+  // The same initiator, the same real ally relationship, but the ALLY
+  // is at war with itself. If cohesion were blended across tribes this
+  // would drag the probability down; it does not move at all, because
+  // `tribeCohesionScore` reads only the initiator's own family fields.
+  const { w: troubled, allyId: troubledAlly } = build(90);
+  const troubledResolution = control.assess(troubled, {
+    scale: 'organization', locationId: 500, tribeId: 900, allyTribeIds: [troubledAlly],
+  });
+
+  assert.equal(calmResolution.tribeCohesionScore, troubledResolution.tribeCohesionScore);
+  assert.equal(calmResolution.finalSuccessProbability, troubledResolution.finalSuccessProbability);
+});
+
+test('the prize stays with the initiator, never with an ally who helped take it', () => {
+  const w = world();
+  w.organizations.push({ id: 500, type: 'club', leader_id: 7777 });
+  member(w, { years: 30 });
+  w.families[0].unity = 100;
+  const allyId = allyTribe(w, { unity: 100 });
+  allyMember(w, allyId, { years: 30 });
+  w.relationships.push({ entity_a_id: 900, entity_b_id: allyId, trust: 60 });
+
+  let result = null;
+  for (let t = 0; t < 40 && (result === null || !result.succeeded); t += 1) {
+    result = control.attempt(w, {
+      scale: 'organization', locationId: 500, tribeId: 900, tick: 10000 + t, seed: 's',
+      allyTribeIds: [allyId],
+    });
+  }
+  assert.ok(result.succeeded, 'forty attempts at p=1.0 cohesion never succeeded');
+  assert.deepEqual(result.allyTribeIds, [allyId]);
+  assert.equal(w.organizations[0].leader_id, w.families[0].head_npc_id);
+  assert.notEqual(w.organizations[0].leader_id, w.families[1].head_npc_id);
+});
+
+test('doing a coalition takeover together moves the people on BOTH sides who did it', () => {
+  const w = world();
+  w.organizations.push({ id: 500, type: 'club', leader_id: null });
+  const a = member(w, { years: 30 });
+  const allyId = allyTribe(w);
+  const b = allyMember(w, allyId, { years: 30 });
+  w.relationships.push({ entity_a_id: 900, entity_b_id: allyId, trust: 60 });
+
+  control.attempt(w, {
+    scale: 'organization', locationId: 500, tribeId: 900, tick: 10000, seed: 'together',
+    allyTribeIds: [allyId],
+  });
+
+  const rel = w.relationships.find(
+    (r) => (r.entity_a_id === a && r.entity_b_id === b) || (r.entity_a_id === b && r.entity_b_id === a),
+  );
+  assert.ok(rel, 'no relationship between an initiator member and an ally member who attempted together');
+  assert.notEqual(rel.trust, 0);
+});
+
+test('the "assess-takeover" verb coerces body.allyTribeIds to real numbers before passing them on', () => {
+  // A request body arrives as JSON, so an id comes in as whatever the
+  // caller sent -- this is the one real place that has to turn it into
+  // the number `control.coalitionAllies` compares against real family
+  // ids, same as `locationId` already does on the line above it.
+  const w = world();
+  w.organizations.push({ id: 500, type: 'club', leader_id: null });
+  member(w, { years: 30 });
+  const allyId = allyTribe(w);
+  allyMember(w, allyId, { years: 30 });
+  w.relationships.push({ entity_a_id: 900, entity_b_id: allyId, trust: 60 });
+
+  const { run } = actions.ACTIONS['assess-takeover'];
+  const result = run(
+    { assessTakeover: (entityId, options) => control.assess(w, { ...options, tribeId: 900 }) },
+    1,
+    { scale: 'organization', locationId: 500, allyTribeIds: [String(allyId)] },
+  );
+  assert.deepEqual(result.resolution.allyTribeIds, [allyId]);
+});

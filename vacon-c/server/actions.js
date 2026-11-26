@@ -192,28 +192,40 @@ const ACTIONS = {
   // requirement and still fail" is only a meaningful risk if they can
   // see the requirement first.
   'assess-takeover': {
-    summary: 'See what it would take for your tribe to hold a place, and your odds.',
+    summary: 'See what it would take for your tribe to hold a place, and your odds -- '
+      + 'optionally pooling in allied tribes.',
     modes: ['citizen', 'leader'],
     requires: ['scale', 'locationId'],
     verbs: ['assessTakeover'],
+    // Task #143. `allyTribeIds` is optional and is the one real
+    // exception to "the tribe is not a parameter" below it: an ally is
+    // somebody else's tribe by definition, so naming one here names a
+    // tribe other than the actor's own. `control.coalitionAllies` is
+    // the real gate on whether naming one does anything at all.
     run: (verbs, actorId, body) => ({
       resolution: verbs.assessTakeover(actorId, {
         scale: body.scale, locationId: Number(body.locationId),
+        allyTribeIds: Array.isArray(body.allyTribeIds)
+          ? body.allyTribeIds.map(Number) : undefined,
       }),
     }),
   },
 
   'attempt-takeover': {
-    summary: 'Try to take control of a place, with your tribe behind you.',
+    summary: 'Try to take control of a place, with your tribe behind you -- '
+      + 'optionally pooling in allied tribes.',
     modes: ['citizen', 'leader'],
     requires: ['scale', 'locationId'],
     verbs: ['attemptTakeover'],
     // The tribe is NOT a parameter. `engine.tribeIdFor` reads it off
     // the actor's family membership, for the same reason the actor is
     // never a parameter: a player acts as themselves, and that means
-    // for their own family.
+    // for their own family. `allyTribeIds` (task #143) is the real
+    // exception, same reasoning as `assess-takeover` above.
     run: (verbs, actorId, body) => verbs.attemptTakeover(actorId, {
       scale: body.scale, locationId: Number(body.locationId),
+      allyTribeIds: Array.isArray(body.allyTribeIds)
+        ? body.allyTribeIds.map(Number) : undefined,
     }),
   },
 

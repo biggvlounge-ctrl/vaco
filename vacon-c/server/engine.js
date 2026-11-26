@@ -2038,12 +2038,22 @@ function savedLocationsOf(entityId) {
   }));
 }
 
+// Task #143. `allyTribeIds` is a list of OTHER tribes' real family ids
+// — named directly, the one real exception to "a player acts as
+// themselves": an ally is somebody else's tribe by definition, and
+// `control.coalitionAllies` is the real gate on whether naming one
+// does anything (a real, pre-existing, sufficiently-trusted
+// relationship to the actor's own tribe). Naming a tribe with no such
+// relationship is not refused — it is simply not an ally, the same
+// "a real, eligible subset, never the raw request" shape `control.
+// assess` already returns.
 function assessTakeover(entityId, options = {}) {
   return control.assess(WorldState, {
     scale: options.scale,
     locationId: options.locationId,
     tribeId: tribeIdFor(entityId),
     tick: WorldState.tick,
+    allyTribeIds: options.allyTribeIds,
   });
 }
 
@@ -2053,6 +2063,7 @@ function attemptTakeover(entityId, options = {}) {
     locationId: options.locationId,
     tribeId: tribeIdFor(entityId),
     tick: WorldState.tick,
+    allyTribeIds: options.allyTribeIds,
   });
   if (result === null) {
     throw new Error(
