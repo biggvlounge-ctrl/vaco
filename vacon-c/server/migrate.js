@@ -972,6 +972,18 @@ async function migrateWorldStateToPostgres(worldState) {
       summary.inventory = worldState.inventory.length;
 
       // ---------------------------------------------------------------
+      // saved_locations — after entities, which entity_id references
+      // ---------------------------------------------------------------
+      for (const s of worldState.savedLocations) {
+        await client.query(
+          `INSERT INTO saved_locations (id, entity_id, scale, location_id, saved_tick)
+             VALUES ($1,$2,$3,$4,$5)`,
+          [s.id, s.entity_id, s.scale, s.location_id, s.saved_tick]
+        );
+      }
+      summary.saved_locations = worldState.savedLocations.length;
+
+      // ---------------------------------------------------------------
       // decision_log — after entities, which entity_id references
       // ---------------------------------------------------------------
       for (const d of worldState.decisionLog) {

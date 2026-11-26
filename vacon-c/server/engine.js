@@ -94,6 +94,7 @@ const culture = require('./culture.js');
 const flows = require('./flows.js');
 const contest = require('./contest.js');
 const control = require('./control.js');
+const savedLocations = require('./savedLocations.js');
 const meetings = require('./meetings.js');
 const landmarks = require('./landmarks.js');
 const salvage = require('./salvage.js');
@@ -198,6 +199,12 @@ const WorldState = {
   // object, and the growth loop had no item that could raise a trait.
   // `server/inventory.js`; items themselves are defined in barter.js.
   inventory: [],
+  // Task #97 — an entity's own bookmarked `{scale, locationId}` pairs.
+  // No table in the schema for this either, same bar as `inventory`
+  // above. `server/savedLocations.js`; the requirements card each
+  // bookmark carries is never stored here, only recomputed live by
+  // `engine.js#savedLocationsOf` through `control.assess`.
+  savedLocations: [],
   // Why somebody did what they did. `decision_log` is one of the most
   // specific tables in the schema — situation, available options, what
   // was chosen, what was expected, confidence, which traits, which
@@ -1368,6 +1375,8 @@ const ACTION_VERBS = {
   assessTakeover: (...args) => assessTakeover(...args),
   attemptTakeover: (...args) => attemptTakeover(...args),
   buildBarricade: (...args) => buildBarricade(...args),
+  saveLocation: (...args) => saveLocation(...args),
+  unsaveLocation: (...args) => unsaveLocation(...args),
   holdMeeting: (...args) => holdMeeting(...args),
   sendMessage: (...args) => sendMessage(...args),
   repurposeProperty: (...args) => repurposeProperty(...args),
@@ -1577,17 +1586,29 @@ function verifyContest(result) {
 // FOR THEIR OWN FAMILY, not for whichever tribe they nominate.
 // `tribeIdFor` reads it off `family_memberships`, so naming somebody
 // else's family is not a thing the API can be asked to do.
-function tribeIdFor(entityId) {
+// The lookup `tribeIdFor` throws on. Split out so a READ — task #97's
+// `savedLocationsOf` — can ask the same real question without an
+// absent family turning a list into a thrown error: `control.assess`
+// already returns null for a tribeId nobody holds (it looks the id up
+// in `worldState.families` and finds nothing), so `null` here is the
+// honest, already-handled answer rather than a special case this file
+// has to invent.
+function familyIdOf(entityId) {
   const membershipRow = (WorldState.familyMemberships || [])
     .find((m) => m.entity_id === entityId);
-  if (!membershipRow) {
+  return membershipRow ? membershipRow.family_id : null;
+}
+
+function tribeIdFor(entityId) {
+  const familyId = familyIdOf(entityId);
+  if (familyId === null) {
     throw new Error(
       `entity ${entityId} belongs to no family, and a takeover is a tribe acting together. `
       + 'COMPOSITION_REQUIREMENTS_TRIBE_COHESION.md makes internal cohesion half the '
       + 'resolution, and a tribe of one has none to measure.',
     );
   }
-  return membershipRow.family_id;
+  return familyId;
 }
 
 // ---------------------------------------------------------------------------
@@ -1901,6 +1922,48 @@ function tutorialProgressFor(entityId) {
   return tutorialMissions.tutorialProgressFor(WorldState, entityId);
 }
 
+// Task #97 — three verbs over `savedLocations.js`'s own plain bookmark
+// list. Saving and unsaving are writes, gated the same way every
+// other action-verb wrapper here is: the entity must be real.
+// `savedLocationsOf` is the read, and it is the one that does the real
+// work — attaching `control.assess`'s own requirements card to every
+// bookmark, computed LIVE (standing rule 3) rather than stored on the
+// row. An entity with no family at all still gets its bookmarks back,
+// each with `requirementsCard: null` — `familyIdOf` over `tribeIdFor`
+// on purpose, because a list is a read and a missing family is an
+// honest unmet precondition for the CARD, not for the LIST.
+function saveLocation(entityId, options = {}) {
+  if (!getLiveEntity(entityId)) throw new Error(`no entity with id ${entityId}`);
+  return savedLocations.saveLocation(WorldState, entityId, {
+    scale: options.scale,
+    locationId: options.locationId,
+    tick: WorldState.tick,
+  });
+}
+
+function unsaveLocation(entityId, savedLocationId) {
+  if (!getLiveEntity(entityId)) throw new Error(`no entity with id ${entityId}`);
+  savedLocations.unsaveLocation(WorldState, entityId, savedLocationId);
+  return { unsaved: true };
+}
+
+function savedLocationsOf(entityId) {
+  if (!getLiveEntity(entityId)) throw new Error(`no entity with id ${entityId}`);
+  const tribeId = familyIdOf(entityId);
+  return savedLocations.savedLocationRowsOf(WorldState, entityId).map((row) => ({
+    id: row.id,
+    scale: row.scale,
+    locationId: row.location_id,
+    savedTick: row.saved_tick,
+    requirementsCard: control.assess(WorldState, {
+      scale: row.scale,
+      locationId: row.location_id,
+      tribeId,
+      tick: WorldState.tick,
+    }),
+  }));
+}
+
 function assessTakeover(entityId, options = {}) {
   return control.assess(WorldState, {
     scale: options.scale,
@@ -2152,6 +2215,9 @@ module.exports = {
   survivalStatusFor,
   seedTutorialStart,
   tutorialProgressFor,
+  saveLocation,
+  unsaveLocation,
+  savedLocationsOf,
   TICK_INTERVALS: behavior.TICK_INTERVALS,
   SCHEDULE_FREQUENCIES: behavior.FREQUENCIES,
   getEntityState,

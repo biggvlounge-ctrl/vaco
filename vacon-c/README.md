@@ -2434,6 +2434,28 @@ there is no real resolution verb to point a journey-in-progress
 mission at. 4 new tests. See CLAUDE.md's hundred-and-seventy-seventh
 standing rule.
 
+## Saved/bookmarked locations with a live requirements card (closes task #97)
+A bookmark is nothing but the one real `{scale, locationId}` pair
+`assess-takeover` already requires, kept on a new `saved_locations`
+table (`server/savedLocations.js`, allowlisted in
+`test/migrate.test.js` on the same bar `inventory` cleared). No
+`requirements_card` column: `control.assess`, the real, already
+player-facing "takeover-key requirements card" generator, is
+recomputed LIVE by `engine.js#savedLocationsOf` on every read instead
+of being stored, because the world a bookmark points at keeps moving
+after it is saved. An entity with no family at all still gets its
+bookmark list back -- each card `null` rather than the list itself
+throwing, via a new non-throwing `familyIdOf` split out of
+`tribeIdFor`'s one-line lookup. `saveLocation` refuses a pair that
+does not resolve to a real target (`control.compositionFor`, reused
+rather than reimplemented) and is idempotent on a repeat save. New
+`'save-location'`/`'unsave-location'` verbs in `actions.js` and a new
+`GET /api/players/:id/saved-locations` read route, same shape as
+`survival-status`/`tutorial-progress`. 13 new tests in
+`test/saved-locations.test.js`; four real mutations each confirmed to
+fail exactly the test that names them. See CLAUDE.md's
+hundred-and-seventy-eighth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

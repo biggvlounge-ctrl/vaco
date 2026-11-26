@@ -10219,3 +10219,73 @@ origin coordinates (`worldState.cities` accumulates across every test
 in this file with no reset between them), so an unrelated, zero-
 distance city from a prior test silently won "nearest" — fixed with
 genuinely distinct coordinates.
+
+**A hundred-and-seventy-eighth, closing task #97 — saved/bookmarked
+locations, and the first new table since §26 inventory.** A saved
+location is nothing but the one real pair `assess-takeover` already
+requires, `{scale, locationId}`, kept against an entity on a new
+`saved_locations` table (`server/schema-extensions.sql`, allowlisted
+in `test/migrate.test.js` on the same bar `inventory` cleared — three
+existing tables considered and rejected, same reasons that file's own
+header gives at length).
+
+**No `requirements_card` column, and that is standing rule 3 rather
+than an oversight.** `control.assess` is the real, already-built
+"takeover-key requirements card" generator this task names, already
+player-facing through `assess-takeover`. Storing the card on the
+bookmark would be exactly the frozen-field failure the ninth standing
+rule already named once (`flows.js` reading birth-value traits
+forever): the world a bookmark points at keeps moving after it is
+saved — a resident is born, a member is recruited, materiel changes
+hands — so `engine.js#savedLocationsOf` recomputes it fresh with
+`control.assess` on every single read, never caching it anywhere.
+Mutation-verified directly: added a real family member between two
+calls to `savedLocationsOf` on the identical bookmark and confirmed
+the second call's `roster.members` moved — a stored card would not
+have seen it.
+
+**A read must not share a write's precondition.** `assessTakeover`/
+`attemptTakeover` both call `tribeIdFor`, which THROWS when an entity
+belongs to no family — correct for those two, because a takeover
+without a tribe is not a coherent request. `savedLocationsOf` is a
+LIST, not a takeover attempt, and throwing there would mean a citizen
+with no family could never even see their own bookmarks. Split
+`tribeIdFor`'s one-line lookup into a non-throwing `familyIdOf` that
+`savedLocationsOf` calls instead — `control.assess` itself already
+returns `null` for a `tribeId` nobody holds (it looks the id up in
+`worldState.families` and finds nothing at line ~860), so `null` was
+already the honest, already-handled answer; the entity's OWN function
+just had to stop manufacturing an error where the callee already had a
+real one. Mutation-verified: reverting `savedLocationsOf` to call
+`tribeIdFor` made the "no family" test throw instead of returning a
+`requirementsCard: null` bookmark, exactly as expected.
+
+**Never a bookmark "about nothing," the same discipline
+`missionVariety.js`'s `offer*Mission` family already holds.**
+`saveLocation` refuses a `{scale, locationId}` pair that does not
+resolve to a real target, checked with `control.compositionFor` — the
+one real scale-and-location existence check `control.assess` already
+performs internally before it ever looks at a tribe, reused rather
+than re-implemented. Idempotent on top of that: bookmarking the
+identical pair twice returns the existing row rather than a second
+one, the same idempotence `media.registerWalkieTalkie` already holds.
+
+Two new write verbs (`save-location`, `unsave-location`,
+`server/actions.js`) and one new read route
+(`GET /api/players/:id/saved-locations`, `server.js`, same shape as
+`study-sources`/`survival-status`/`tutorial-progress`) — the card is
+never in a request body; it is computed on the way out, never on the
+way in. 13 new tests, four real mutations confirmed to fail exactly
+the test that names them: the idempotence check, the real-existence
+check, `unsaveLocation`'s ownership check, and `familyIdOf`'s
+null-safety.
+
+**And the twenty-second standing rule's own guard caught this round's
+own real defect before it shipped.** `test/inventory.test.js`'s
+stated file/route counts (`VACANCY_INVENTORY.md`'s "All 166 files
+present on disk" and "128 routes") were not updated for the new
+`savedLocations.js` file and the new `saved-locations` route — the
+full suite failed on exactly those two assertions, re-derived rather
+than trusted, the same way that file's own header says a typed-once
+number always eventually will. Fixed to 167/129 before this entry was
+written, not after.

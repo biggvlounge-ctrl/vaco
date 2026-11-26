@@ -489,6 +489,11 @@ async function restoreWorldStateFromPostgres(worldState) {
     nums(h, ['id', 'holder_entity_id', 'quantity', 'condition', 'acquired_tick']));
   summary.inventory = worldState.inventory.length;
 
+  // Task #97 — `scale` stays a string; every other column is numeric.
+  worldState.savedLocations = (await q('SELECT * FROM saved_locations ORDER BY id')).map((s) =>
+    nums(s, ['id', 'entity_id', 'location_id', 'saved_tick']));
+  summary.saved_locations = worldState.savedLocations.length;
+
   // **The item DEFINITIONS a restored world's holdings refer to.**
   //
   // `inventory` rows carry an `item_name` and nothing else; what that

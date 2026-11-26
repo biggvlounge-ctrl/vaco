@@ -638,3 +638,43 @@ ALTER TABLE missions ADD COLUMN IF NOT EXISTS location_property_id BIGINT REFERE
 -- Zero for a freshly generated row — a newly built system starts
 -- caught up, which is `generateInfrastructure`'s own default.
 ALTER TABLE infrastructure ADD COLUMN IF NOT EXISTS waste_backlog NUMERIC DEFAULT 0;
+
+
+-- ---------------------------------------------------------------------
+-- saved_locations
+-- ---------------------------------------------------------------------
+-- Task #97 — "saved/bookmarked locations with a takeover-key
+-- requirements card." A bookmark is a `{scale, location_id}` pair, the
+-- exact pair `assess-takeover` already requires, kept against an
+-- entity. Three existing tables were considered and rejected, the
+-- same bar `inventory` above holds:
+--
+--   `players` has no field for a list of bookmarks, and would need one
+--   per player rather than per entity — every other takeover verb
+--   (`assess-takeover`, `attempt-takeover`, `build-barricade`) acts on
+--   `player.linked_entity_id`, never the player row itself.
+--
+--   `ownership_records` is about having taken a property, not about
+--   watching one worth taking — a bookmark long predates any
+--   ownership and most never lead to one.
+--
+--   `historical_records` is the permanent record of what already
+--   happened. A saved location is a standing intent about the future,
+--   not an event.
+--
+-- No `requirements_card` column, and that is standing rule 3 rather
+-- than an oversight: `control.assess` is real, already built, already
+-- player-facing through `assess-takeover`, and the world a bookmark
+-- points at keeps moving — a stored card goes stale the first tick
+-- the target's roster, cohesion or materiel changes.
+-- `engine.js#savedLocationsOf` recomputes it live on every read.
+CREATE TABLE IF NOT EXISTS saved_locations (
+    id                  BIGSERIAL PRIMARY KEY,
+    entity_id           BIGINT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+    scale               TEXT NOT NULL,
+    location_id         BIGINT NOT NULL,
+    saved_tick          BIGINT NOT NULL,
+    UNIQUE (entity_id, scale, location_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_saved_locations_entity ON saved_locations (entity_id);

@@ -48,6 +48,7 @@ const investments = require('./investments.js');
 const missions = require('./missions.js');
 const players = require('./players.js');
 const property = require('./property.js');
+const savedLocations = require('./savedLocations.js');
 const snapshots = require('./snapshots.js');
 const territory = require('./territory.js');
 const tick = require('./tick.js');
@@ -66,7 +67,7 @@ function nextAfter(rows, field = 'id') {
   return max + 1;
 }
 
-const MODULES = [archetypes, households, migration, crime, culture, decisions, keysLog, demographics, motivation, economy, flows, infrastructure, inventory, investments, missions, players, property, snapshots, territory, tick, worldStore];
+const MODULES = [archetypes, households, migration, crime, culture, decisions, keysLog, demographics, motivation, economy, flows, infrastructure, inventory, investments, missions, players, property, savedLocations, snapshots, territory, tick, worldStore];
 
 // Reseed every module's counters from the world it is handed. Returns
 // what each one was set to, so a restore can report it and a test can

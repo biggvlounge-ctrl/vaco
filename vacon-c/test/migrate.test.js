@@ -112,6 +112,12 @@ const EXTENSION_TABLES = {
     + 'no object, and the growth loop had no item that could raise a trait. '
     + 'individual_finances.assets is one NUMERIC and cannot say which goods; ownership_records '
     + 'is keyed to entities(id) and an item in a satchel is not an entity.',
+  saved_locations: 'task #97 — an entity\'s own bookmarked {scale, location_id} pairs. '
+    + '`players` has no field for a bookmark list and would need one per player rather than '
+    + 'per entity; `ownership_records` is about having taken a property, not watching one '
+    + 'worth taking; `historical_records` is a permanent record of what already happened, and '
+    + 'a bookmark is a standing intent about the future. No requirements-card column — '
+    + '`control.assess` computes it live on every read.',
 };
 
 function extensionColumns() {

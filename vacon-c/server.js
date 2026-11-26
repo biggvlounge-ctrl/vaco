@@ -1160,6 +1160,22 @@ app.get('/api/players/:id/tutorial-progress', (req, res) => {
   }
 });
 
+// Task #97 — every location this player has bookmarked, each with
+// `control.assess`'s own real requirements card computed LIVE. Same
+// shape as `study-sources`/`survival-status`/`tutorial-progress`:
+// saving and unsaving are writes and go through
+// `POST /api/players/:id/action` (`save-location`/`unsave-location`);
+// this is the read.
+app.get('/api/players/:id/saved-locations', (req, res) => {
+  const player = (engine.WorldState.players || []).find((p) => p.id === Number(req.params.id));
+  if (!player) return res.status(404).json({ error: `no player with id ${req.params.id}` });
+  try {
+    return res.json({ savedLocations: engine.savedLocationsOf(player.linked_entity_id) });
+  } catch (err) {
+    return res.status(404).json({ error: err.message });
+  }
+});
+
 // -- missions: the state machine ----------------------------------------------
 //
 // The engine's first real player verb. Everything else here reads a

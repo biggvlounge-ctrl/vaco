@@ -227,6 +227,28 @@ const ACTIONS = {
     }),
   },
 
+  // Task #97 — the same `{scale, locationId}` pair `assess-takeover`
+  // already requires, kept on a list. The requirements card itself is
+  // never in the body here: `GET /api/players/:id/saved-locations`
+  // computes it live, same shape as `survival-status`/`tutorial-progress`.
+  'save-location': {
+    summary: 'Bookmark a place, by scale and id, to watch its takeover-key requirements over time.',
+    modes: ['citizen', 'leader'],
+    requires: ['scale', 'locationId'],
+    verbs: ['saveLocation'],
+    run: (verbs, actorId, body) => verbs.saveLocation(actorId, {
+      scale: body.scale, locationId: Number(body.locationId),
+    }),
+  },
+
+  'unsave-location': {
+    summary: 'Remove one of your own bookmarked locations.',
+    modes: ['citizen', 'leader'],
+    requires: ['savedLocationId'],
+    verbs: ['unsaveLocation'],
+    run: (verbs, actorId, body) => verbs.unsaveLocation(actorId, Number(body.savedLocationId)),
+  },
+
   // **Salvage, as three verbs.** `server/salvage.js` is the one system
   // in the engine a player is meant to touch constantly rather than at
   // a turning point — you take things apart and make things all day —
