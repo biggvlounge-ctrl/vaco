@@ -47,12 +47,16 @@ const economy = require('./economy.js');
 const inventory = require('./inventory.js');
 const items = require('./items.js');
 const produce = require('./produce.js');
+const travel = require('./travel.js');
+const vehicles = require('./vehicles.js');
+const geo = require('./geo.js');
 
 const MISSION_RECRUIT_REWARD = 40;
 const MISSION_ALLIANCE_REWARD = 40;
 const MISSION_SPY_REWARD = 40;
 const MISSION_BARTER_REWARD = 40;
 const MISSION_HUNT_REWARD = 40;
+const MISSION_TRAVEL_REWARD = 40;
 
 function communityAnchor(worldState, communityId) {
   return (worldState.properties || []).find((p) => p.community_id === communityId) ?? null;
@@ -274,15 +278,85 @@ function offerHuntMission(worldState, npcId, options = {}) {
   return { mission };
 }
 
+// **Task #119 — the real, already-player-facing `begin-journey` verb
+// (`travel.beginJourney`) already fully supports a vehicle and real
+// fuel: a vehicle journey consumes one real unit of `vehicles
+// .FUEL_ITEM_NAME` from the leader every real travelling day
+// (`travel.js#advanceJourneys`'s own header), and genuinely running out
+// stalls the trip rather than harming anybody. This file's own job is
+// naming a real opportunity where that fuel constraint actually bites
+// — never a second fuel mechanic beside it.
+//
+// `totalDays` is recomputed here with the IDENTICAL formula
+// `beginJourney` itself uses (distance / speed, `Math.ceil`, floor of
+// 1) — not a duplicate mechanism disagreeing with it, the same
+// look-before-you-spend relationship `assessTakeover`/`attemptTakeover`
+// and `make-thing`'s own check flag already have to their committing
+// twin, because `beginJourney` cannot be called just to preview a
+// trip without actually starting it.
+//
+// Scans every real OTHER city the citizen could drive to and offers
+// the one with the GREATEST real fuel shortfall — the identical
+// "pick the worst real case" shape `offerBarterMission` already uses
+// for the scarcest resource — and returns null when the citizen's own
+// real fuel is genuinely enough for every one of them.
+function offerTravelMission(worldState, npcId, options = {}) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`offerTravelMission: no NPC ${npcId}`);
+  if (npc.communityId == null) return null;
+
+  const originCityId = travel.cityOf(worldState, npcId);
+  if (originCityId == null) return null;
+  const originCity = (worldState.cities || []).find((c) => c.id === originCityId);
+  if (!originCity) return null;
+
+  const heldVehicleType = vehicles.VEHICLE_TYPES
+    .find((type) => vehicles.kmPerDayFor(worldState, npcId, type) !== null);
+  if (!heldVehicleType) return null;
+  const kmPerDay = vehicles.kmPerDayFor(worldState, npcId, heldVehicleType);
+  const fuelHeld = inventory.quantityOf(worldState, npcId, vehicles.FUEL_ITEM_NAME);
+
+  let worst = null;
+  for (const destinationCity of (worldState.cities || [])) {
+    if (destinationCity.id === originCityId) continue;
+    const distanceMetres = geo.distanceMetres(geo.positionOf(originCity), geo.positionOf(destinationCity));
+    if (distanceMetres === null) continue;
+    const totalDays = Math.max(1, Math.ceil(distanceMetres / (kmPerDay * 1000)));
+    const shortfall = totalDays - fuelHeld;
+    if (shortfall > 0 && (worst === null || shortfall > worst.shortfall)) {
+      worst = { destinationCity, totalDays, shortfall };
+    }
+  }
+  if (!worst) return null;
+  const { destinationCity, totalDays } = worst;
+
+  const anchor = options.anchorPropertyId != null
+    ? (worldState.properties || []).find((p) => p.id === options.anchorPropertyId)
+    : communityAnchor(worldState, npc.communityId);
+  if (!anchor) return null;
+
+  const mission = missions.generateMission(worldState, {
+    locationId: anchor.id,
+    objective: `Travel by ${heldVehicleType} to ${destinationCity.name ?? `city ${destinationCity.id}`} — `
+      + `the trip needs ${totalDays} real day(s) of fuel and you genuinely hold only ${fuelHeld}`,
+    reward: options.reward ?? MISSION_TRAVEL_REWARD,
+  });
+  return {
+    mission, destinationCityId: destinationCity.id, vehicleType: heldVehicleType, totalDays, fuelHeld,
+  };
+}
+
 module.exports = {
   MISSION_RECRUIT_REWARD,
   MISSION_ALLIANCE_REWARD,
   MISSION_SPY_REWARD,
   MISSION_BARTER_REWARD,
   MISSION_HUNT_REWARD,
+  MISSION_TRAVEL_REWARD,
   offerRecruitMission,
   offerAllianceMission,
   offerSpyMission,
   offerBarterMission,
   offerHuntMission,
+  offerTravelMission,
 };

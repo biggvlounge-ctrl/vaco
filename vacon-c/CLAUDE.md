@@ -10146,3 +10146,37 @@ one), reusing `test/produce.test.js`'s own standing-rule-9 fixture
 discipline for setting a live skill trait rather than the generation-
 time birth sheet. Mutation-verified: bypassing the employment gate is
 caught by the refusal test; restored byte-identical.
+
+**A hundred-and-seventy-sixth, closing task #119 — the limited-fuel
+travel mission, and the sixth real mission wrapper in
+`missionVariety.js`, this time with no gap to close first.** The real
+`begin-journey` verb (`travel.beginJourney`) already fully supports a
+vehicle and real fuel — a vehicle journey consumes one real unit of
+`vehicles.FUEL_ITEM_NAME` from the leader every real travelling day,
+and genuinely running out stalls the trip rather than harming anybody
+(`travel.js#advanceJourneys`'s own header). So this file's only real
+job was naming a real opportunity where that constraint actually
+bites, never a second fuel mechanic beside it.
+
+**`offerTravelMission`'s `totalDays` is recomputed with the identical
+formula `beginJourney` itself uses** (distance ÷ speed, `Math.ceil`,
+floor of 1) rather than disagreeing with it — the same look-before-
+you-spend relationship `assessTakeover`/`attemptTakeover` and
+`make-thing`'s own check flag already hold to their committing twin,
+because `beginJourney` cannot be called just to preview a trip
+without actually starting one. It scans every real OTHER city the
+citizen's own held vehicle could reach and offers the one with the
+GREATEST real fuel shortfall — the identical "pick the worst real
+case" shape `offerBarterMission` already uses for the scarcest
+resource — and returns null when the citizen's own real fuel is
+genuinely enough for every one of them.
+
+3 new tests in `test/missionVariety.test.js`. The first version of
+the "picks the worst, not just the first qualifying" test could not
+actually tell the two apart — only one candidate city ever had a real
+positive shortfall, so "first" and "worst" picked the same answer by
+accident. Fixed by adding a second, intermediate-distance city with
+a real but smaller shortfall, pushed before the real worst one in
+the fixture array. Mutation-verified against the corrected test:
+reducing the comparison to "first qualifying" is now caught; restored
+byte-identical.

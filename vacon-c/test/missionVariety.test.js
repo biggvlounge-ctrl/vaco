@@ -12,6 +12,8 @@ const engine = require('../server/engine.js');
 const inventory = require('../server/inventory.js');
 const produce = require('../server/produce.js');
 const economy = require('../server/economy.js');
+const vehicles = require('../server/vehicles.js');
+const salvage = require('../server/salvage.js');
 const missionVariety = require('../server/missionVariety.js');
 
 const YEAR = 365;
@@ -159,6 +161,57 @@ test('offerSpyMission never names a real deceased family member, and returns nul
   landmark(engine.WorldState, 69110, 'shop', 69010);
 
   assert.equal(missionVariety.offerSpyMission(engine.WorldState, npc.id), null);
+});
+
+test('offerTravelMission names the real other city with the greatest real fuel shortfall for a held vehicle', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 69013;
+  engine.WorldState.communities.push({ id: 69013, city_id: 69913 });
+  engine.WorldState.cities.push({ id: 69913, name: 'Origin City', latitude: 38.6, longitude: -90.2 });
+  engine.WorldState.cities.push({ id: 69914, name: 'Near City', latitude: 38.7, longitude: -90.3 });
+  // Pushed BEFORE the real worst city, with a real but SMALLER
+  // shortfall -- a "pick the first qualifying city" bug would wrongly
+  // land here instead of on the real worst case.
+  engine.WorldState.cities.push({ id: 69920, name: 'Medium City', latitude: 41.3, longitude: -90.2 });
+  engine.WorldState.cities.push({ id: 69915, name: 'Far City', latitude: 40.7, longitude: -74.0 });
+  salvage.registerItems(engine.WorldState);
+  vehicles.registerFuelItem(engine.WorldState);
+  inventory.give(engine.WorldState, { entityId: npc.id, itemName: 'scooter', quantity: 1, condition: 100 });
+  inventory.give(engine.WorldState, { entityId: npc.id, itemName: vehicles.FUEL_ITEM_NAME, quantity: 1 });
+  landmark(engine.WorldState, 69113, 'shop', 69013);
+
+  const offer = missionVariety.offerTravelMission(engine.WorldState, npc.id);
+  assert.ok(offer, 'no travel mission opened');
+  assert.equal(offer.vehicleType, 'scooter');
+  assert.equal(offer.destinationCityId, 69915, 'the farther real city has the greater real fuel shortfall');
+  assert.ok(offer.totalDays > offer.fuelHeld, 'the whole point is that fuel held is genuinely not enough');
+  assert.match(offer.mission.objective, /Far City/);
+});
+
+test('offerTravelMission returns null when the citizen genuinely holds enough fuel for every real reachable city', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 69014;
+  engine.WorldState.communities.push({ id: 69014, city_id: 69916 });
+  engine.WorldState.cities.push({ id: 69916, name: 'Origin City 2', latitude: 38.6, longitude: -90.2 });
+  engine.WorldState.cities.push({ id: 69917, name: 'Near City 2', latitude: 38.7, longitude: -90.3 });
+  salvage.registerItems(engine.WorldState);
+  vehicles.registerFuelItem(engine.WorldState);
+  inventory.give(engine.WorldState, { entityId: npc.id, itemName: 'scooter', quantity: 1, condition: 100 });
+  inventory.give(engine.WorldState, { entityId: npc.id, itemName: vehicles.FUEL_ITEM_NAME, quantity: 1000 });
+  landmark(engine.WorldState, 69114, 'shop', 69014);
+
+  assert.equal(missionVariety.offerTravelMission(engine.WorldState, npc.id), null);
+});
+
+test('offerTravelMission returns null for a citizen holding no real vehicle at all', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 69015;
+  engine.WorldState.communities.push({ id: 69015, city_id: 69918 });
+  engine.WorldState.cities.push({ id: 69918, name: 'Origin City 3', latitude: 38.6, longitude: -90.2 });
+  engine.WorldState.cities.push({ id: 69919, name: 'Far City 3', latitude: 40.7, longitude: -74.0 });
+  landmark(engine.WorldState, 69115, 'shop', 69015);
+
+  assert.equal(missionVariety.offerTravelMission(engine.WorldState, npc.id), null);
 });
 
 test('offerBarterMission names a real resident holding the real scarcest survival resource', () => {

@@ -2409,6 +2409,18 @@ Combat skill and Tier 2 before ever offering the mission --
 tests in `test/missionVariety.test.js`; mutation-verified. See
 CLAUDE.md's hundred-and-seventy-fifth standing rule.
 
+## Real limited-fuel travel mission (closes task #119)
+The real `begin-journey` verb already supports a vehicle and real
+fuel -- one real unit consumed from the leader every real travelling
+day, running out stalls the trip rather than harming anybody.
+`missionVariety.offerTravelMission` names the real opportunity where
+that constraint actually bites: scans every real other city the
+citizen's own held vehicle could reach, previewing each trip's real
+day count with the identical formula `beginJourney` itself uses
+(never a second, disagreeing one), and offers the one with the
+greatest real fuel shortfall. 3 new tests; mutation-verified. See
+CLAUDE.md's hundred-and-seventy-sixth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a
