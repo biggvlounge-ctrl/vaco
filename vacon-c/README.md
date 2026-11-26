@@ -2581,6 +2581,20 @@ both copies of `SOC_GROUP_BY_OCCUPATION` (`labourPacks.js` and
 `test/occupations.test.js`. See CLAUDE.md's hundred-and-eighty-sixth
 standing rule.
 
+### Real foster-care-home and job-corps-center landmark categories (closes task #231)
+Two new real, singleton hero landmark categories: `foster-care-home`
+(residential, staffed by task #232's own `caseworker`) and
+`job-corps-center` (government, staffed by `teacher`) — both drawn
+from the full hero pool like `apartment-complex`/`zoo-aquarium`, never
+guaranteed one-per-city. Neither appears in either founding discovery
+document, so `discovery.js`'s own pool for both is `null`. Added crew
+profiles (`foster-care`, `job-corps`) after measuring that every OTHER
+hero category already had one. Both duplicated into
+`world-layer/exportRegion.js`'s own `KEY_CATEGORIES` list, kept
+identical by `test/landmark-packs.test.js`'s cross-repository
+assertion. 3 new tests in `test/landmarks.test.js`. See CLAUDE.md's
+hundred-and-eighty-seventh standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

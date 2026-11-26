@@ -87,6 +87,10 @@ const KEY_CATEGORIES = [
   // `school`'s own public-only density never covered. See
   // `vacon-c/server/landmarks.js`'s own comment above this entry.
   'private-school',
+  // Two more, "foster care homes + Job Corps/youth workforce programs"
+  // (VACON-C task #231) -- see `vacon-c/server/landmarks.js`'s own
+  // comment above these two entries for the real citations.
+  'foster-care-home', 'job-corps-center',
 ];
 
 // UNESCO inscription is treated as maximal historical importance by

@@ -98,9 +98,13 @@ test('THE KEY’s twenty-three categories are all here, plus the school and five
   // (task #71), the real, separate population NCES's own public-school
   // count for `school` does not cover. See CLAUDE.md's hundred-and-
   // thirtieth standing rule.
-  assert.equal(landmarks.KEY_BUILDING_CATEGORIES.length, 39);
+  //
+  // **Forty-one, after `foster-care-home`/`job-corps-center`** — task
+  // #231, by direct request. See CLAUDE.md's hundred-and-eighty-
+  // seventh standing rule.
+  assert.equal(landmarks.KEY_BUILDING_CATEGORIES.length, 41);
   assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes('school'));
-  for (const category of ['casino', 'fire-station', 'ems-station', 'ranger-station', 'port-terminal', 'mall', 'park', 'distribution-center', 'industrial-plant', 'military-base', 'forest', 'river', 'lake', 'apartment-complex', 'private-school']) {
+  for (const category of ['casino', 'fire-station', 'ems-station', 'ranger-station', 'port-terminal', 'mall', 'park', 'distribution-center', 'industrial-plant', 'military-base', 'forest', 'river', 'lake', 'apartment-complex', 'private-school', 'foster-care-home', 'job-corps-center']) {
     assert.ok(landmarks.KEY_BUILDING_CATEGORIES.includes(category), category);
   }
   for (const category of landmarks.KEY_BUILDING_CATEGORIES) {
@@ -509,4 +513,36 @@ test('the catalogue carries what a building is and whether it is kept', () => {
   ]) {
     assert.ok(statistics.KEYS.includes(key), `${key} is not in the catalogue`);
   }
+});
+
+// ---------------------------------------------------------------------
+// Task #231 — foster-care-home and job-corps-center
+// ---------------------------------------------------------------------
+
+test('foster-care-home is real, residential, and staffed by a real caseworker', () => {
+  assert.equal(landmarks.propertyTypeFor('foster-care-home'), 'residential');
+  assert.equal(landmarks.staffPostFor('foster-care-home'), 'caseworker');
+  assert.equal(landmarks.crewNameFor('foster-care-home'), 'foster-care');
+  assert.deepEqual(landmarks.crewFor('foster-care-home'), [{ occupation: 'caseworker', count: 1 }]);
+});
+
+test('job-corps-center is real, government-run, and staffed by real teachers', () => {
+  assert.equal(landmarks.propertyTypeFor('job-corps-center'), 'government');
+  assert.equal(landmarks.staffPostFor('job-corps-center'), 'teacher');
+  assert.equal(landmarks.crewNameFor('job-corps-center'), 'job-corps');
+  const crew = landmarks.crewFor('job-corps-center');
+  assert.deepEqual(crew, [
+    { occupation: 'teacher', count: 2 },
+    { occupation: 'manager', count: 1 },
+  ]);
+});
+
+test('neither foster-care-home nor job-corps-center is a repeatable, guaranteed-per-city category', () => {
+  // Real but rare -- a SINGLETON category, drawn like any other hero
+  // landmark, never a guaranteed one-per-city the way `school`/
+  // `church` are.
+  assert.ok(landmarks.SINGLETON_CATEGORIES.includes('foster-care-home'));
+  assert.ok(landmarks.SINGLETON_CATEGORIES.includes('job-corps-center'));
+  assert.equal(landmarks.densityPer1kFor('foster-care-home'), null);
+  assert.equal(landmarks.densityPer1kFor('job-corps-center'), null);
 });

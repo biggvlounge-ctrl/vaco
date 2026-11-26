@@ -10743,3 +10743,42 @@ and `world-layer/imports/blsImport.js` — keeping the standing
 cross-check (`test/labour-packs.test.js`'s own identity assertion)
 honest rather than silently drifting the two apart. 5 new tests in
 `test/occupations.test.js`.
+
+**A hundred-and-eighty-seventh, closing task #231 — foster care homes
+and a Job Corps center, as two more real, singleton landmark
+categories.** `foster-care-home` (`residential`, staffed by task
+#232's own real `caseworker`) and `job-corps-center` (`government`,
+staffed by `teacher`) sit in `landmarks.KEY_BUILDING_TYPES` the same
+way `apartment-complex`/`zoo-aquarium`/`masonic-building` already do
+— rare, real, singleton categories drawn from the full hero pool like
+any other, never a guaranteed one-per-city the way `school`/`church`
+are. Neither appears in either founding discovery document, so
+`discovery.js`'s own pool entry for both is `null`, the same honest
+gap `prison`/`zoo-aquarium`/`apartment-complex` already hold rather
+than an invented loot table.
+
+**Measured before writing it: every OTHER hero category already had
+a `CREW_BY_CATEGORY` entry, and these two were the only exceptions.**
+`landmarks.crewNameFor` safely returns `null` for a category with no
+entry and `control.maintenanceFor` already falls back cleanly to the
+generic role composition for exactly this case — so nothing would
+have broken by leaving these two out. They were added anyway,
+`foster-care` (`caseworker` x1) and `job-corps` (`teacher` x2,
+`manager` x1), because 100% of the thirty-nine other hero categories
+already had one and leaving a real, now-measured gap looks like an
+oversight rather than a choice.
+
+**The cross-repository cost of adding to `KEY_BUILDING_CATEGORIES`,
+paid in full rather than partially**: `world-layer/exportRegion.js`'s
+own duplicate `KEY_CATEGORIES` list (kept identical by
+`test/landmark-packs.test.js`'s "exact match" assertion, which IS
+part of this project's own `node --test test/` run) needed the same
+two entries. `world-layer/test/exportRegion.test.js`'s own hardcoded
+category COUNT was ALREADY stale before this round (confirmed by its
+own header comment, which says so) because that test file is not part
+of this run and nothing catches its drift — corrected to the real
+current count (41) rather than left wrong a second time, though the
+real guard remains the cross-repository assertion, not that count.
+3 new tests in `test/landmarks.test.js`, plus two pre-existing literal
+counts in `test/landmarks.test.js` and `test/discovery.test.js`
+updated (39→41 hero categories, 58→60 total categories).

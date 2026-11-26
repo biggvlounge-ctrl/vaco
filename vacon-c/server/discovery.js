@@ -166,6 +166,12 @@ const POOLS = {
   //: same honest `null` `stadium-arena`/`notable-bridge`/`park`
   //: already hold.
   'apartment-complex': null,
+  //: Task #231 -- neither category appears in either founding
+  //: discovery document, the same honest `null` `prison`/
+  //: `zoo-aquarium`/`apartment-complex` already hold rather than an
+  //: invented loot table for a category the documents never named.
+  'foster-care-home': null,
+  'job-corps-center': null,
 
   // -- retail ---------------------------------------------------------
   //: COMPREHENSIVE_RETAIL_KEY_LOCATIONS.md's merchandise pools, which

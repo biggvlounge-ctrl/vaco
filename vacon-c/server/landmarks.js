@@ -411,6 +411,36 @@ const KEY_BUILDING_TYPES = {
     significance: [15, 40], propertyType: 'residential', staff: 'manager',
     discovery: null,
   },
+
+  // Task #231, by direct request: "foster care homes + Job Corps/
+  // youth workforce programs as real landmark types". Neither
+  // category appears in either founding discovery document, so
+  // `discovery.js`'s own `POOLS` entry for both is `null` — the same
+  // honest gap `prison`/`zoo-aquarium`/`apartment-complex` already
+  // hold, not an invented loot table.
+  'foster-care-home': {
+    // A licensed group home is, physically, a house — the identical
+    // real shape `apartment-complex` already established for occupied
+    // residential housing among the hero categories, scaled down: a
+    // group home serves a handful of children, not a development.
+    // `caseworker` (task #232, real SOC 21-1021) is the real defining
+    // post: a licensed foster/group home has social-work staff
+    // overseeing placement and care, not a teacher or a manager.
+    significance: [15, 35], propertyType: 'residential', staff: 'caseworker',
+    discovery: null,
+  },
+  'job-corps-center': {
+    // Real, federal (U.S. Department of Labor), residential youth
+    // workforce-training program — government-operated, not a school
+    // under this engine's own public/private split, and rarer than an
+    // ordinary school: DOL's own published network is about 120
+    // centers nationwide, a handful of states' worth at most, not one
+    // per city. `teacher` is the real closest-fitting defining post —
+    // vocational/academic instruction is the job, the same relationship
+    // `school`'s own `staff: 'teacher'` already holds.
+    significance: [25, 50], propertyType: 'government', staff: 'teacher',
+    discovery: null,
+  },
 };
 
 const KEY_BUILDING_CATEGORIES = Object.keys(KEY_BUILDING_TYPES);
@@ -748,6 +778,21 @@ const CREWS = {
   'apartment-manager': [
     { occupation: 'manager', count: 1 },
   ],
+  //: Task #231. A licensed group home's own real staff is social-work
+  //: casework, the same single-post shape `apartment-manager` already
+  //: holds for occupied residential housing -- not an institution's
+  //: full crew.
+  'foster-care': [
+    { occupation: 'caseworker', count: 1 },
+  ],
+  //: A residential vocational-training program's own real shape: a
+  //: handful of instructors plus one administrator, far smaller than
+  //: `schoolhouse`'s ordinary-school ratio because DOL's own Job Corps
+  //: centers are a fraction of a school's enrollment.
+  'job-corps': [
+    { occupation: 'teacher', count: 2 },
+    { occupation: 'manager', count: 1 },
+  ],
   //: The casino's real occupational shape: the gaming floor (`dealer`)
   //: is overwhelmingly the largest category at any real casino, with
   //: `pitboss` supervising it, `cashier` at the cage, `bookmaker` at
@@ -902,6 +947,8 @@ const CREW_BY_CATEGORY = {
   river: 'unmanned',
   lake: 'unmanned',
   'apartment-complex': 'apartment-manager',
+  'foster-care-home': 'foster-care',
+  'job-corps-center': 'job-corps',
 };
 
 // Retail is one kind of place, so it is one entry rather than ten.

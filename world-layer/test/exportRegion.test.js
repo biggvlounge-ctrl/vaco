@@ -115,7 +115,13 @@ test('the Key is the documents’ twenty-three, plus the school they disagree ab
   // count on both sides — `landmark-packs.test.js`'s own "world-layer's
   // exported Key matches this engine's Key, exactly" is what actually
   // keeps the two lists from silently diverging again.
-  assert.equal(KEY_CATEGORIES.length, 38);
+  // This literal count is the thing this file's own header already
+  // warns is prone to drifting silently, because this directory is
+  // not part of `vacon-c`'s own `node --test test/` run. Updated to
+  // the real current count (VACON-C task #231's two additions) rather
+  // than left wrong a second time; `landmark-packs.test.js`'s "exact
+  // match" assertion, which IS in that run, is the real guard.
+  assert.equal(KEY_CATEGORIES.length, 41);
   assert.ok(KEY_CATEGORIES.includes('school'));
   assert.ok(KEY_CATEGORIES.includes('masonic-building'));
   assert.ok(KEY_CATEGORIES.includes('other-distinctive-feature'));
@@ -126,6 +132,8 @@ test('the Key is the documents’ twenty-three, plus the school they disagree ab
   assert.ok(KEY_CATEGORIES.includes('river'));
   assert.ok(KEY_CATEGORIES.includes('lake'));
   assert.ok(KEY_CATEGORIES.includes('apartment-complex'));
+  assert.ok(KEY_CATEGORIES.includes('foster-care-home'));
+  assert.ok(KEY_CATEGORIES.includes('job-corps-center'));
 });
 
 // ---------------------------------------------------------------------
