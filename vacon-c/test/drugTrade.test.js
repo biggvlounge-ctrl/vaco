@@ -248,6 +248,99 @@ test('runStreetDealing never sells for a real gang\'s own leader/lieutenant/shot
 });
 
 // ---------------------------------------------------------------------
+// dealDrugs — task #129, the real player-facing half of this
+// mechanism, sharing resolveSale with runStreetDealing's own sweep.
+// ---------------------------------------------------------------------
+
+test('dealDrugs sells a real held substance RIGHT NOW for a real soldier/associate, crediting real money and recording a real drug-category crime', () => {
+  const leader = adult(flatTraits(50));
+  const org = gang(leader.id);
+  const dealer = soldierIn(org);
+  drugTrade.produceMarijuana(w, dealer.id, { tick: 0 });
+
+  const sold = drugTrade.dealDrugs(w, dealer.id, { itemName: 'marijuana', tick: 0 });
+  assert.equal(sold.category, 'drug');
+  assert.equal(sold.perpetrator_entity_id, dealer.id);
+  assert.equal(sold.victim_entity_id, null, 'a drug sale has no real victim');
+  assert.equal(inventory.quantityOf(w, dealer.id, 'marijuana'), 0, 'dealing the full held amount leaves none behind');
+  assert.ok(Number(economy.getLatestFinances(w, dealer.id)?.savings) > 0, 'the real sale actually credited real money');
+});
+
+test('dealDrugs respects an explicit quantity, bounded to what is actually held', () => {
+  const leader = adult(flatTraits(50));
+  const org = gang(leader.id);
+  const dealer = soldierIn(org);
+  drugTrade.produceMarijuana(w, dealer.id, { tick: 0 });
+  const held = inventory.quantityOf(w, dealer.id, 'marijuana');
+
+  drugTrade.dealDrugs(w, dealer.id, { itemName: 'marijuana', quantity: 3, tick: 0 });
+  assert.equal(inventory.quantityOf(w, dealer.id, 'marijuana'), held - 3);
+
+  // Asking for more than held is bounded down, never an overdraw.
+  drugTrade.dealDrugs(w, dealer.id, { itemName: 'marijuana', quantity: 999, tick: 0 });
+  assert.equal(inventory.quantityOf(w, dealer.id, 'marijuana'), 0);
+});
+
+test('dealDrugs throws for a substance name that is not real', () => {
+  const leader = adult(flatTraits(50));
+  const org = gang(leader.id);
+  const dealer = soldierIn(org);
+  assert.throws(() => drugTrade.dealDrugs(w, dealer.id, { itemName: 'fairy_dust', tick: 0 }), /not a real substance/);
+});
+
+test('dealDrugs throws for an entity who is not a real member of any real gang', () => {
+  const loner = adult(flatTraits(50), nextId += 1);
+  assert.throws(
+    () => drugTrade.dealDrugs(w, loner.id, { itemName: 'marijuana', tick: 0 }),
+    /not a real member of any real gang/,
+  );
+});
+
+test('dealDrugs throws for a real gang leader/lieutenant/shot_caller tier, never a street-level-only verb bypassed', () => {
+  const leader = adult((def) => (def.family === 'faction' && def.name === 'Territorial Instinct' ? 95 : 5));
+  const org = gang(leader.id);
+  membership.joinOrganization(w, { entityId: leader.id, organizationId: org.id });
+  drugTrade.produceMarijuana(w, leader.id, { tick: 0 });
+  assert.equal(membership.gangTierFor(w, org.id, leader.id, 0), 'leader');
+
+  assert.throws(
+    () => drugTrade.dealDrugs(w, leader.id, { itemName: 'marijuana', tick: 0 }),
+    /does not deal street-level/,
+  );
+});
+
+test('dealDrugs throws when the real soldier/associate holds none of the named substance', () => {
+  const leader = adult(flatTraits(50));
+  const org = gang(leader.id);
+  const dealer = soldierIn(org);
+  assert.throws(
+    () => drugTrade.dealDrugs(w, dealer.id, { itemName: 'cocaine', tick: 0 }),
+    /holds no real cocaine/,
+  );
+});
+
+test('mutation check: dealDrugs and runStreetDealing credit the identical real price for the identical substance and quantity', () => {
+  const leaderA = adult(flatTraits(50));
+  const orgA = gang(leaderA.id);
+  const dealerA = soldierIn(orgA);
+  drugTrade.produceMarijuana(w, dealerA.id, { tick: 0 });
+  drugTrade.dealDrugs(w, dealerA.id, { itemName: 'marijuana', quantity: 4, tick: 0 });
+  const creditedByDealDrugs = Number(economy.getLatestFinances(w, dealerA.id)?.savings ?? 0);
+
+  const leaderB = adult(flatTraits(50));
+  const orgB = gang(leaderB.id);
+  const dealerB = soldierIn(orgB);
+  const resolved = drugTrade.resolveSale(w, {
+    entityId: dealerB.id, itemName: 'marijuana', quantity: 4, tick: 0,
+  });
+  const creditedByResolveSale = Number(economy.getLatestFinances(w, dealerB.id)?.savings ?? 0);
+
+  assert.equal(creditedByDealDrugs, creditedByResolveSale, 'the two real callers must compute the identical price');
+  assert.equal(creditedByDealDrugs, Math.round(drugTrade.SUBSTANCES.marijuana.baseValue * 4 * 100) / 100);
+  assert.equal(resolved.category, 'drug');
+});
+
+// ---------------------------------------------------------------------
 // runPrisonSmuggling
 // ---------------------------------------------------------------------
 

@@ -18,6 +18,8 @@ const camps = require('../server/camps.js');
 const travel = require('../server/travel.js');
 const missionVariety = require('../server/missionVariety.js');
 const businesses = require('../server/businesses.js');
+const drugTrade = require('../server/drugTrade.js');
+const membership = require('../server/membership.js');
 
 const YEAR = 365;
 
@@ -782,4 +784,85 @@ test('offerBusinessMission returns null with no real going wage anywhere (no lab
   });
 
   assert.equal(missionVariety.offerBusinessMission(w, 1), null);
+});
+
+// ---------------------------------------------------------------------
+// Task #129 -- the eleventh offer*Mission, closing the drug verb gap
+// this file's own header named alongside business and extortion.
+// Reuses the SHARED `engine.WorldState` directly (the identical
+// pattern `offerHuntMission`'s own tests already use), since a real
+// gang tier reads live `faction` traits through `getLiveEntity` --
+// the same real substrate `engine.generateNPC` already writes,
+// never a hand-built isolated world for this one.
+// ---------------------------------------------------------------------
+
+function drugGang(leaderId) {
+  return engine.generateOrganization({ name: `Drug Gang ${leaderId}`, type: 'gang', leaderId });
+}
+
+// A real soldier/associate tier, deterministically -- the identical
+// real trait shape `test/drugTrade.test.js`'s own `soldierIn` already
+// establishes: Territorial Instinct strictly highest of the four real
+// faction dimensions -> `soldier`.
+function drugSoldier(gangOrg, communityId) {
+  const npc = engine.generateNPC({
+    traitValueFor: (def) => {
+      if (def.family !== 'faction') return 50;
+      if (def.name === 'Territorial Instinct') return 95;
+      if (def.name === 'Defection Risk') return 50;
+      return 5;
+    },
+    communityId,
+  });
+  npc.createdTick = engine.WorldState.tick - 30 * 365;
+  membership.joinOrganization(engine.WorldState, { entityId: npc.id, organizationId: gangOrg.id });
+  return npc;
+}
+
+test('offerDrugMission points at dealing a real held substance for a real gang soldier/associate', () => {
+  const leader = engine.generateNPC();
+  const org = drugGang(leader.id);
+  const dealer = drugSoldier(org, 69021);
+  engine.WorldState.communities.push({ id: 69021, city_id: 69921 });
+  landmark(engine.WorldState, 69121, 'shop', 69021);
+  drugTrade.produceMarijuana(engine.WorldState, dealer.id, { tick: engine.WorldState.tick });
+
+  const offer = missionVariety.offerDrugMission(engine.WorldState, dealer.id);
+  assert.ok(offer, 'no drug mission was opened for a real soldier holding a real substance');
+  assert.equal(offer.itemName, 'marijuana');
+  assert.match(offer.mission.objective, /Deal your real held marijuana/);
+  assert.equal(offer.mission.reward, missionVariety.MISSION_DRUG_REWARD);
+});
+
+test('offerDrugMission returns null for an entity who is not a real member of any real gang', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 69022;
+  engine.WorldState.communities.push({ id: 69022, city_id: 69922 });
+  landmark(engine.WorldState, 69122, 'shop', 69022);
+
+  assert.equal(missionVariety.offerDrugMission(engine.WorldState, npc.id), null);
+});
+
+test('offerDrugMission returns null for a real gang leader/lieutenant/shot_caller tier, holding a real substance notwithstanding', () => {
+  const leader = engine.generateNPC({
+    traitValueFor: (def) => (def.family === 'faction' && def.name === 'Territorial Instinct' ? 95 : 5),
+  });
+  leader.communityId = 69023;
+  engine.WorldState.communities.push({ id: 69023, city_id: 69923 });
+  landmark(engine.WorldState, 69123, 'shop', 69023);
+  const org = drugGang(leader.id);
+  membership.joinOrganization(engine.WorldState, { entityId: leader.id, organizationId: org.id });
+  drugTrade.produceMarijuana(engine.WorldState, leader.id, { tick: engine.WorldState.tick });
+
+  assert.equal(missionVariety.offerDrugMission(engine.WorldState, leader.id), null);
+});
+
+test('offerDrugMission returns null for a real soldier/associate holding no real substance at all', () => {
+  const leader = engine.generateNPC();
+  const org = drugGang(leader.id);
+  const dealer = drugSoldier(org, 69024);
+  engine.WorldState.communities.push({ id: 69024, city_id: 69924 });
+  landmark(engine.WorldState, 69124, 'shop', 69024);
+
+  assert.equal(missionVariety.offerDrugMission(engine.WorldState, dealer.id), null);
 });

@@ -97,6 +97,7 @@ const control = require('./control.js');
 const savedLocations = require('./savedLocations.js');
 const extortion = require('./extortion.js');
 const businesses = require('./businesses.js');
+const drugTrade = require('./drugTrade.js');
 const meetings = require('./meetings.js');
 const landmarks = require('./landmarks.js');
 const salvage = require('./salvage.js');
@@ -900,6 +901,25 @@ function foundBusiness(founderId, options = {}) {
   return businesses.foundBusiness(WorldState, { ...options, founderId, generateOrganization });
 }
 
+// Task #129: the real player-facing drug-trade verbs. `drugTrade.js`'s
+// own `produceMarijuana`/`convertCrack`/`importSubstance`/`dealDrugs`
+// already resolve the actor's own real gang membership/tier directly
+// -- no caller-supplied id, the fourth standing Phase-3 rule already
+// satisfied inside drugTrade.js itself, so these are pure pass-through
+// wrappers, the identical shape `captureEntity`'s own wrapper holds.
+function produceMarijuana(actorId, options = {}) {
+  return drugTrade.produceMarijuana(WorldState, actorId, options);
+}
+function convertCrack(actorId, options = {}) {
+  return drugTrade.convertCrack(WorldState, actorId, options);
+}
+function importSubstance(actorId, substanceName, options = {}) {
+  return drugTrade.importSubstance(WorldState, actorId, substanceName, options);
+}
+function dealDrugs(actorId, options = {}) {
+  return drugTrade.dealDrugs(WorldState, actorId, options);
+}
+
 // Task #130: the real player-facing half of extortion.js's own
 // mechanism. The actor's own real LEADERSHIP of the demanding
 // organization is checked here, not just passed through — the same
@@ -1394,6 +1414,10 @@ const ACTION_VERBS = {
   disposeOfCapture: (...args) => disposeOfCapture(...args),
   demandTribute: (...args) => demandTribute(...args),
   foundBusiness: (...args) => foundBusiness(...args),
+  produceMarijuana: (...args) => produceMarijuana(...args),
+  convertCrack: (...args) => convertCrack(...args),
+  importSubstance: (...args) => importSubstance(...args),
+  dealDrugs: (...args) => dealDrugs(...args),
   assignRole: (...args) => assignRole(...args),
   sendSpy: (...args) => sendSpy(...args),
   attemptHeist: (...args) => attemptHeist(...args),

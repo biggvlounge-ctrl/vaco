@@ -56,6 +56,7 @@ const control = require('./control.js');
 const authority = require('./authority.js');
 const extortion = require('./extortion.js');
 const businesses = require('./businesses.js');
+const drugTrade = require('./drugTrade.js');
 
 const MISSION_RECRUIT_REWARD = 40;
 const MISSION_ALLIANCE_REWARD = 40;
@@ -67,6 +68,7 @@ const MISSION_NOMADIC_REWARD = 40;
 const MISSION_EXPANSION_REWARD = 40;
 const MISSION_EXTORTION_REWARD = 40;
 const MISSION_BUSINESS_REWARD = 40;
+const MISSION_DRUG_REWARD = 40;
 
 function communityAnchor(worldState, communityId) {
   return (worldState.properties || []).find((p) => p.community_id === communityId) ?? null;
@@ -625,6 +627,46 @@ function offerBusinessMission(worldState, npcId, options = {}) {
   return { mission, capital };
 }
 
+// **Task #129, the eleventh `offer*Mission`, closing the drug verb
+// gap this file's own header named alongside business and extortion.**
+// Same shape task #130/#128 already used: build the missing real verb
+// first (`drugTrade.dealDrugs`, composing the identical `resolveSale`
+// code `runStreetDealing`'s own sweep already shares), then wrap it.
+//
+// Reads the IDENTICAL real precondition `dealDrugs` itself re-checks
+// — real soldier/associate gang tier, holding a real substance —
+// never a second, looser gate that could offer a mission the real
+// verb would then refuse.
+function offerDrugMission(worldState, npcId, options = {}) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`offerDrugMission: no NPC ${npcId}`);
+
+  const org = drugTrade.gangOf(worldState, npcId);
+  if (!org) return null;
+  const tick = options.tick ?? worldState.tick ?? 0;
+  const tier = membership.gangTierFor(worldState, org.id, npcId, tick);
+  if (tier !== 'soldier' && tier !== 'associate') return null;
+
+  const substanceSet = new Set(drugTrade.SUBSTANCE_NAMES);
+  const holding = (worldState.inventory || []).find(
+    (h) => h.holder_entity_id === npcId && substanceSet.has(h.item_name) && Number(h.quantity) > 0,
+  );
+  if (!holding) return null;
+
+  const anchor = options.anchorPropertyId != null
+    ? (worldState.properties || []).find((p) => p.id === options.anchorPropertyId)
+    : communityAnchor(worldState, npc.communityId);
+  if (!anchor) return null;
+
+  const mission = missions.generateMission(worldState, {
+    locationId: anchor.id,
+    objective: `Deal your real held ${holding.item_name} on the street — your own real gang `
+      + 'membership already covers this',
+    reward: options.reward ?? MISSION_DRUG_REWARD,
+  });
+  return { mission, itemName: holding.item_name, quantity: holding.quantity };
+}
+
 module.exports = {
   MISSION_RECRUIT_REWARD,
   MISSION_ALLIANCE_REWARD,
@@ -636,6 +678,7 @@ module.exports = {
   MISSION_EXPANSION_REWARD,
   MISSION_EXTORTION_REWARD,
   MISSION_BUSINESS_REWARD,
+  MISSION_DRUG_REWARD,
   offerRecruitMission,
   offerAllianceMission,
   offerSpyMission,
@@ -646,4 +689,5 @@ module.exports = {
   offerExpansionMission,
   offerExtortionMission,
   offerBusinessMission,
+  offerDrugMission,
 };

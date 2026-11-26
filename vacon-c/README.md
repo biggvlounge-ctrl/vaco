@@ -2535,6 +2535,24 @@ capital) — mutation-verified across all three gates. New
 `['citizen','leader']` verb: `found-business`. 5 new tests in
 `test/missionVariety.test.js`. See CLAUDE.md's
 hundred-and-eighty-second standing rule.
+
+### Real drug-production/dealing player verbs (closes task #129)
+`drugTrade.js`'s own `produceMarijuana`/`convertCrack`/
+`importSubstance` already resolved the actor's own real gang
+membership directly, so `engine.js`'s wrappers for those three are
+pure pass-through. The real gap was street-level dealing: `resolveSale`
+is the shared real consequence code `runStreetDealing`'s own
+unattended per-tick sweep used to inline; it now calls the same
+function the new real `dealDrugs` verb does — the identical shape
+`extortion.js#resolveDemand` already took for task #130.
+`offerDrugMission` is the eleventh `missionVariety.js` wrapper,
+reading the IDENTICAL real precondition `dealDrugs` itself re-checks
+(real soldier/associate gang tier, holding a real substance). New
+`['citizen','leader']` verbs: `produce-marijuana`, `convert-crack`,
+`import-substance`, `deal-drugs`. 7 new tests in
+`test/drugTrade.test.js`, 4 new in `test/missionVariety.test.js`. See
+CLAUDE.md's hundred-and-eighty-third standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

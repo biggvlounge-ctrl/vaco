@@ -10543,3 +10543,92 @@ test, since `foundBusiness` was already covered by `test/businesses
 `ACTION_VERBS`-only, same posture `captureEntity`/`disposeOfCapture`
 already hold — no dedicated engine-level wrapper test, confirmed by
 hand instead.
+
+**A hundred-and-eighty-third, closing task #129 and the last third of
+the task #118 backlog note** ("business/drug/extortion split out as
+their own real-verb gaps"). `drugTrade.js`'s own
+`produceMarijuana`/`convertCrack`/`importSubstance` already resolved
+the actor's own real gang membership directly — no caller-supplied
+id, the fourth standing Phase-3 rule already satisfied inside
+`drugTrade.js` itself — so `engine.js`'s own wrappers for those three
+are pure pass-through, the identical shape `captureEntity`'s own
+wrapper already holds.
+
+**The real gap was street-level dealing, which only ever existed as
+`runStreetDealing`'s own unattended per-tick sweep.** `resolveSale` is
+the shared real consequence code (take the held substance, credit the
+real price, record the real `drug`-category crime with no real
+victim) `runStreetDealing`'s own loop body used to inline; it now
+calls the same function `drugTrade.dealDrugs` does — the identical
+shape `extortion.js#resolveDemand` already took for task #130.
+`dealDrugs` re-enforces every real precondition the sweep's own loop
+already checks (real soldier/associate gang tier, holding a real
+substance) and skips only the sweep's own `BASE_DEALING_RISK` gate,
+which exists purely to pace the unattended draw — the identical
+reasoning `demandTribute` already used against
+`extortion.EXTORTION_RATE`.
+
+**`offerDrugMission` is the eleventh `missionVariety.js` wrapper**,
+reading the IDENTICAL real precondition `dealDrugs` itself re-checks.
+Its own test file reuses the SHARED `engine.WorldState` directly
+(the same pattern `offerHuntMission`'s own tests already use) rather
+than a hand-built isolated world, because a real gang tier reads live
+`faction` traits through `getLiveEntity` — the same real substrate
+`engine.generateNPC` already writes.
+
+New `['citizen','leader']` verbs: `produce-marijuana`, `convert-crack`,
+`import-substance`, `deal-drugs`. 7 new tests in
+`test/drugTrade.test.js` (including a mutation check: `dealDrugs` and
+`runStreetDealing`'s own sweep credit the identical real price for the
+identical substance and quantity), 4 new in
+`test/missionVariety.test.js`.
+
+**One process note, not a defect in the shipped code.** The first
+draft of the `dealDrugs`/`runStreetDealing` shared-code mutation check
+wrote a mutated copy of `drugTrade.js` to disk, deleted it from
+`require.cache`, and restored it in a `finally` block — a pattern this
+project's OWN hand-run mutation-verification already uses during
+development, but never before baked into a PERMANENT automated test
+that mutates a real source file on every suite run. Every other
+"mutation check" test already in this codebase
+(`test/extortion.test.js`'s own three) is an ordinary behavioural
+assertion on the real, shared formula instead — never literal file
+mutation at test time. Replaced before this round shipped, with the
+same shape those three already use: assert the two real callers
+(`dealDrugs`, `drugTrade.resolveSale` directly) compute the identical
+real price for the identical inputs.
+
+**A hundred-and-eighty-fourth, and it is a confirmed-pre-existing,
+confirmed-non-deterministic hang, broader than it first looked.**
+Chasing down an intermittent stall while confirming #128/#129's own
+suite run, `test/businesses.test.js`'s own "a generated world
+actually founds and can lose businesses over real ticks" test (a full
+`worldgen.generateWorld` plus 300 real `engine.advanceTick()` calls)
+hung on one run and not the next. `git stash` reproduced it on
+committed HEAD (c7193b0) with none of this round's own changes
+present — not caused by #128 or #129 — and a diagnostic script
+instrumented with synchronous file logging (to rule out stdout-
+buffering artefacts from piping through another process) confirmed it
+is genuinely non-deterministic rather than seed-dependent: one run
+stalled at tick 60, a separate full-suite run in parallel completed
+the identical test with no stall at all.
+
+**This is the sixty-third standing rule's own hang, found again, and
+broader than its own record of it.** `test/worldgen.test.js`'s hang
+(tasks #16, #149) was already on file as never fully root-caused
+across multiple rounds — only ever worked around with
+`--test-timeout` or file exclusion. A full-suite run with
+`node --test --test-timeout=60000` shows the SAME class of hang
+affecting **seven files, not one**: `authority.test.js`,
+`businesses.test.js`, `construction.test.js`, `migration.test.js`,
+`production.test.js`, `utilities.test.js`, `worldgen.test.js` — every
+one of them a test that calls `worldgen.generateWorld()` and then runs
+many real `advanceTick()` calls in a row. **Deliberately not
+root-caused in this round, by the sixty-third rule's own established
+precedent, not by oversight**: handled by re-running the full suite
+with `--test-timeout=60000` and confirming zero actual test FAILURES
+(only cancellations attributable to this known class), which is the
+sixty-third rule's own treatment and a valid basis for committing
+unrelated work. Left as its own real, separate, future task — the
+seven-file scope is the new information worth keeping, not a reason
+to widen this round to cover it.

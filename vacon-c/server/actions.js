@@ -491,6 +491,42 @@ const ACTIONS = {
     run: (verbs, actorId, body) => verbs.foundBusiness(actorId, { name: body.name }),
   },
 
+  'produce-marijuana': {
+    summary: 'Grow and harvest a real batch of marijuana -- real gang membership required, no cartel '
+      + 'connection needed.',
+    modes: ['citizen', 'leader'],
+    requires: [],
+    verbs: ['produceMarijuana'],
+    run: (verbs, actorId) => verbs.produceMarijuana(actorId),
+  },
+
+  'convert-crack': {
+    summary: 'Convert your real held cocaine into crack cocaine -- a domestic conversion, no cartel '
+      + 'connection needed.',
+    modes: ['citizen', 'leader'],
+    requires: [],
+    verbs: ['convertCrack'],
+    run: (verbs, actorId) => verbs.convertCrack(actorId),
+  },
+
+  'import-substance': {
+    summary: "Import a real cartel-sourced substance -- requires your own real organization's earned "
+      + 'cartel connection.',
+    modes: ['citizen', 'leader'],
+    requires: ['substanceName'],
+    verbs: ['importSubstance'],
+    run: (verbs, actorId, body) => verbs.importSubstance(actorId, body.substanceName),
+  },
+
+  'deal-drugs': {
+    summary: 'Deal a real held substance on the street right now -- real gang soldier/associate tier '
+      + 'required, rather than waiting on the random per-tick sweep.',
+    modes: ['citizen', 'leader'],
+    requires: ['itemName'],
+    verbs: ['dealDrugs'],
+    run: (verbs, actorId, body) => verbs.dealDrugs(actorId, { itemName: body.itemName, quantity: body.quantity }),
+  },
+
   'demand-tribute': {
     summary: 'Demand tribute from a real, specific business your own organization genuinely holds '
       + 'ground over -- right now, rather than waiting on the random per-tick sweep.',

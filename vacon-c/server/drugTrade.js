@@ -269,6 +269,38 @@ function importSubstance(worldState, entityId, substanceName, options = {}) {
 }
 
 // ---------------------------------------------------------------------
+// resolveSale — the real consequence code `runStreetDealing`'s own
+// sweep and the real player-facing `dealDrugs` (task #129) both share,
+// rather than risking two mechanics quietly disagreeing, the identical
+// shape `extortion.js#resolveDemand` already took for task #130.
+// ---------------------------------------------------------------------
+// No real victim — a drug sale is a real, consensual transaction
+// between the dealer and a buyer this engine does not need to name,
+// the same honest shape every §9 category without one already holds.
+function resolveSale(worldState, options = {}) {
+  const { entityId, itemName, quantity, tick = worldState.tick ?? 0 } = options;
+  const saleQuantity = Math.max(1, Math.round(Number(quantity) || 0));
+  inventory.take(worldState, { entityId, itemName, quantity: saleQuantity, tick });
+
+  const price = Math.round((SUBSTANCES[itemName]?.baseValue ?? 0) * saleQuantity);
+  if (price > 0) {
+    const current = economy.getLatestFinances(worldState, entityId);
+    economy.generateIndividualFinances(worldState, entityId, {
+      income: current?.income ?? 0,
+      savings: Math.round(((current?.savings ?? 0) + price) * 100) / 100,
+      debt: current?.debt ?? 0,
+      assets: current?.assets ?? 0,
+      tick,
+    });
+  }
+
+  return crime.recordCrime(worldState, {
+    category: 'drug', perpetratorId: entityId, victimId: null, tick,
+    detail: `street-level sale of ${saleQuantity} ${itemName}`,
+  });
+}
+
+// ---------------------------------------------------------------------
 // runStreetDealing — the real generator crime.js's own `drug` category
 // was waiting for
 // ---------------------------------------------------------------------
@@ -295,31 +327,43 @@ function runStreetDealing(worldState, tick = worldState.tick ?? 0) {
     if (seededDraw([worldState.seed ?? 'world', npc.id, tick, 'crime:drug']) >= BASE_DEALING_RISK) continue;
 
     const saleQuantity = Math.min(Number(holding.quantity), Math.max(1, Math.ceil(Number(holding.quantity) / 2)));
-    inventory.take(worldState, { entityId: npc.id, itemName: holding.item_name, quantity: saleQuantity, tick });
-
-    const price = Math.round((SUBSTANCES[holding.item_name]?.baseValue ?? 0) * saleQuantity);
-    if (price > 0) {
-      const current = economy.getLatestFinances(worldState, npc.id);
-      economy.generateIndividualFinances(worldState, npc.id, {
-        income: current?.income ?? 0,
-        savings: Math.round(((current?.savings ?? 0) + price) * 100) / 100,
-        debt: current?.debt ?? 0,
-        assets: current?.assets ?? 0,
-        tick,
-      });
-    }
-
-    // No real victim — a drug sale is a real, consensual transaction
-    // between the dealer and a buyer this engine does not need to
-    // name, the same honest shape every §9 category without one
-    // already holds.
-    const incident = crime.recordCrime(worldState, {
-      category: 'drug', perpetratorId: npc.id, victimId: null, tick,
-      detail: `street-level sale of ${saleQuantity} ${holding.item_name}`,
+    const incident = resolveSale(worldState, {
+      entityId: npc.id, itemName: holding.item_name, quantity: saleQuantity, tick,
     });
     incidents.push(incident);
   }
   return incidents;
+}
+
+// ---------------------------------------------------------------------
+// dealDrugs — task #129, the real player-facing half of this
+// mechanism. A real gang soldier/associate holding a real substance
+// can deal it RIGHT NOW rather than only ever waiting on
+// `runStreetDealing`'s own random per-tick draw. Shares the identical
+// real consequence code (`resolveSale`) with the sweep. The sweep's
+// own `BASE_DEALING_RISK` gate exists only to pace the UNATTENDED
+// draw — a player who chose to act does not also need to clear it,
+// the identical reasoning `demandTribute` already used against
+// `extortion.EXTORTION_RATE`.
+function dealDrugs(worldState, entityId, options = {}) {
+  const { itemName, tick = worldState.tick ?? 0 } = options;
+  if (!SUBSTANCE_NAMES.includes(itemName)) {
+    throw new Error(`dealDrugs: "${itemName}" is not a real substance.`);
+  }
+  const org = gangOf(worldState, entityId);
+  if (!org) throw new Error(`dealDrugs: entity ${entityId} is not a real member of any real gang.`);
+  const tier = membership.gangTierFor(worldState, org.id, entityId, tick);
+  if (tier !== 'soldier' && tier !== 'associate') {
+    throw new Error(`dealDrugs: entity ${entityId}'s real gang tier (${tier}) does not deal street-level.`);
+  }
+  const held = inventory.quantityOf(worldState, entityId, itemName);
+  if (held <= 0) {
+    throw new Error(`dealDrugs: entity ${entityId} holds no real ${itemName} to deal.`);
+  }
+  const quantity = options.quantity != null
+    ? Math.min(held, Math.max(1, Math.round(Number(options.quantity))))
+    : held;
+  return resolveSale(worldState, { entityId, itemName, quantity, tick });
 }
 
 // ---------------------------------------------------------------------
@@ -385,6 +429,8 @@ module.exports = {
   produceMarijuana,
   convertCrack,
   importSubstance,
+  resolveSale,
+  dealDrugs,
   runStreetDealing,
   runPrisonSmuggling,
 };
