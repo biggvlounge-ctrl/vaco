@@ -3152,3 +3152,28 @@ Iran war has heightened cyber threats to US energy infrastructure) --
 rather than blended in as if it were also real. No calendar anchor
 for tick 0 is claimed, since none exists in the engine to anchor to.
 See CLAUDE.md's two-hundred-and-eleventh standing rule.
+
+### Stalled electric/autonomous vehicles after the grid goes down (closes task #109)
+`electric_car`/`autonomous_car` join `VEHICLE_TYPES` -- real EVs and
+today's real autonomous fleets (Waymo, Zoox) are both electric, so
+pairing them under one real dependency (grid power, never a fuel
+item) is accurate. Remnant-only, the same posture `weapons.js`'s own
+pistol/rifle already hold: `salvage.recipeFor` returns `null` for
+both, and `restoreVehicle` refuses them with a real, specific reason
+rather than crashing on a recipe that does not exist. The real moment
+the grid "goes down" is `infrastructure.failInfrastructure` actually
+succeeding on a real `electricity` row -- `vehicles.gridAvailableIn`
+is a real tri-state read of that (`true`/`false`/`null` for "no such
+row exists to ask," never a stall on the unknown case), and
+`isStalled` gates `beginJourney` with its own real, specific refusal
+rather than reusing the existing "too damaged" message for a cause
+that is not damage. The new mission source --
+`missionTriggers.maybeTriggerStalledVehicleMission` -- is called
+directly from `infrastructure.advanceInfrastructure`'s own real
+failure loop, the instant a real `electricity` row fails, scanning
+the city's own real residents for the first one genuinely holding a
+real EV/AV and offering them a real mission at their own real home.
+16 new tests across `test/missionTriggers.test.js`,
+`test/vehicles.test.js` and an end-to-end integration test in
+`test/utilities.test.js`. See CLAUDE.md's two-hundred-and-twelfth
+standing rule.

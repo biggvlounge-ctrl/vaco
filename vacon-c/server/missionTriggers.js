@@ -317,7 +317,56 @@ function maybeTriggerItemMission(worldState, entityId, propertyId, found, option
   return mission;
 }
 
+// Task #109 — "stalled electric/autonomous vehicles after the grid
+// goes down (new mission source)." The real moment the grid "goes
+// down" is `infrastructure.failInfrastructure` actually succeeding on
+// a real `electricity` row (`advanceInfrastructure`'s own daily
+// draw) — never a second, invented outage signal. Called from there
+// with the real city that just lost power.
+//
+// Scans that city's own real residents for the first one genuinely
+// holding a real `electric_car`/`autonomous_car`
+// (`vehicles.ELECTRIC_VEHICLE_TYPES`) — the exact kind of person this
+// failure actually affects, never everyone in the city — and offers
+// them a real mission at their own real home, if they have one to be
+// offered at. No home, no stranded holder, or a mission already open
+// there: honestly nothing, the same shape every other trigger in this
+// file already holds for "nothing happened this time."
+function maybeTriggerStalledVehicleMission(worldState, cityId, options = {}) {
+  const { tick = worldState.tick ?? 0 } = options;
+  // eslint-disable-next-line global-require
+  const vehicles = require('./vehicles.js');
+  // eslint-disable-next-line global-require
+  const inventory = require('./inventory.js');
+
+  const communityIds = new Set(
+    (worldState.communities || []).filter((c) => c.city_id === cityId).map((c) => c.id),
+  );
+  const residents = (worldState.npcs || []).filter((n) => communityIds.has(n.communityId));
+
+  let stranded = null;
+  let vehicleType = null;
+  for (const npc of residents) {
+    const held = vehicles.ELECTRIC_VEHICLE_TYPES.find((type) => {
+      const holding = inventory.findHolding(worldState, npc.id, type);
+      return holding && Number(holding.quantity) > 0;
+    });
+    if (held) { stranded = npc; vehicleType = held; break; }
+  }
+  if (!stranded || stranded.home_property_id == null) return null;
+  if (hasOpenMissionAt(worldState, stranded.home_property_id)) return null;
+
+  // eslint-disable-next-line global-require
+  const missionVariety = require('./missionVariety.js');
+  const readableType = vehicleType.replace('_', ' ');
+  return missions.generateMission(worldState, {
+    locationId: stranded.home_property_id,
+    objective: `Your real ${readableType} won't start -- the power's out. Find a way to get it moving again.`,
+    reward: missionVariety.MISSION_STALLED_VEHICLE_REWARD,
+  });
+}
+
 module.exports = {
   MISSION_TRIGGER_CHANCE, CATEGORY_ORDER, hasOpenMissionAt, maybeTriggerMission,
-  maybeTriggerItemMission,
+  maybeTriggerItemMission, maybeTriggerStalledVehicleMission,
 };

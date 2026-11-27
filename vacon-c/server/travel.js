@@ -174,8 +174,20 @@ function beginJourney(worldState, leaderEntityId, options = {}) {
     if (kmPerDay <= 0) {
       throw new Error(`beginJourney: this real ${vehicleType} is too damaged to move at all.`);
     }
+    // Task #109 -- a real electric/autonomous vehicle needs real grid
+    // power, never a fuel item, and is refused honestly rather than
+    // silently drawing fuel it does not use (`vehicles.isStalled`
+    // reads the real `electricity` infrastructure state for the
+    // entity's own current city).
+    if (vehicles.isStalled(worldState, leaderEntityId, vehicleType)) {
+      throw new Error(`beginJourney: this real ${vehicleType} has no charge to draw on -- the electricity grid is down here.`);
+    }
     metresPerDay = kmPerDay * 1000;
-    vehicles.registerFuelItem(worldState);
+    if (vehicles.ELECTRIC_VEHICLE_TYPES.includes(vehicleType)) {
+      vehicles.registerElectricVehicleItems(worldState);
+    } else {
+      vehicles.registerFuelItem(worldState);
+    }
   }
 
   const members = membersFor(worldState, leaderEntityId);
@@ -311,14 +323,27 @@ function advanceJourneys(worldState, tick = worldState.tick ?? 0) {
     // leader) every real travelling day — out of fuel stalls the day
     // rather than harming anybody, since this is a pace problem, not a
     // deprivation one. See this file's own header.
+    //
+    // **An electric/autonomous vehicle (task #109) draws no per-day
+    // fuel item at all — it was already refused at departure
+    // (`beginJourney`'s own `vehicles.isStalled` check) unless its
+    // origin city's real grid was up, and there is no real "distance
+    // per charge" figure to cite for a recurring draw mid-journey.**
+    // Declared, not invented: between two cities there is no real
+    // city left to ask whether its grid is up, so a day-by-day grid
+    // check mid-transit would have nothing real to read either.
     if (journeyEntry.vehicleType !== null && journeyEntry.memberEntityIds.includes(journeyEntry.leaderEntityId)) {
-      const hadFuel = consumeOneUnitOfCategory(worldState, journeyEntry.leaderEntityId, vehicles.FUEL_ITEM_NAME);
-      vehicles.applyDailyWear(worldState, journeyEntry.leaderEntityId, journeyEntry.vehicleType);
-      if (!hadFuel) {
-        events.push({
-          type: 'journey-stalled', journeyId: journeyEntry.id, reason: 'out of fuel', tick,
-        });
-        continue;
+      if (vehicles.ELECTRIC_VEHICLE_TYPES.includes(journeyEntry.vehicleType)) {
+        vehicles.applyDailyWear(worldState, journeyEntry.leaderEntityId, journeyEntry.vehicleType);
+      } else {
+        const hadFuel = consumeOneUnitOfCategory(worldState, journeyEntry.leaderEntityId, vehicles.FUEL_ITEM_NAME);
+        vehicles.applyDailyWear(worldState, journeyEntry.leaderEntityId, journeyEntry.vehicleType);
+        if (!hadFuel) {
+          events.push({
+            type: 'journey-stalled', journeyId: journeyEntry.id, reason: 'out of fuel', tick,
+          });
+          continue;
+        }
       }
     }
 

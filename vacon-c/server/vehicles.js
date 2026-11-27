@@ -138,7 +138,67 @@ const heistTools = require('./heistTools.js');
 const crime = require('./crime.js');
 const { seededDraw } = require('./seeded.js');
 
-const VEHICLE_TYPES = ['car', 'motorcycle', 'scooter'];
+const VEHICLE_TYPES = ['car', 'motorcycle', 'scooter', 'electric_car', 'autonomous_car'];
+
+// Task #109, by direct backlog instruction: "stalled electric/
+// autonomous vehicles after the grid goes down (new mission source)."
+// Real EVs and today's real commercially-deployed autonomous fleets
+// (Waymo, Zoox) are both electric -- pairing them under one real
+// dependency (grid power, never a fuel item) is accurate, not
+// invented. **Remnant-only, same posture `weapons.js`'s own
+// pistol/rifle already hold**: there is no real recipe here, and
+// none is invented -- a battery pack, an electric drivetrain and (for
+// the autonomous half) the onboard compute are not something
+// `salvage.js`'s own materials-and-Tier model can honestly reproduce.
+// `salvage.recipeFor` returns `null` for both names, which
+// `restoreVehicle` below refuses explicitly rather than crashing on.
+const ELECTRIC_VEHICLE_TYPES = ['electric_car', 'autonomous_car'];
+
+// Registered the identical lazy way `registerFuelItem` already is --
+// `transport`, the real §28 category `car`/`motorcycle`/`scooter`
+// already use, never a second one invented for just these two.
+function registerElectricVehicleItems(worldState) {
+  worldState.barterItems = worldState.barterItems || [];
+  for (const name of ELECTRIC_VEHICLE_TYPES) {
+    if (worldState.barterItems.some((i) => i?.name === name)) continue;
+    worldState.barterItems.push({ name, category: 'transport', origin: 'remnant' });
+  }
+}
+
+// Same local join every other file in this engine repeats rather than
+// centralising (`travel.js#cityOf`, `crime.js#cityOf`, and others) --
+// an NPC's real community joined to its real city.
+function cityOf(worldState, entityId) {
+  const npc = (worldState.npcs || []).find((n) => n.id === Number(entityId));
+  if (!npc) return null;
+  const community = (worldState.communities || []).find((c) => c.id === npc.communityId);
+  return community?.city_id ?? null;
+}
+
+// Real tri-state, never a guessed boolean: `true`/`false` only once a
+// real `electricity` infrastructure row for this city actually exists
+// to ask — `infrastructure.isFailed`, never a second outage signal.
+// `null` ("unknown") for a city with no such row placed at all, or no
+// real city to ask about — the corollary on `Number()` this file's
+// own project discipline holds elsewhere: unknown is not a zero, and
+// a vehicle is not stalled on an unmeasured city any more than an
+// unobserved person reads as content.
+function gridAvailableIn(worldState, cityId) {
+  if (cityId == null) return null;
+  // eslint-disable-next-line global-require
+  const infrastructure = require('./infrastructure.js');
+  const rows = infrastructure.infrastructureIn(worldState, cityId, 'electricity');
+  if (rows.length === 0) return null;
+  return !rows.some((row) => infrastructure.isFailed(row));
+}
+
+// Is THIS specific vehicle usable right now, given where its holder
+// actually is? A non-electric vehicle never stalls for this reason —
+// its own fuel/condition checks are the whole story, unchanged.
+function isStalled(worldState, entityId, vehicleType) {
+  if (!ELECTRIC_VEHICLE_TYPES.includes(vehicleType)) return false;
+  return gridAvailableIn(worldState, cityOf(worldState, entityId)) === false;
+}
 
 //: The real item a vehicle actually burns. **Checked directly, not
 //: assumed**: `items.TRADE_CATEGORIES` (the real §28 item-category
@@ -164,6 +224,13 @@ const KM_PER_DAY_BY_TYPE = {
   car: 400,
   motorcycle: 350,
   scooter: 150,
+  // Same rate as `car` -- no document here distinguishes a real
+  // achievable daily range for an EV/AV from an ordinary car on this
+  // engine's own post-collapse road network, so this does not invent
+  // one; the real difference this file models is the power source
+  // (`isStalled`), not the pace.
+  electric_car: 400,
+  autonomous_car: 400,
 };
 
 //: Three real, commonly documented LEGACY vehicle-theft methods —
@@ -342,6 +409,12 @@ function restoreVehicle(worldState, entityId, type, options = {}) {
   if (Number(holding.condition) >= 100) {
     return { restored: false, reason: 'already at full real condition', condition: Number(holding.condition) };
   }
+  // Remnant-only, see this file's own header on ELECTRIC_VEHICLE_TYPES
+  // -- `salvage.recipeFor` would return `null` for both, which this
+  // refuses explicitly rather than crashing on `null.tier` below.
+  if (ELECTRIC_VEHICLE_TYPES.includes(type)) {
+    throw new Error(`restoreVehicle: a ${type} cannot be repaired from salvaged materials -- there is no real recipe for one, by design.`);
+  }
 
   const recipe = salvage.recipeFor(type);
   if (!occupations.tierReachable(npc, recipe.tier)) {
@@ -375,6 +448,7 @@ function restoreVehicle(worldState, entityId, type, options = {}) {
 
 module.exports = {
   VEHICLE_TYPES,
+  ELECTRIC_VEHICLE_TYPES,
   KM_PER_DAY_BY_TYPE,
   FUEL_ITEM_NAME,
   VEHICLE_THEFT_TECHNIQUES,
@@ -384,6 +458,9 @@ module.exports = {
   DRIVING_MODULATOR_FLOOR,
   DRIVING_MODULATOR_SPAN,
   registerFuelItem,
+  registerElectricVehicleItems,
+  gridAvailableIn,
+  isStalled,
   drivingModulatorFor,
   kmPerDayFor,
   currentHolderOf,

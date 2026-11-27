@@ -310,3 +310,40 @@ test('restoreVehicle refuses outright, never half-applying, when no real alterna
   );
   assert.equal(inventory.findHolding(w, owner.id, 'scooter').condition, 30, 'a refused restoration must not touch condition at all');
 });
+
+// ---------------------------------------------------------------------
+// Task #109 — electric/autonomous vehicles are remnant-only, same
+// posture weapons.js's own pistol/rifle already hold, and
+// restoreVehicle refuses them honestly rather than crashing on a real
+// recipe that does not exist.
+// ---------------------------------------------------------------------
+
+test('restoreVehicle refuses an electric/autonomous vehicle honestly -- there is no real recipe for one', () => {
+  const owner = mechanic();
+  vehicles.registerElectricVehicleItems(w);
+  inventory.give(w, { entityId: owner.id, itemName: 'electric_car', quantity: 1, condition: 40, tick: 0 });
+  assert.throws(
+    () => vehicles.restoreVehicle(w, owner.id, 'electric_car'),
+    /cannot be repaired from salvaged materials/,
+  );
+  inventory.give(w, { entityId: owner.id, itemName: 'autonomous_car', quantity: 1, condition: 40, tick: 0 });
+  assert.throws(
+    () => vehicles.restoreVehicle(w, owner.id, 'autonomous_car'),
+    /cannot be repaired from salvaged materials/,
+  );
+});
+
+test('salvage.make has no real recipe for an electric/autonomous vehicle either -- never craftable from parts', () => {
+  assert.equal(salvage.recipeFor('electric_car'), null);
+  assert.equal(salvage.recipeFor('autonomous_car'), null);
+});
+
+test('registerElectricVehicleItems is idempotent and registers both under the real transport category', () => {
+  const freshWorld = { barterItems: [] };
+  vehicles.registerElectricVehicleItems(freshWorld);
+  vehicles.registerElectricVehicleItems(freshWorld);
+  assert.equal(freshWorld.barterItems.filter((i) => i.name === 'electric_car').length, 1);
+  assert.equal(freshWorld.barterItems.filter((i) => i.name === 'autonomous_car').length, 1);
+  assert.ok(freshWorld.barterItems.every((i) => i.category === 'transport'));
+  assert.ok(freshWorld.barterItems.every((i) => i.origin === 'remnant'));
+});

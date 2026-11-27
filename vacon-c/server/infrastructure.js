@@ -531,6 +531,16 @@ function advanceInfrastructure(worldState, tick = worldState.tick ?? 0) {
         affected_entity_ids: [],
         global_effects: { ...failure, failureRisk: risk },
       });
+      // Task #109 — the real moment the grid "goes down." A lazy
+      // require, same caution this file's own circular-dependency
+      // pattern already holds elsewhere: `missionTriggers.js` has no
+      // reason to require this file back, but neither did the last
+      // module this guard was added for, until it did.
+      if (row.type === 'electricity') {
+        // eslint-disable-next-line global-require
+        const missionTriggers = require('./missionTriggers.js');
+        missionTriggers.maybeTriggerStalledVehicleMission(worldState, row.city_id, { tick });
+      }
     }
   }
 

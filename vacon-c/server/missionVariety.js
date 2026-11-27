@@ -74,6 +74,7 @@ const MISSION_BUSINESS_REWARD = 40;
 const MISSION_DRUG_REWARD = 40;
 const MISSION_RAILWAY_REWARD = 40;
 const MISSION_ENCOUNTER_REWARD = 40;
+const MISSION_STALLED_VEHICLE_REWARD = 40;
 
 function communityAnchor(worldState, communityId) {
   return (worldState.properties || []).find((p) => p.community_id === communityId) ?? null;
@@ -819,6 +820,7 @@ module.exports = {
   MISSION_DRUG_REWARD,
   MISSION_RAILWAY_REWARD,
   MISSION_ENCOUNTER_REWARD,
+  MISSION_STALLED_VEHICLE_REWARD,
   offerRecruitMission,
   offerAllianceMission,
   offerSpyMission,

@@ -12441,3 +12441,86 @@ own closing section names that gap explicitly, the same restraint
 this file's own recurring "declare it, do not build past what was
 asked" posture (`statistics.js`'s own declared-absent entries,
 `usgsImport.js`'s terrain-with-no-consumer) already holds elsewhere.
+
+**A two-hundred-and-twelfth, closing task #109 — "stalled electric/
+autonomous vehicles after the grid goes down (new mission source)."**
+Real EVs and today's real commercially-deployed autonomous fleets
+(Waymo, Zoox) are both electric — pairing `electric_car`/
+`autonomous_car` under one real dependency (grid power, never a fuel
+item) is accurate, not invented. Both join `VEHICLE_TYPES`.
+
+**Remnant-only, the exact posture `weapons.js`'s own pistol/rifle
+already hold, checked rather than assumed to need a new recipe.**
+`salvage.recipeFor('electric_car')`/`('autonomous_car')` both return
+`null` — a battery pack, an electric drivetrain and (for the
+autonomous half) the onboard compute are not something this engine's
+own materials-and-Tier model can honestly reproduce, and inventing a
+recipe here would be exactly the kind of fabricated substrate this
+file's own discipline exists to catch. `restoreVehicle` refuses both
+explicitly, with a real, specific reason, rather than crashing on
+`null.tier` — caught by writing the refusal before the first test
+ran, not by a thrown `TypeError` surfacing it after.
+
+**The real moment the grid "goes down" is `infrastructure
+.failInfrastructure` actually succeeding on a real `electricity` row
+— never a second, invented outage signal.** `vehicles
+.gridAvailableIn(worldState, cityId)` is a real TRI-STATE read of
+that row through `infrastructure.isFailed`: `true`/`false` only once
+a real `electricity` row exists to ask, `null` ("unknown") for a city
+with none placed at all. **Unknown is not a stall**, the same
+corollary on `Number()` this file already states for `moodFor()`'s
+own null-observation case — an unmeasured city's EV is not stranded
+any more than an unobserved person reads as content. `vehicles.isStalled` is
+`false` for every non-electric vehicle type unconditionally — a gas
+car's own fuel/condition checks are the whole story, unchanged.
+
+**`beginJourney` refuses a stalled EV/AV honestly, with its own real
+reason, rather than reusing "too damaged to move at all" (the
+existing condition-0 message) for a cause that is not damage.** A
+fully-charged, fully-intact EV sitting in a city with no real grid is
+not broken; saying so would misreport the real cause. The per-day
+travel loop (task #37's own real `fuel`-per-day draw) is skipped
+entirely for an electric/autonomous vehicle — declared, not invented:
+there is no real city to ask mid-transit between two cities, so a
+recurring day-by-day grid check would have nothing real to read
+either, and there is no cited real "distance per charge" figure to
+invent a second consumption model from. The one real gate is at
+departure, where a real city is actually being asked.
+
+**The new mission source is the real moment itself, not a player
+action that happens to fail.** `missionTriggers
+.maybeTriggerStalledVehicleMission(worldState, cityId, options)` is
+called directly from `infrastructure.advanceInfrastructure`'s own
+real failure loop, the instant a real `electricity` row actually
+fails — the same "event-triggered mission" shape task #98 already
+established, scoped here to exactly the residents this failure
+actually affects. Scans the city's own real residents
+(community→city join) for the first one genuinely holding a real
+`electric_car`/`autonomous_car`, and offers them a real mission at
+their own real home — no stranded holder, no real home to offer it
+at, or a mission already open there: honestly nothing, the same
+shape every other trigger in this file already holds. New
+`MISSION_STALLED_VEHICLE_REWARD` in `missionVariety.js`, the identical
+40 every other mission reward in that file already uses — never a
+special, unjustified number for a comparable event.
+
+**A lazy require from `infrastructure.js` into `missionTriggers.js`,
+the same circular-dependency caution this project holds throughout —
+checked, not just assumed safe.** `node -e` loaded all three modules
+(`infrastructure.js`, `vehicles.js`, `missionTriggers.js`) together
+before this shipped and confirmed no cycle; the lazy require stays
+anyway, since the module that needed this caution before did not
+need it until it did.
+
+12 new tests in `test/missionTriggers.test.js` (the grid tri-state,
+`isStalled` for every combination, the mission trigger's own real
+scan and its honest "nothing" cases, and `beginJourney`'s own real
+refusal through the real dispatcher path), 3 new in
+`test/vehicles.test.js` (the remnant-only refusal, the real missing
+recipe, idempotent item registration), and 1 new integration test in
+`test/utilities.test.js` proving the real wiring end to end: a real
+`advanceInfrastructure` electricity failure (not a hand-called
+`failInfrastructure`) actually reaches the real mission trigger,
+found via the same bounded-loop-waiting-for-a-real-seeded-draw shape
+`test/missionTriggers.test.js`'s own disguise-find test already uses,
+never a relaxed `DAILY_FAILURE_RATE`.

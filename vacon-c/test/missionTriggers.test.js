@@ -436,3 +436,128 @@ test('searchLocation: finding a real disguise item at a real controlled location
   }
   assert.ok(sawItemMission, 'expected a real disguise find to surface itemMissionGenerated within this property\'s own finite, measured supply');
 });
+
+// ---------------------------------------------------------------------
+// maybeTriggerStalledVehicleMission — task #109, "stalled electric/
+// autonomous vehicles after the grid goes down (new mission source)."
+// See server/vehicles.js's own header for the real grid-dependency
+// model this reads.
+// ---------------------------------------------------------------------
+
+const vehicles = require('../server/vehicles.js');
+const inventory = require('../server/inventory.js');
+
+function withResident(w, { id = 1, communityId = 9, homePropertyId = 501 } = {}) {
+  w.npcs = w.npcs || [];
+  w.inventory = w.inventory || [];
+  w.barterItems = w.barterItems || [];
+  w.npcs.push({ id, status: 'active', communityId, home_property_id: homePropertyId, traits: {} });
+  return w.npcs[w.npcs.length - 1];
+}
+
+test('a real electricity failure in a city with no stranded EV/AV holder triggers nothing', () => {
+  const w = baseWorld();
+  withResident(w); // no vehicle held at all
+  assert.equal(missionTriggers.maybeTriggerStalledVehicleMission(w, 1, { tick: 0 }), null);
+});
+
+test('a real resident holding a real electric_car gets a real mission at their own real home', () => {
+  const w = baseWorld();
+  const npc = withResident(w);
+  vehicles.registerElectricVehicleItems(w);
+  inventory.give(w, { entityId: npc.id, itemName: 'electric_car', tick: 0 });
+
+  const mission = missionTriggers.maybeTriggerStalledVehicleMission(w, 1, { tick: 0 });
+  assert.ok(mission);
+  assert.equal(mission.location_property_id, 501);
+  assert.match(mission.objective, /electric car/);
+  assert.equal(mission.reward, require('../server/missionVariety.js').MISSION_STALLED_VEHICLE_REWARD);
+});
+
+test('a real resident holding a real autonomous_car is named correctly in the objective', () => {
+  const w = baseWorld();
+  const npc = withResident(w);
+  vehicles.registerElectricVehicleItems(w);
+  inventory.give(w, { entityId: npc.id, itemName: 'autonomous_car', tick: 0 });
+
+  const mission = missionTriggers.maybeTriggerStalledVehicleMission(w, 1, { tick: 0 });
+  assert.match(mission.objective, /autonomous car/);
+});
+
+test('an ordinary gas car never counts as stranded -- this is scoped to the electric/autonomous pair', () => {
+  const w = baseWorld();
+  const npc = withResident(w);
+  const salvage = require('../server/salvage.js');
+  salvage.registerItems(w);
+  inventory.give(w, { entityId: npc.id, itemName: 'car', tick: 0 });
+
+  assert.equal(missionTriggers.maybeTriggerStalledVehicleMission(w, 1, { tick: 0 }), null);
+});
+
+test('a resident with no real home property is honestly skipped, never thrown', () => {
+  const w = baseWorld();
+  const npc = withResident(w, { homePropertyId: null });
+  vehicles.registerElectricVehicleItems(w);
+  inventory.give(w, { entityId: npc.id, itemName: 'electric_car', tick: 0 });
+
+  assert.equal(missionTriggers.maybeTriggerStalledVehicleMission(w, 1, { tick: 0 }), null);
+});
+
+test('a location already carrying an open mission does not get a second one stacked on top', () => {
+  const w = baseWorld();
+  const npc = withResident(w);
+  vehicles.registerElectricVehicleItems(w);
+  inventory.give(w, { entityId: npc.id, itemName: 'electric_car', tick: 0 });
+  missions.generateMission(w, { locationId: 501, objective: 'Already here' });
+
+  assert.equal(missionTriggers.maybeTriggerStalledVehicleMission(w, 1, { tick: 0 }), null);
+});
+
+// -- the real grid-dependency model in vehicles.js itself --------------
+
+test('isStalled is always false for an ordinary gas vehicle, whatever the grid is doing', () => {
+  const w = baseWorld();
+  withResident(w);
+  assert.equal(vehicles.isStalled(w, 1, 'car'), false);
+});
+
+test('an electric/autonomous vehicle is not stalled when no real electricity infrastructure exists to ask -- unknown is not a stall', () => {
+  const w = baseWorld();
+  withResident(w);
+  w.infrastructure = [];
+  assert.equal(vehicles.isStalled(w, 1, 'electric_car'), false);
+  assert.equal(vehicles.gridAvailableIn(w, 1), null);
+});
+
+test('an electric/autonomous vehicle stalls once this city\'s real electricity row has actually failed', () => {
+  const infrastructure = require('../server/infrastructure.js');
+  const w = baseWorld();
+  withResident(w);
+  w.infrastructure = [];
+  const row = infrastructure.generateInfrastructure(w, { cityId: 1, type: 'electricity' });
+  infrastructure.failInfrastructure(w, row, { tick: 0 });
+
+  assert.equal(vehicles.gridAvailableIn(w, 1), false);
+  assert.equal(vehicles.isStalled(w, 1, 'electric_car'), true);
+  assert.equal(vehicles.isStalled(w, 1, 'autonomous_car'), true);
+  assert.equal(vehicles.isStalled(w, 1, 'car'), false);
+});
+
+test('beginJourney honestly refuses a real electric vehicle with no real grid to charge from', () => {
+  const infrastructure = require('../server/infrastructure.js');
+  const travel = require('../server/travel.js');
+  const w = baseWorld();
+  const npc = withResident(w, { id: 2 });
+  w.cities.push({ id: 2, region_id: null });
+  w.infrastructure = [];
+  const row = infrastructure.generateInfrastructure(w, { cityId: 1, type: 'electricity' });
+  infrastructure.failInfrastructure(w, row, { tick: 0 });
+  vehicles.registerElectricVehicleItems(w);
+  inventory.give(w, { entityId: npc.id, itemName: 'electric_car', tick: 0 });
+  w.families = []; w.familyMemberships = []; w.journeys = [];
+
+  assert.throws(
+    () => travel.beginJourney(w, npc.id, { destinationCityId: 2, vehicleType: 'electric_car' }),
+    /no charge to draw on -- the electricity grid is down/,
+  );
+});

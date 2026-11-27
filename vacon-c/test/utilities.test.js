@@ -530,3 +530,49 @@ test('the four systems this was for are levelled to what the code does', () => {
   assert.equal(level(21), 'slot');
   assert.match(urbanSystems.SYSTEMS.find((s) => s.n === 21).note, /public_safety/);
 });
+
+// ---------------------------------------------------------------------
+// Task #109 — a real `advanceInfrastructure` electricity failure, not
+// a hand-called `failInfrastructure`, actually reaches
+// `missionTriggers.maybeTriggerStalledVehicleMission` in server/
+// infrastructure.js's own loop. The individual pieces (the grid check,
+// the mission content) are tested directly against `failInfrastructure`
+// in test/missionTriggers.test.js; this is the one real integration
+// point those tests cannot see on their own.
+// ---------------------------------------------------------------------
+
+test('a real electricity failure surfaced through advanceInfrastructure itself reaches the real stalled-vehicle mission trigger', () => {
+  const vehicles = require('../server/vehicles.js');
+  const inventory = require('../server/inventory.js');
+  const missions = require('../server/missions.js');
+
+  const w = cityWorldWithResidents(0);
+  w.properties = [{ id: 1, community_id: 10 }];
+  w.missions = [];
+  w.inventory = [];
+  w.barterItems = [];
+  const resident = { id: 1, status: 'active', communityId: 10, home_property_id: 1, traits: {} };
+  w.npcs.push(resident);
+  vehicles.registerElectricVehicleItems(w);
+  inventory.give(w, { entityId: resident.id, itemName: 'electric_car', tick: 0 });
+
+  // Condition 0 / age at the real ceiling / no maintenance -- the
+  // maximum real `failureRisk` (1.0) this file's own formula can
+  // produce, so the daily draw has the best real odds of landing.
+  // Still probabilistic (`DAILY_FAILURE_RATE` is a real, measured
+  // constant, never relaxed for a test), so this loops for a real
+  // failure to actually occur rather than asserting on tick 1 — the
+  // same bounded-wait shape test/missionTriggers.test.js's own
+  // disguise-find test already uses for an analogous seeded draw.
+  infrastructure.generateInfrastructure(w, {
+    cityId: 1, type: 'electricity', condition: 0, age: 100, maintenanceLevel: 0,
+  });
+
+  let sawMission = false;
+  for (let t = 1; t <= 5000; t += 1) {
+    infrastructure.advanceInfrastructure(w, t);
+    if (w.missions.length > 0) { sawMission = true; break; }
+  }
+  assert.ok(sawMission, 'expected advanceInfrastructure\'s own real electricity failure to eventually trigger the stalled-vehicle mission');
+  assert.equal(missions.listMissions(w, { status: 'available' })[0].location_property_id, 1);
+});
