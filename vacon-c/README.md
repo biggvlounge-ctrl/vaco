@@ -2815,6 +2815,28 @@ flat 1 task #122 already established. New `talk-to` player verb. 13
 new tests, confirmed live through the real dispatcher. See CLAUDE.md's
 hundred-and-ninety-seventh standing rule.
 
+### Event-triggered mission generation, "NPCs/orgs making a move" (closes task #98)
+The mirror image of `missionTriggers.js` (a player visits real ground
+and a mission triggers from whoever holds it): `server/moveMissions.js`
+reacts when a real organization does something consequential on its
+own, independent of any player. Reads `tick.js`'s own already-resolved
+`worldState.events` log, curated to three real types each confirmed by
+reading its own push site: `dominant_power_claims_ground`,
+`territory_status_change`, `rogue_security_force_formed` — each
+already carrying a real organization id. `takeover_unlocked` (names a
+family, not an organization) and `chaos_recruitment`/
+`chaos_family_absorption` (a different real log with no location
+resolution) were checked and deliberately excluded. Reuses
+`missionTriggers.MISSION_TRIGGER_CHANCE`/`hasOpenMissionAt` and
+`tribeMissions.REWARD_FLOOR`/`REWARD_CEILING` unchanged; a real faction
+becomes `controllingFactionId`, any other real organization attaches
+via `issuing_organization_id`. Opt-in via `WorldState.
+eventTriggeredMissions`, forwarded automatically by `engine.js#
+advanceTick()` — unset by every existing caller, so a world that never
+opts in is byte-for-byte unchanged. 12 new tests, confirmed live
+through `engine.advanceTick()` itself. See CLAUDE.md's hundred-and-
+ninety-eighth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

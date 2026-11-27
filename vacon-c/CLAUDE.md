@@ -11497,3 +11497,83 @@ fresh stranger reads `neutral`, never `warm`), the fact-sharing
 "genuinely news" comparison from both directions, and confirming
 `interactWith` moves `shared_history` and never `trust`. Confirmed
 live through the real dispatcher.
+
+**A hundred-and-ninety-eighth, closing task #98 — event-triggered
+mission generation, "NPCs/orgs making a move."**
+
+**The mirror image of a mechanism already built, not a duplicate of
+it.** `missionTriggers.js` already covers a PLAYER visiting real
+ground and a mission triggering from whoever already holds it. This
+is the other half, genuinely unbuilt until now: a real organization
+does something consequential entirely on its own, independent of
+whether any player is anywhere nearby, and `server/moveMissions.js`
+reacts to that specific move with a real mission.
+
+**The real substrate was already there, resolved and waiting.**
+`tick.js#runEventPhase` already resolves and stores a real
+`community_id`/`city_id` on every tick-level event via `events.
+locationOfEvent` before this file ever runs — so no location logic is
+duplicated, only read. Three real event types are curated as "a
+move," each confirmed by reading its own push site directly rather
+than assumed: `dominant_power_claims_ground` (a real pre-existing
+local power converts its hold into a territorial claim),
+`territory_status_change` (a real territory block's control
+resolution actually moved it), and `rogue_security_force_formed` (a
+real government's own officers defect and found a new organization).
+Each already carries a real organization id as the first entry of its
+own `affected_entity_ids`.
+
+**Two real candidates were checked and deliberately excluded, named
+rather than silently left out.** `takeover_unlocked` (control.js)
+names a real HIRED INDIVIDUAL, not an organization — its own
+`global_effects.tribeId` names a FAMILY, and `missions.
+generateMission`'s own real `controllingFactionId` validation
+requires an `organizations` row with `isFaction`, which a family is
+never going to be; folding it in would mean either inventing a second
+mission field this schema does not have or silently mislabeling a
+family as an organization, worse than leaving the gap named.
+`chaos_recruitment`/`chaos_family_absorption` (recruitment.js) write
+to `worldStore.addHistoricalRecord` directly — a different real table
+with no `community_id`/`city_id` resolution step at all. Merging two
+differently-shaped real logs into one reader would be exactly the
+third standing rule's "two disagreeing answers," so this file reads
+the one tick-level log, never both.
+
+**Nothing here is a second convention — `missionTriggers.js`'s own
+real numbers and rules, reused unchanged.**
+`missionTriggers.MISSION_TRIGGER_CHANCE` (0.1, that file's own
+measured rate) and `hasOpenMissionAt` are reused directly, never a
+second, disagreeing rate or "already has a job" check.
+`tribeMissions.REWARD_FLOOR`/`REWARD_CEILING` supply the real reward
+range the same way. A real faction organization becomes
+`controllingFactionId`; any other real organization is attached via
+`issuing_organization_id` instead — the identical non-faction
+convention `missionTriggers.js`/`leadership.js#directMission` already
+established. A property is picked deterministically from the real
+properties in the event's own community, seeded on the event's own id
+— never the tick, never who happens to be nearby — the same "a reward
+should not move depending on who triggered it or when" reasoning
+`tribeMissions.js` already gives, applied to location choice instead
+of payout.
+
+**Opt-in, the same posture every additive tick-time mechanism in this
+registry already holds.** `tick.js#advanceTick` only calls
+`runMoveMissions` when its own `options.eventTriggeredMissions` is
+truthy; `engine.js#advanceTick()` forwards `WorldState.
+eventTriggeredMissions` through automatically, unset by every
+existing caller — so a world that never opts in generates byte-for-
+byte identically to before this file existed. This is a tick-time
+flag, not a generation-time one like `institutionStaffing`/
+`drugTrafficking`/`extendedFamily`, so it is read directly off
+`worldState` (the same `worldState.tickIntervals`-style direct
+override this engine already uses for an opt-in tick-time setting)
+rather than threaded through `generateWorld`'s own config object.
+
+12 new tests (`test/moveMissions.test.js`): the real curation itself
+(exactly three types, confirmed), real refusals (not a curated type,
+no real community, no real organization, an already-open mission at
+the deterministically-picked property), real generation on both
+sides of the faction/non-faction split (found across 500 real seeded
+event ids each), and the opt-in flag confirmed live through
+`engine.advanceTick()` itself, both unset and explicitly set, neither
+ever throwing.

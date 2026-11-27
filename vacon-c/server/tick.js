@@ -84,6 +84,7 @@ const households = require('./households.js');
 const roguePolice = require('./roguePolice.js');
 const fraud = require('./fraud.js');
 const dominance = require('./dominance.js');
+const moveMissions = require('./moveMissions.js');
 const drugTrade = require('./drugTrade.js');
 const groupFights = require('./groupFights.js');
 const corruption = require('./corruption.js');
@@ -1828,6 +1829,17 @@ function advanceTick(worldState, options = {}) {
   });
 
   const events = runEventPhase(worldState, candidateEvents);   // 9
+
+  // Task #98, opt-in via `options.eventTriggeredMissions` —
+  // `engine.js#advanceTick()` forwards `WorldState.
+  // eventTriggeredMissions` through, unset by every existing caller.
+  // A world that does not opt in generates byte-for-byte identically
+  // to before this file existed, the same posture every other
+  // additive tick-time mechanism in this registry already holds.
+  if (options.eventTriggeredMissions) {
+    moveMissions.runMoveMissions(worldState, events, worldState.tick);
+  }
+
   const historicalRecords = runHistoryPhase(worldState, events); // 10
   const reemergenceIndex = runReemergencePhase(worldState);    // 11
 

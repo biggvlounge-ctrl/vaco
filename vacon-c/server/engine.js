@@ -817,7 +817,15 @@ function addEnvironmentalCondition(condition) {
 }
 
 function advanceTick() {
-  return tick.advanceTick(WorldState, { generateOrganization, generateFaction });
+  return tick.advanceTick(WorldState, {
+    generateOrganization, generateFaction,
+    // Task #98, opt-in. Set `WorldState.eventTriggeredMissions = true`
+    // to turn it on; every existing caller leaves this `undefined` and
+    // gets byte-for-byte unchanged behavior, the same `worldState.
+    // tickIntervals`-style direct flag this engine already uses for
+    // an opt-in tick-time setting.
+    eventTriggeredMissions: WorldState.eventTriggeredMissions,
+  });
 }
 
 // ---------------------------------------------------------------------------
