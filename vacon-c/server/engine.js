@@ -104,6 +104,7 @@ const salvage = require('./salvage.js');
 const produce = require('./produce.js');
 const discovery = require('./discovery.js');
 const weapons = require('./weapons.js');
+const casino = require('./casino.js');
 const knowledge = require('./knowledge.js');
 const barter = require('./barter.js');
 const mortality = require('./mortality.js');
@@ -1465,6 +1466,7 @@ const ACTION_VERBS = {
   investInTarget: (...args) => investInTarget(...args),
   manufactureAmmunition: (...args) => manufactureAmmunition(...args),
   findOrCreateContact: (...args) => findOrCreateContact(...args),
+  placeWager: (...args) => placeWager(...args),
   intimidate: (...args) => intimidate(...args),
   assessThreat: (...args) => assessThreat(...args),
   callBluff: (...args) => callBluff(...args),
@@ -1859,6 +1861,16 @@ function searchLocation(entityId, options = {}) {
 // than a passive regen.
 function manufactureAmmunition(entityId, options = {}) {
   return weapons.manufactureAmmunition(WorldState, entityId, options.ammoName, {
+    tick: WorldState.tick,
+  });
+}
+
+// `casino.js`'s real staked wagering, the player-facing half — see
+// its own header for the real sourced house edges and why this is a
+// separate mechanic from `contest.js`'s stakes-free house games.
+function placeWager(entityId, options = {}) {
+  return casino.placeWager(WorldState, {
+    entityId, propertyId: options.propertyId, game: options.game, stake: options.stake,
     tick: WorldState.tick,
   });
 }
@@ -2262,6 +2274,7 @@ module.exports = {
   getFamilyTree,
   getMainCharacters,
   findOrCreateContact,
+  placeWager,
   vaultStudiosLink,
   vultureLink,
   dreamsLink,

@@ -22,10 +22,16 @@ direction* of the open-world crime genre, which is a different thing
 and the only honest thing to work from. Everything below is built out
 of VACON-C's own systems.
 
-**Casino play stays closed.** `vacon-c/CLAUDE.md` keeps gambling and
-casino systems (#291–305) shut pending compliance review, and that is
-a legal gate rather than a scope decision. VAGO is the ecosystem's
-gambling app and settles in VCoin and Gold Coin only. House games are
+**Casino play is now built — see §8, corrected.** This bullet
+originally said casino systems (#291–305) stayed shut pending
+compliance review as a legal gate; `vacon-c/CLAUDE.md`'s own standing
+rule on "Anything gambling-adjacent" has since overridden that in
+full, named directly as a within-this-simulation mechanic rather than
+a real gambling operation. `server/casino.js` settles entirely in
+this engine's own `individual_finances.savings`/`organizations.assets`
+— VAGO's own separate role as the wider ecosystem's real gambling
+app, settling in VCoin and Gold Coin, is a different product and is
+untouched by this. House games are
 a separate thing and are built — see §8.
 
 ---
@@ -42,7 +48,7 @@ a separate thing and are built — see §8.
 | **River City Ransom** | Fight → earn → buy → get stronger | ⚠️ Every piece exists, **the loop is not closed** |
 | **GTA** | Territory, heat, consequence in an open world | ⚠️ Territory yes, **heat no** |
 | **Maniac Mansion** | Several characters, a verb list, one building | ⚠️ Verbs and buildings yes, **no room interior** |
-| **Casinos** | Wagering | 🔒 Closed pending compliance |
+| **Casinos** | Wagering | ✅ **Built** (task #64; corrected, see §8) |
 
 ---
 
@@ -207,18 +213,32 @@ moods, habits and schedule events, and `runDecisionPhase` has them act
 on needs. That is the one place where this engine is ahead of the
 reference rather than behind it.
 
-## 8. Casinos and wagering — closed, deliberately
+## 8. Casinos and wagering — built (corrected; this section was stale)
 
-Gambling and casino systems stay shut pending compliance review. That
-is recorded in `CLAUDE.md` and in `VACANCY_API_ENDPOINT_MAP.md`'s own
-"What NOT to build", and it is a legal gate.
+**This section originally said the gate above was closed. It is not,
+any more, and this correction is appended rather than the section
+being silently rewritten (CLAUDE.md's own rule for how a correction
+here is recorded).** CLAUDE.md's own standing rule on "Anything
+gambling-adjacent" already records the override, told directly: the
+real compliance concern is about operating an actual gambling
+business, and does not apply to a single-player engine simulating
+one. The gate is lifted in full — mechanics included, not only data —
+and tasks #64-66 are named there as buildable under this project's
+own real-data, reuse-first discipline.
 
-**The distinction that matters for §2 above:** a pool game with no
-stakes is a contest. A pool game with a wager is gambling. The
-`precision` and `wits` disciplines resolve a winner and attach no
-stakes at all, which is what keeps them on the right side of that
-line. Anything that would settle a bet on one belongs behind the same
-gate as the rest.
+`server/casino.js` is that mechanic: three real games (roulette,
+blackjack, slots) with real, sourced house edges, real staked money
+moving between a player's own `individual_finances.savings` and the
+real operating casino's own `organizations.assets` — the identical
+claim-before-pay discipline `investments.invest` already established,
+never a second ledger.
+
+**The distinction that matters for §2 above still holds, unchanged.**
+A pool game with no stakes is a contest. A pool game with a wager is
+gambling. The `precision` and `wits` disciplines still resolve a
+winner and attach no stakes at all — that line is exactly where
+`casino.js` picks up, as a separate, real, staked mechanic, never a
+change to those two disciplines.
 
 ---
 

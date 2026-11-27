@@ -11153,3 +11153,69 @@ measured on these exact fixtures, not guessed. 4 new tests total,
 including the direct 0.75/1.25-band proof and a default-parameter
 backward-compatibility check (a gang with no real `leader_id` behaves
 exactly as it always did).
+
+**A hundred-and-ninety-fourth, closing task #64 — the real "mechanics
+included, not only data" half of the casino system, under this file's
+own standing override of the gambling/casino compliance gate.**
+`GAME_LANGUAGE_AND_REFERENCES.md`'s own §8 said, verbatim, "no stakes
+are attached and none should be... that is the line between a pool
+game and the casino systems that stay closed" — stale the moment the
+override was recorded, and corrected in that file now rather than
+left to disagree with this one.
+
+**Everything landmark/staff-side was already real before this round.**
+`landmarks.js`'s `casino` category (a real `dealer` defining post, a
+real discovery pool) and its own `casino` crew
+(`dealer`/`pitboss`/`cashier`/`bookmaker`/`manager`/`surveillance`),
+plus `occupations.js`'s four real SOC-coded casino occupations, were
+built under the same earlier override round. A casino property's real
+operator is `worldgen.js`'s own generic landmark business-generation
+pass (`type: 'business'`) — the identical mechanism every other
+staffed commercial landmark (skyscraper, airport, mall, ...) already
+uses, not a special case needed for this one. **Checked directly
+rather than assumed, for "nationality-correct casino demographics":**
+Missouri's own real casinos (this engine's St. Louis worked example)
+are commercial riverboat licenses under the Missouri Gaming
+Commission, never tribal — so the generic `business` operator is the
+demographically CORRECT real type for this region, not a gap. Tribal
+gaming under the Indian Gaming Regulatory Act is real elsewhere in
+the U.S. and is a different, separate ownership structure this
+engine's one-region-per-world model has no occasion to model here.
+
+**`server/casino.js` is the real, separate, STAKED mechanic —
+`contest.js`'s `precision`/`wits` house games keep their own
+deliberate no-stakes design, untouched.** Three real games, with real
+sourced house edges every public reference agrees on: roulette's
+EXACT mathematical edge (American double-zero, 2/38, not an
+estimate); blackjack's commonly-cited ~1% basic-strategy edge,
+modulated by the player's own real `contest.rateEntity(worldState,
+entityId, 'wits')` rating through the identical `0.75 + x/200`
+neutral-at-50 band tasks #107/#127/#198 already established — skill
+DIVIDES the house's edge, never multiplies it, so the 0.75 floor on
+the modulator keeps even a maximally skilled player on the house's
+side of an even bet, the way basic strategy narrows blackjack's real
+edge without flipping it into a player edge; slots' commonly-cited
+~8% hold, no skill term at all. Modelled as one representative
+even-money wager per game, not every real bet type and payout table a
+casino offers — a declared scope limit, the same "one grain, real
+source, generic name" line `landmarks.js`'s own `casino`/
+`port-terminal` entries already draw, applied to bets instead of
+buildings.
+
+**Money moves exactly the way `investments.invest` already moves
+it** — claim-before-pay between a player's own
+`individual_finances.savings` and the real operating casino's own
+`organizations.assets`, never a third ledger. A new `'place-wager'`
+player verb (`propertyId`, `game`, `stake`), wired through
+`engine.js`'s thin-wrapper/`ACTION_VERBS` injection discipline the
+same way every other action verb already is.
+
+11 new tests (`test/casino.test.js`): the real sourced house edges,
+the even-money win-chance formula, skill narrowing (never flipping)
+blackjack's edge, five real refusal paths (not a real casino, not
+open yet, no real operator, not a real game, a stake the player does
+not really have — claim-before-pay verified by checking neither side's
+money moved on a refusal), and two deterministic searches for a real
+seeded losing and winning tick, each checking the exact real money
+movement on both sides. `test/actions.test.js`'s own exact
+`REQUIRED_VERBS` list updated to include `placeWager`.

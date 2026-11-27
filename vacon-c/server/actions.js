@@ -916,6 +916,22 @@ const ACTIONS = {
     verbs: ['breakCamp'],
     run: (verbs, actorId, body) => verbs.breakCamp(actorId, Number(body.campId)),
   },
+
+  // **`casino.js`'s real staked wagering — see that file's own header
+  // for why this is a separate mechanic from `contest.js`'s stakes-
+  // free `precision`/`wits` house games, under CLAUDE.md's own
+  // standing override of the gambling/casino compliance gate.**
+  'place-wager': {
+    summary: 'Place a real wager (roulette, blackjack, or slots) at an operating casino, staking your own real savings.',
+    modes: ['citizen', 'leader'],
+    requires: ['propertyId', 'game', 'stake'],
+    verbs: ['placeWager'],
+    run: (verbs, actorId, body) => verbs.placeWager(actorId, {
+      propertyId: Number(body.propertyId),
+      game: body.game,
+      stake: Number(body.stake),
+    }),
+  },
 };
 
 const ACTION_NAMES = Object.keys(ACTIONS);

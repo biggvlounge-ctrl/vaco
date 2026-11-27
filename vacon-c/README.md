@@ -2708,6 +2708,30 @@ speedup proofs on identical seeds (34 vs. 32 recruits over 5000 ticks;
 band test and a default-parameter backward-compatibility check.
 See CLAUDE.md's hundred-and-ninety-third standing rule.
 
+### Real staked casino wagering, under this project's own gambling/casino compliance override (closes task #64)
+`GAME_LANGUAGE_AND_REFERENCES.md`'s own §8 said "no stakes are
+attached and none should be... that is the line between a pool game
+and the casino systems that stay closed" — corrected there now, under
+CLAUDE.md's own standing override of the compliance gate.
+Landmark/staff/operator were already real (`landmarks.js`'s `casino`
+category and crew, `occupations.js`'s four SOC-coded casino roles,
+the generic `business`-type operator every staffed commercial
+landmark already uses — checked directly: Missouri's own real
+casinos, this engine's worked example, are commercial riverboat
+licenses, never tribal, so that generic operator is the
+demographically correct type here). `server/casino.js` is the real,
+separate, STAKED mechanic `contest.js`'s stakes-free `precision`/
+`wits` house games deliberately are not: three real games with real
+sourced house edges (roulette's exact 2/38; blackjack's ~1%,
+modulated by the player's own real `wits` rating through the
+identical 0.75/1.25 neutral-at-50 band tasks #107/#127/#198 already
+established; slots' ~8%, no skill term), one representative
+even-money wager per game (a declared scope limit). Money moves
+exactly like `investments.invest` already moves it — claim-before-pay
+between a player's `individual_finances.savings` and the house's real
+`organizations.assets`. New `place-wager` player verb. 11 new tests.
+See CLAUDE.md's hundred-and-ninety-fourth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a
