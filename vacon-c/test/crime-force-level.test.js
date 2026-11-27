@@ -102,6 +102,43 @@ test('force_level is null for an armed (gun) incident -- push/punch/knee/choke a
   assert.equal(incident.force_level, null, 'a shooting is not a push, punch, knee or choke');
 });
 
+// A generated world's own real gun-reflux mechanic (task #196) can
+// already arm an NPC by generation time -- so both of these tests
+// clear the perpetrator's real inventory first, guaranteeing the
+// specific armed/unarmed state each is actually testing rather than
+// trusting a freshly generated NPC to start with nothing.
+function clearInventory(w, entityId) {
+  w.inventory = (w.inventory || []).filter((h) => h.holder_entity_id !== entityId);
+}
+
+test('recordEscalation sets force_level to the real "pistol_whip" technique for an equipped-but-unloaded firearm, never a push/punch/knee/choke band', () => {
+  const w = freshWorld('force-level-wire-5');
+  const perpetrator = w.npcs[0];
+  const victim = w.npcs[1];
+  weapons.registerItems(w);
+  clearInventory(w, perpetrator.id);
+  inventory.give(w, { entityId: perpetrator.id, itemName: 'pistol' });
+  inventory.equip(w, { entityId: perpetrator.id, itemName: 'pistol' });
+  // No ammunition given at all -- a real equipped firearm that cannot fire.
+  assert.equal(weapons.isFunctioningFirearm(w, perpetrator.id), false, 'fixture accidentally armed the perpetrator with a functioning gun');
+  const incident = crime.recordEscalation(w, {
+    perpetratorId: perpetrator.id, victimId: victim.id, tick: 1, responseLevel: 90,
+  });
+  assert.equal(incident.category, 'violent', 'an unfired gun is not a shooting -- category stays unarmed');
+  assert.equal(incident.force_level, 'pistol_whip');
+});
+
+test('recordEscalation never reports pistol_whip for a genuinely unarmed perpetrator', () => {
+  const w = freshWorld('force-level-wire-6');
+  const a = w.npcs[0].id;
+  const b = w.npcs[1].id;
+  clearInventory(w, a);
+  const incident = crime.recordEscalation(w, {
+    perpetratorId: a, victimId: b, tick: 1, responseLevel: 90,
+  });
+  assert.equal(incident.force_level, 'choke');
+});
+
 test('recordCrime stores force_level as a plain, real field on the incident, null when not given', () => {
   const w = freshWorld('force-level-wire-4');
   const a = w.npcs[0].id;

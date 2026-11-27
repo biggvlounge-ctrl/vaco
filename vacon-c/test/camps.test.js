@@ -14,6 +14,7 @@ const engine = require('../server/engine.js');
 const camps = require('../server/camps.js');
 const party = require('../server/party.js');
 const worldStore = require('../server/worldStore.js');
+const policing = require('../server/policing.js');
 
 const w = engine.WorldState;
 
@@ -220,4 +221,59 @@ test('activeCampFor / campOf: real reads, null for anyone or anything not real',
   const camp = camps.establishCamp(w, founder.id, { communityId: community.id, campType: 'lake', tick: 0 });
   assert.equal(camps.activeCampFor(w, founder.id).id, camp.id);
   assert.equal(camps.campOf(w, 999999999), null);
+});
+
+// ---------------------------------------------------------------------
+// How this is effective: a real evasion bonus through
+// policing.evasionOf, the same real path disguise.js already reaches
+// -- see this file's own header above `CAMP_EVASION_BONUS`.
+// ---------------------------------------------------------------------
+
+test('evasionOf is raised by the real camp bonus while actively camped, bounded to 1', () => {
+  const community = freshCommunity();
+  const resident = residentOf(community);
+  const baseline = policing.evasionOf(w, resident.id);
+
+  camps.establishCamp(w, resident.id, { communityId: community.id, campType: 'lake', tick: 0 });
+  const camped = policing.evasionOf(w, resident.id);
+
+  assert.ok(camped > baseline, 'living at a real off-grid camp must raise evasion');
+  assert.equal(
+    Math.round((camped - baseline) * 100) / 100,
+    camps.CAMP_EVASION_BONUS,
+  );
+  assert.ok(camped <= 1);
+});
+
+test('evasionOf drops the camp bonus the instant the camp is broken, never a frozen snapshot', () => {
+  const community = freshCommunity();
+  const founder = residentOf(community);
+  const baseline = policing.evasionOf(w, founder.id);
+  const camp = camps.establishCamp(w, founder.id, { communityId: community.id, campType: 'woods', tick: 0 });
+  assert.ok(policing.evasionOf(w, founder.id) > baseline);
+
+  camps.breakCamp(w, camp.id, founder.id);
+  assert.equal(policing.evasionOf(w, founder.id), baseline);
+});
+
+test('the camp bonus is identical across woods/cave/lake -- no unjustified per-type concealment gradient', () => {
+  // Each person's own before/after delta is what is asserted, not one
+  // person's evasion against another's -- two different NPCs' skill
+  // draws are not guaranteed equal, but the real camp bonus each type
+  // adds must be the one real constant regardless.
+  const woodsCommunity = freshCommunity();
+  const woodsFounder = residentOf(woodsCommunity);
+  const woodsBaseline = policing.evasionOf(w, woodsFounder.id);
+  camps.establishCamp(w, woodsFounder.id, { communityId: woodsCommunity.id, campType: 'woods', tick: 0 });
+  const woodsDelta = Math.round((policing.evasionOf(w, woodsFounder.id) - woodsBaseline) * 100) / 100;
+
+  const lakeCommunity = freshCommunity();
+  const lakeFounder = residentOf(lakeCommunity);
+  const lakeBaseline = policing.evasionOf(w, lakeFounder.id);
+  camps.establishCamp(w, lakeFounder.id, { communityId: lakeCommunity.id, campType: 'lake', tick: 0 });
+  const lakeDelta = Math.round((policing.evasionOf(w, lakeFounder.id) - lakeBaseline) * 100) / 100;
+
+  assert.equal(woodsDelta, camps.CAMP_EVASION_BONUS);
+  assert.equal(lakeDelta, camps.CAMP_EVASION_BONUS);
+  assert.equal(woodsDelta, lakeDelta);
 });

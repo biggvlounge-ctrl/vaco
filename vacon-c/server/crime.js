@@ -665,6 +665,25 @@ function sharesFamily(worldState, aId, bId) {
 // the soft/control end; `punch` and `knee` are hard strikes, ascending;
 // `choke` is the neck-restraint end — the same real ordering, not an
 // invented one.
+//
+// **A fifth, real technique sits above all four, by direct
+// instruction: "add in a pistol whip."** The same NIJ continuum lists
+// an impact-weapon tier above empty-hand technique — a firearm used
+// as a blunt object rather than fired, which is exactly what
+// pistol-whipping is and why it is charged as aggravated (weapon-
+// involved) assault rather than simple assault in U.S. law despite no
+// shot being fired. `weapons.equippedFirearm` is the real, already-
+// built check for "holds a real firearm" — checked regardless of
+// ammo, the identical fact `isFunctioningFirearm` already reads the
+// OPPOSITE way to decide `category` (that file's own header: an
+// unloaded gun stays an unarmed INCIDENT on purpose, so a struggle
+// over an empty pistol is not double-counted as a shooting). This is
+// the one real case that fact was always going to matter for: an
+// equipped firearm that is not currently functioning (no held
+// ammunition) still gets swung, and `'pistol_whip'` is the real,
+// separate `force_level` for that — never a push/punch/knee/choke
+// band, because none of those four describe striking with a held
+// weapon, and never the `gun` category, because no round was fired.
 const FORCE_LEVELS = [
   { name: 'push', max: 60 },
   { name: 'punch', max: 70 },
@@ -717,10 +736,18 @@ function recordEscalation(worldState, options = {}) {
 
   // **Not a live gauge — a snapshot, taken once, at the moment this
   // incident is recorded, same as `severity` on the same line below.**
-  // Null for an armed incident (push/punch/knee/choke are unarmed
-  // techniques; a shooting is not any of them) and for any escalation
-  // whose `responseLevel` was never passed in at all.
-  const forceLevel = functioning ? null : forceLevelFor(responseLevel);
+  // Null for an armed (fired) incident (push/punch/knee/choke are
+  // unarmed techniques; a shooting is not any of them) and for any
+  // escalation whose `responseLevel` was never passed in at all. A
+  // real equipped firearm that is NOT functioning (no held ammunition
+  // — see this file's own `category` comment above for why that stays
+  // an unarmed incident) still gets swung: `'pistol_whip'`, the real,
+  // separate fifth technique this file's own `FORCE_LEVELS` header
+  // names, checked before the ordinary push/punch/knee/choke bands.
+  const pistolWhipping = !functioning && !!weapons.equippedFirearm(worldState, perpetratorId);
+  const forceLevel = functioning
+    ? null
+    : (pistolWhipping ? 'pistol_whip' : forceLevelFor(responseLevel));
 
   return recordCrime(worldState, {
     category,

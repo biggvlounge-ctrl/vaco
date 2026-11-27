@@ -2837,6 +2837,41 @@ opts in is byte-for-byte unchanged. 12 new tests, confirmed live
 through `engine.advanceTick()` itself. See CLAUDE.md's hundred-and-
 ninety-eighth standing rule.
 
+### Pistol whip — a fifth real force-level technique
+A fifth technique alongside task #136's `push`/`punch`/`knee`/`choke`
+bands: striking with an EQUIPPED but not-functioning firearm (no held
+round of its own ammunition — `weapons.js`'s own real `equippedFirearm`
+vs. `isFunctioningFirearm` distinction) is neither a shooting (nothing
+fired, `category` stays whatever unarmed category it already was,
+never `'gun'`) nor an ordinary bare-handed technique — real-world
+pistol-whipping is charged as weapon-involved assault regardless. One
+override check in `server/crime.js#recordEscalation`, checked before
+the existing `responseLevel` banding: `!functioning &&
+weapons.equippedFirearm(...)` reports `force_level: 'pistol_whip'`, a
+plain string literal, never a sixth entry added to `FORCE_LEVELS`
+itself (that array is specifically the unarmed `responseLevel`
+banding). 2 new tests in `test/crime-force-level.test.js` (10 total).
+See CLAUDE.md's hundred-and-ninety-ninth standing rule.
+
+### Off-grid/wood camps are now actually effective — a real evasion bonus
+Closes `camps.js`'s own previously-declared, deliberately-deferred
+gap: living at a real off-grid camp (`woods`/`cave`/`lake`) now raises
+`policing.evasionOf` by `camps.CAMP_EVASION_BONUS` (0.2 — the identical
+magnitude `disguise.DISGUISE_EVASION_BONUS` already uses, for the same
+real kind of fact: something that makes this person harder to pin down
+for as long as it holds), reaching every one of `evasionOf`'s real
+consumers — victim confidence, bystander-witness confidence,
+`clearanceChance` — for free, the same way the existing disguise bonus
+already does. Applied uniformly across all three camp types, since the
+real common fact that matters for concealment ("not at any known
+address") does not vary by type. Required at call time inside
+`policing.js`, not module scope, to avoid a real circular-require cycle
+(`camps.js` → `party.js` → `leadership.js` → `justice.js` →
+`authority.js` → `policing.js`) — the identical fix
+`factionCapacityOf`'s own `authority.js` require already uses one
+require deeper in the same cycle. 4 new tests in `test/camps.test.js`.
+See CLAUDE.md's two-hundredth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

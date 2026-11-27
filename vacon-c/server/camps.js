@@ -62,6 +62,32 @@
 // not ask, and answering it silently here would quietly recalibrate a
 // system this project's own twelfth standing rule already warns about
 // touching without measuring first.
+//
+// ---------------------------------------------------------------------
+// How this is effective — by direct follow-up instruction: "how that
+// could be effective." Reuses `policing.js#evasionOf`, never a second
+// detection model
+// ---------------------------------------------------------------------
+// `policing.evasionOf` already composes a skill base with a
+// SITUATIONAL bonus for `disguise.isDisguised` — "the same skilled
+// thief is harder to pin down wearing [a mask] than not," disguise.js's
+// own words. Living off-grid is the identical kind of fact one level
+// up: nobody at a real camp has a known address `policing.
+// clearanceChance`'s own victim/witness/capacity terms could be run
+// against, the same real reason a fugitive going off-grid is harder to
+// locate than one who stays at a registered home. `CAMP_EVASION_BONUS`
+// is deliberately the exact same value as `disguise.
+// DISGUISE_EVASION_BONUS` — not a second invented number for a
+// comparable real claim, the identical reuse disguise.js's own header
+// already did borrowing from `policing.VICTIM_BONUS`. Reaches
+// `evasionOf`'s every real consumer for free (victim/bystander witness
+// confidence AND clearance chance) rather than a second check added to
+// each — the same "one real number, many consumers" shape disguise.js
+// itself established. All three camp types (woods/cave/lake) grant the
+// identical bonus: the real common fact that matters here is "not at
+// any known address," which every camp type shares equally — inventing
+// a per-type split would assert a distinction `policing.js`'s own
+// address-based clearance model has no way to use.
 
 'use strict';
 
@@ -75,6 +101,11 @@ const CAMP_TYPES = ['woods', 'cave', 'lake'];
 //: for through a `landmarks.js` require, the same self-contained
 //: posture `landCoverPacks.js`'s own `FOREST_CLASSES` duplicate takes.
 const CAVE_LANDMARK_CATEGORIES = ['cave-system', 'natural-formation'];
+
+//: Reused as-is from `disguise.DISGUISE_EVASION_BONUS` — see this
+//: file's own header above for why this is the same number rather
+//: than a second invented one.
+const CAMP_EVASION_BONUS = 0.2;
 
 let nextCampId = 1;
 
@@ -209,6 +240,7 @@ function breakCamp(worldState, campId, founderEntityId) {
 module.exports = {
   CAMP_TYPES,
   CAVE_LANDMARK_CATEGORIES,
+  CAMP_EVASION_BONUS,
   caveLandmarkIn,
   hasRealForestSignal,
   activeCampFor,

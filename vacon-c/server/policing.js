@@ -267,8 +267,26 @@ function evasionOf(worldState, entityId) {
   // and it reaches an unskilled person exactly as much as a skilled
   // one — unlike the four traits above, which are who this person IS.
   const disguised = disguise.isDisguised(worldState, entityId);
-  const bonus = disguised ? disguise.DISGUISE_EVASION_BONUS : 0;
-  return Math.max(0, Math.min(1, base + bonus));
+  const disguiseBonus = disguised ? disguise.DISGUISE_EVASION_BONUS : 0;
+  // **A second, independent situational fact, additive with the
+  // first**: living at a real off-grid camp (`camps.js`) is not a
+  // disguise worn for one offence, it is this person's actual current
+  // living arrangement — "not at any known address" — and that reaches
+  // every one of `evasionOf`'s own real consumers the identical way
+  // `disguise.js`'s own bonus does. See `camps.js`'s own header for why
+  // this reuses the exact same magnitude rather than inventing a
+  // second number for a comparable real claim.
+  //
+  // Required at call time, not at module scope — the identical cycle
+  // `factionCapacityOf`'s own `authority.js` require already documents
+  // above: `camps.js` requires `party.js`, which requires
+  // `leadership.js`, which requires `justice.js`, which requires
+  // `authority.js`, which requires THIS module at module scope — so a
+  // module-scope require here hands one of the two a half-built module.
+  // eslint-disable-next-line global-require
+  const camps = require('./camps.js');
+  const campBonus = camps.activeCampFor(worldState, entityId) ? camps.CAMP_EVASION_BONUS : 0;
+  return Math.max(0, Math.min(1, base + disguiseBonus + campBonus));
 }
 
 // A real bystander account of THIS perpetrator, held by anyone other

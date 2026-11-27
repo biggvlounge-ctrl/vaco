@@ -11577,3 +11577,111 @@ sides of the faction/non-faction split (found across 500 real seeded
 event ids each), and the opt-in flag confirmed live through
 `engine.advanceTick()` itself, both unset and explicitly set, neither
 ever throwing.
+
+**A hundred-and-ninety-ninth, closing the "pistol whip" half of a
+direct instruction — a fifth real force-level technique, additive to
+task #136's own banding rather than a second scale beside it.**
+
+`server/crime.js#FORCE_LEVELS` already bands an UNARMED escalation's
+`responseLevel` into `push`/`punch`/`knee`/`choke`, and
+`recordEscalation` already asks `weapons.isFunctioningFirearm` to keep
+a FIRED gun's `category: 'gun'` out of that band entirely —
+`force_level` stays `null` for a shooting, because none of the four
+named techniques describes one. Striking somebody with an EQUIPPED but
+not-functioning firearm (no round of its own ammunition held, the real
+distinction `weapons.js`'s own header draws between
+`equippedFirearm`/`isFunctioningFirearm`) is neither of those two
+things, and had no real technique to land in before this: not a
+shooting (nothing fired), and not a bare-handed push/punch/knee/choke
+either, since a real NIJ use-of-force continuum already ranks a
+handheld impact weapon above an empty-hand technique and below a
+firearm discharge, which is exactly the real, citable gap this closes.
+
+**One override check, before the existing band, never a sixth entry
+added to `FORCE_LEVELS` itself.** `FORCE_LEVELS` is specifically the
+unarmed `responseLevel` banding; `pistol_whip` is a plain string
+literal, matching the test file's own existing literal-string
+convention, not a new exported constant. `recordEscalation` checks
+`!functioning && !!weapons.equippedFirearm(...)` BEFORE calling
+`forceLevelFor`, so an equipped-but-unloaded firearm reports
+`'pistol_whip'` regardless of what `responseLevel` would otherwise
+have banded it as — the real-world fact that pistol-whipping is
+charged as aggravated/weapon-involved assault even though nothing was
+fired, which this engine had no way to represent before. `category`
+is untouched — it stays `'violent'` (or whichever UNARMED category the
+incident already carried), preserving the project's own deliberate
+"an unloaded gun is not a `gun` category" design decision exactly as
+`weapons.js`'s header already states it. This mechanic only adds
+information at the separate `force_level` layer; it does not reopen
+that decision.
+
+2 new tests (`test/crime-force-level.test.js`, 10 total now): a real
+equipped-but-unloaded pistol reports `force_level: 'pistol_whip'` with
+`category` staying `'violent'`, and a genuinely unarmed perpetrator
+still reports an ordinary `'choke'` band, never `'pistol_whip'`. Both
+needed a `clearInventory` fixture helper, because `worldgen.
+generateWorld`'s own real gun-reflux mechanic (task #196) can already
+arm an NPC by generation time purely by chance — the eighth standing
+rule's own lesson, applied to a fixture built from a real generator
+rather than hand-assembled traits.
+
+**A two-hundredth, closing the "off-grid and wood locations — how
+that could be effective" half of the same direct instruction — the
+real mechanism `camps.js`'s own header had already named and
+deliberately deferred, reused rather than invented fresh.**
+
+`server/camps.js`'s own header, written when off-grid camps (task #55)
+were first built, explicitly declined two mechanics on the grounds
+that nothing had asked for either. This instruction is the real ask
+the header was waiting for, and the honest answer was not a third,
+parallel detection system — it is `policing.js#evasionOf`, the exact
+real extension point `disguise.js` (task #36) already uses for "a
+situational fact about THIS offence, not a skill the person has."
+Living at a real off-grid camp is the identical shape one level up: a
+fact about where this person currently lives — no known or registered
+address at all — rather than a choice made for one offence, and it
+reaches every one of `evasionOf`'s own real consumers (victim
+confidence, bystander-witness confidence, `clearanceChance`) for free,
+the same way the disguise bonus already does, rather than three
+separate checks added in three separate files.
+
+**The same magnitude, not a second invented number for a comparable
+real claim.** `camps.CAMP_EVASION_BONUS` is `0.2` — identical to
+`disguise.DISGUISE_EVASION_BONUS` — because both describe the same
+real kind of fact (something that makes THIS person, for the duration
+it holds, meaningfully harder to pin down) and this registry has
+already measured and justified that magnitude once; inventing a second
+number for the same claim would be exactly the mistake the
+seventeenth standing rule's four-attempt case study exists to avoid.
+Applied uniformly across `woods`/`cave`/`lake`: the real common fact
+that matters for concealment — "not at any known address" — does not
+vary by camp type the way `camps.js`'s own placement-validation
+signals do (a real cave landmark, a real forest land-cover class, no
+real signal at all for open water), and asserting an unjustified
+concealment gradient between the three would be inventing a fact this
+registry has no citation for.
+
+**Required at call time, not module scope — the same real cycle
+`factionCapacityOf`'s own `authority.js` require already documents in
+this exact file.** `camps.js` requires `party.js`, which requires
+`leadership.js`, which requires `justice.js`, which requires
+`authority.js`, which requires `policing.js` at module scope (it reads
+`trustIn`) — so a module-scope `camps.js` require inside `policing.js`
+hands one of the two a half-built module the instant any caller reaches
+`party.js` first. Found directly, not by inspection: a first version
+required `camps.js` at module scope and `test/camps.test.js`'s own new
+tests failed with `party.partyOf is not a function`, because `party.js`
+was still mid-load (its `module.exports` not yet assigned) when the
+cycle looped back through `camps.js` to request it a second time.
+Fixed the same way `factionCapacityOf` already fixes the identical
+problem one require deeper into the same cycle.
+
+4 new tests (`test/camps.test.js`): `evasionOf` raised by exactly the
+real camp bonus while actively camped, bounded to 1; the bonus
+dropping the instant a camp is broken — a live read through
+`camps.activeCampFor`, never a frozen snapshot, the ninth standing
+rule's own discipline; and the bonus confirmed identical across a real
+`woods` camp and a real `lake` camp, each checked against its own
+before/after delta rather than one person's evasion compared to
+another's, since two different NPCs' underlying skill draws are not
+guaranteed equal.
