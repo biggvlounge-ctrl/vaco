@@ -60,6 +60,49 @@ const economy = require('./economy.js');
 const occupations = require('./occupations.js');
 const { seededDraw } = require('./seeded.js');
 
+// ---------------------------------------------------------------------
+// Task #198 — leadership/influence-scaled follower growth, from
+// family to cross-location control
+// ---------------------------------------------------------------------
+// Everything above scales the chaos-recruitment/family-absorption
+// RATE on real community danger alone — a gang led by nobody in
+// particular attracted followers exactly as fast as one led by the
+// single most influential figure in the city, because no leadership
+// term existed anywhere in either draw. `leadershipGrowthMultiplierFor`
+// closes that, reading the real leader's own `influence
+// .influenceRatingOf` through the identical `0.75 + x/200`
+// neutral-at-50 band `economy.productivityOf`/`vehicles
+// .drivingModulatorFor` already established for Discipline/
+// efficiency/health/focus/Driving (tasks #107/#127) — a modulator,
+// never a gate, so a nobody-led group keeps recruiting, just slower,
+// and a group led by this city's most influential figure recruits up
+// to 1.25x faster.
+//
+// No real leader at all (`organizations.leader_id`/`families
+// .head_npc_id` both null) is a different claim than "unmeasured" —
+// there is no one here to rate — so it reads as the flat neutral
+// multiplier (1), not the trait scale's own centre run through the
+// formula by accident.
+//
+// "Family to cross-location control" is this file's own real span,
+// not a third mechanism: `runChaosRecruitment` (below) is the
+// organization/gang/tribe-as-organization half, `
+// runChaosFamilyAbsorption` (further below) is the real family/tribe
+// half this engine already treats as one concept
+// (`engine.tribeIdFor` reads a tribe straight off
+// `family_memberships` — see that function's own header), and
+// `control.js`'s own already-built org-expansion mission (task #124)
+// is what a faster-growing roster eventually reaches: a bigger real
+// membership measured against the nineteenth standing rule's own
+// 5:10:1 composition ratio can attempt a bigger target, including a
+// second city, with no new code needed there at all. Confirmed, not
+// rebuilt — see this file's own test for the measurement.
+function leadershipGrowthMultiplierFor(worldState, leaderEntityId) {
+  if (leaderEntityId == null) return 1;
+  const rating = influence.influenceRatingOf(worldState, leaderEntityId);
+  return Math.max(0, 0.75 + rating / 200);
+}
+
 // No cycle to check here, unlike `justice.js`'s own `ensurePrisonGang`
 // needing a lazy, in-function `require('./engine.js')`: `mortality.js`
 // and `characterCreation.js` both sit outside the `engine.js` →
@@ -136,7 +179,8 @@ function runChaosRecruitment(worldState, options = {}) {
       const organization = (worldState.organizations || []).find((o) => o.id === row.organizationId);
       if (!organization) continue;
 
-      const chance = BASE_RECRUITMENT_RISK * dangerScore;
+      const leaderMultiplier = leadershipGrowthMultiplierFor(worldState, organization.leader_id ?? null);
+      const chance = BASE_RECRUITMENT_RISK * dangerScore * leaderMultiplier;
       const draw = seededDraw([organization.id, community.id, tick, 'chaos-recruitment']);
       if (draw >= chance) continue;
 
@@ -399,11 +443,18 @@ function runChaosFamilyAbsorption(worldState, options = {}) {
       const candidates = absorbingFamilyCandidates(worldState, community.id, ownFamilyId);
       if (candidates.length === 0) continue;
 
-      const chance = BASE_RECRUITMENT_RISK * dangerScore;
+      // The real absorbing family is picked BEFORE the draw now (task
+      // #198), deterministically on `unity` exactly as before — this
+      // reordering changes nothing about WHICH family wins, only
+      // which real leadership figure the rate below gets to read,
+      // because that family's own `head_npc_id` is the real
+      // "tribe/family leader" this file's header names.
+      const family = bestAbsorbingFamily(candidates);
+      const leaderMultiplier = leadershipGrowthMultiplierFor(worldState, family.head_npc_id ?? null);
+      const chance = BASE_RECRUITMENT_RISK * dangerScore * leaderMultiplier;
       const draw = seededDraw([orphan.id, community.id, tick, 'chaos-family-absorption']);
       if (draw >= chance) continue;
 
-      const family = bestAbsorbingFamily(candidates);
       absorbIntoFamily(worldState, {
         familyId: family.id, entityId: orphan.id, role: 'child', generationNumber: family.generation,
       });
@@ -440,6 +491,7 @@ function familyAbsorptionEventsFor(worldState, communityId) {
 
 module.exports = {
   BASE_RECRUITMENT_RISK,
+  leadershipGrowthMultiplierFor,
   eligibleCandidates,
   runChaosRecruitment,
   recruitmentEventsFor,

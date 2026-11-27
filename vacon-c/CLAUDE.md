@@ -11093,3 +11093,63 @@ organization with no veteran (1), a veteran as an ordinary member
 `work` habit's `Endurance` gain is identical with or without the
 boost), and default-parameter backward compatibility (omitting
 `combatMultiplier` behaves exactly like passing explicit `1`).
+
+**A hundred-and-ninety-third, closing task #198 — leadership/
+influence-scaled follower growth, from family to cross-location
+control, reusing task #15/#170's own chaos-driven recruitment file
+rather than starting a second growth mechanism.** `recruitment.js`'s
+real danger-scaled rate (`runChaosRecruitment` for gangs/orgs,
+`runChaosFamilyAbsorption` for the "tribe" a family already is —
+`engine.tribeIdFor` reads one straight off `family_memberships`, this
+file's own header already says so) had no leadership term in it at
+all — a gang led by nobody attracted followers exactly as fast as one
+led by the city's single most influential figure.
+
+**`leadershipGrowthMultiplierFor(worldState, leaderEntityId)` reads
+the real leader's own `influence.influenceRatingOf` through the
+identical `0.75 + x/200` neutral-at-50 band tasks #107/#127 already
+established** for Discipline/efficiency/health/focus/Driving — a
+modulator, never a gate, so a nobody-led group keeps recruiting, just
+slower, never zero. No real leader at all (`organizations.leader_id`/
+`families.head_npc_id` both null) is a different claim than
+"unmeasured" — there is no one to rate — so it reads as the flat
+neutral multiplier (1), not the trait scale's own centre run through
+the formula by accident.
+
+**"Family to cross-location control" is this file's own real span,
+not a third mechanism.** `runChaosRecruitment` is the organization/
+gang/tribe-as-organization half; `runChaosFamilyAbsorption` is the
+real family/tribe half (kinship absorbing an already-orphaned child —
+the family head's own real `influenceRatingOf` now scales how fast
+THAT happens too, picked exactly as before by real `unity`, never
+by influence); and `control.js`'s already-built org-expansion mission
+(task #124) — a bigger real membership measured against the
+nineteenth standing rule's own 5:10:1 composition ratio reaching a
+bigger target, including a second city — is what a faster-growing
+roster eventually reaches, with no new code needed there at all.
+Confirmed, not rebuilt.
+
+**For `runChaosFamilyAbsorption`, the real absorbing family had to be
+picked BEFORE the rate's own draw, not after** — the chance needs a
+real leader to rate, and `bestAbsorbingFamily` (still deterministic,
+still by `unity`, never touched) is what identifies one. Reordering
+changed nothing about WHICH family wins; the existing "highest-unity
+family" test still passes unchanged.
+
+**Two real, measured rate-speedup proofs, the same shape task #182's
+sparring-rate test and task #127's driving-rate test already use:
+identical seeds (same gang id, same community id, same incident
+schedule) so the per-tick draw is the literal same number in both
+worlds, and only the leadership multiplier differs** — populations
+large enough (200 real residents / 100 real orphans) that the
+measurement window never exhausts either candidate pool, which was
+measured and ruled out directly before writing the numbers down (a
+smaller population hits a ceiling where both worlds simply recruit
+everyone eventually and the real rate difference vanishes into it).
+A maximally influential leader recruits 34 times against a leaderless
+gang's 32 over 5000 ticks; a maximally influential family head absorbs
+78 real orphans against a headless family's 74 over 200 ticks — both
+measured on these exact fixtures, not guessed. 4 new tests total,
+including the direct 0.75/1.25-band proof and a default-parameter
+backward-compatibility check (a gang with no real `leader_id` behaves
+exactly as it always did).

@@ -2687,6 +2687,27 @@ confirmed with `od -c`, and left exactly as-is (unrelated to this
 task, causes no bug). 8 new tests. See CLAUDE.md's hundred-and-
 ninety-second standing rule.
 
+### Leadership/influence-scaled follower growth, from family to cross-location control (closes task #198)
+Reuses `recruitment.js`'s own chaos-driven growth rate (tasks #15/
+#170) rather than a second mechanism. `leadershipGrowthMultiplierFor`
+reads the real group leader's (`organizations.leader_id`/`families
+.head_npc_id`) own `influence.influenceRatingOf` through the
+identical 0.75/1.25 neutral-at-50 band tasks #107/#127 already
+established, scaling both `runChaosRecruitment` (orgs/gangs) and
+`runChaosFamilyAbsorption` (the real family/tribe half) — a nobody-led
+group still recruits, just slower; no real leader at all reads as the
+flat neutral multiplier, not an unmeasured one run through the
+formula by accident. WHO is picked never changes (still the highest
+real `influenceRatingOf` candidate; still the highest real `unity`
+family — the family pick simply had to move before the rate's own
+draw so there was a real leader to read). "Cross-location control" is
+task #124's already-built org-expansion mission, reached by a
+faster-growing roster with no new code there. Two real, measured
+speedup proofs on identical seeds (34 vs. 32 recruits over 5000 ticks;
+78 vs. 74 orphans absorbed over 200 ticks), plus the direct 0.75/1.25
+band test and a default-parameter backward-compatibility check.
+See CLAUDE.md's hundred-and-ninety-third standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

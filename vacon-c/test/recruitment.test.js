@@ -14,6 +14,16 @@ const crime = require('../server/crime.js');
 const membership = require('../server/membership.js');
 const economy = require('../server/economy.js');
 const occupations = require('../server/occupations.js');
+const { getTraitId } = require('../server/traitDefinitions.js');
+
+// Same real helper shape `test/influence.test.js` already uses.
+function setTrait(w, entityId, family, name, value) {
+  const traitId = getTraitId(family, name);
+  if (!traitId) throw new Error(`fixture names a trait that does not exist: ${family}.${name}`);
+  w.entityTraits.push({
+    entity_id: entityId, trait_id: traitId, current_value: value, base_value: value, key_modifier: 0,
+  });
+}
 
 // Real shape from `test/crime.test.js`'s own "the danger map and the
 // displayed level are built from the same rate" — the known-working
@@ -400,4 +410,188 @@ test('runChaosFamilyAbsorption never absorbs a real orphan when no other real fa
     absorptions += recruitment.runChaosFamilyAbsorption(w, { tick }).length;
   }
   assert.equal(absorptions, 0, 'an orphan was absorbed with no real eligible family present at all');
+});
+
+// ---------------------------------------------------------------------
+// Task #198 — leadership/influence-scaled follower growth, from family
+// to cross-location control
+// ---------------------------------------------------------------------
+
+test('leadershipGrowthMultiplierFor reads the real leader\'s own influenceRatingOf through the identical 0.75/1.25 neutral-at-50 band tasks #107/#127 already established', () => {
+  const w = dangerousWorld();
+  assert.equal(recruitment.leadershipGrowthMultiplierFor(w, null), 1,
+    'no real leader at all must read as the flat neutral multiplier, not the trait scale\'s own centre run through the formula by accident');
+
+  // npc 1: nothing set at all -- leads nothing real, no visible
+  // occupation. A real, below-average leadership claim, not an
+  // unmeasured one, so this reads BELOW the neutral centre.
+  const low = recruitment.leadershipGrowthMultiplierFor(w, 1);
+  assert.ok(low > 0.75 && low < 1, `expected a below-neutral multiplier for an unremarkable leader, got ${low}`);
+
+  // npc 2: a real maxed-out leader -- a tier-5 occupation, leads this
+  // same real gang at its own real maximum influence/membership, real
+  // maxed social and aura traits, placed in a tiny real community for
+  // maxed local prominence -- the identical "max every real component"
+  // shape test/plays.test.js's own "maximally influential leader" test
+  // already uses for influenceRatingOf itself.
+  const tinyCommunity = { id: 2, name: 'Founders Row' };
+  w.communities.push(tinyCommunity);
+  w.npcs.find((n) => n.id === 2).communityId = tinyCommunity.id;
+
+  const gang = organization(w);
+  gang.influence = 100;
+  gang.leader_id = 2;
+  membership.joinOrganization(w, { entityId: 2, organizationId: gang.id });
+  for (let i = 0; i < 19; i += 1) {
+    w.npcs.push({ id: 1000 + i, communityId: tinyCommunity.id, status: 'active', home_property_id: null });
+    membership.joinOrganization(w, { entityId: 1000 + i, organizationId: gang.id });
+  }
+  economy.hireEntity(w, { entityId: 2, employerOrganizationId: gang.id, wage: 50, position: 'officer', tick: 400 });
+  for (const name of ['Charisma', 'Persuasion', 'Reputation', 'Network Reach']) setTrait(w, 2, 'social', name, 100);
+  setTrait(w, 2, 'reputation', 'Notoriety', 100);
+
+  const high = recruitment.leadershipGrowthMultiplierFor(w, 2);
+  assert.ok(high > 1.2, `expected a near-ceiling multiplier for a maximally influential leader, got ${high}`);
+});
+
+// A real rate-speedup proof, the same shape task #182's sparring-rate
+// test and task #127's driving-rate test already use: identical seeds
+// (same gang id, same community id, same incident schedule) so the
+// per-tick draw is literally the same number in both worlds, and only
+// the leadership multiplier differs. A large enough real population
+// (200) that the measurement window (5000 ticks) never exhausts the
+// candidate pool in either world -- a smaller population would hit a
+// ceiling where both worlds simply recruit everyone eventually and the
+// real rate difference this test is proving would vanish into that
+// ceiling (measured and ruled out directly before writing this down).
+function sustainedDangerWorld({ population, windowTicks, incidentSpacing, incidentsPerSpacing }) {
+  const w = {
+    tick: 400, npcs: [], communities: [{ id: 1, name: 'Hollow Row' }],
+    crimeIncidents: [], organizations: [], entityOrganizationMemberships: [],
+    employmentRecords: [], entityTraits: [], historicalRecords: [],
+    families: [], familyMemberships: [], nextEntityId: 1,
+  };
+  for (let i = 1; i <= population; i += 1) {
+    w.npcs.push({ id: i, communityId: 1, status: 'active', home_property_id: null });
+  }
+  // Incidents spread across the WHOLE measurement window so the real
+  // 365-tick rolling window `crime.dangerByCommunity` reads
+  // (`crime.DANGER_WINDOW_TICKS`) never runs dry mid-measurement --
+  // without this, danger decays to 0 well before either world's
+  // window ends and the comparison would be measuring nothing.
+  for (let t = 380; t < 400 + windowTicks; t += incidentSpacing) {
+    for (let k = 0; k < incidentsPerSpacing; k += 1) {
+      w.crimeIncidents.push({ id: w.crimeIncidents.length + 1, community_id: 1, category: 'theft', tick: t });
+    }
+  }
+  economy.reseedIds(w);
+  return w;
+}
+
+test('a real, highly-influential gang leader measurably speeds up runChaosRecruitment\'s own rate over an identical, unled gang -- never the WHO it picks, the RATE it fires at', () => {
+  const population = 200;
+  const windowTicks = 5000;
+
+  const low = sustainedDangerWorld({ population, windowTicks, incidentSpacing: 100, incidentsPerSpacing: 40 });
+  const lowGang = organization(low);
+  membership.joinOrganization(low, { entityId: 1, organizationId: lowGang.id });
+
+  const high = sustainedDangerWorld({ population, windowTicks, incidentSpacing: 100, incidentsPerSpacing: 40 });
+  const highGang = organization(high); // same auto-assigned id as lowGang -- identical draw stream
+  assert.equal(highGang.id, lowGang.id, 'the two fixtures diverged before the leadership term was even introduced');
+  highGang.influence = 100;
+  highGang.leader_id = 2;
+  membership.joinOrganization(high, { entityId: 1, organizationId: highGang.id });
+  membership.joinOrganization(high, { entityId: 2, organizationId: highGang.id });
+  economy.hireEntity(high, { entityId: 2, employerOrganizationId: highGang.id, wage: 50, position: 'officer', tick: 400 });
+  for (const name of ['Charisma', 'Persuasion', 'Reputation', 'Network Reach']) setTrait(high, 2, 'social', name, 100);
+  setTrait(high, 2, 'reputation', 'Notoriety', 100);
+
+  let lowCount = 0;
+  let highCount = 0;
+  for (let tick = 400; tick < 400 + windowTicks; tick += 1) {
+    lowCount += recruitment.runChaosRecruitment(low, { tick }).length;
+    highCount += recruitment.runChaosRecruitment(high, { tick }).length;
+  }
+
+  // Measured, not guessed, on this exact fixture -- re-derive by
+  // running this test rather than hand-recomputing if either number
+  // ever needs to move.
+  assert.equal(lowCount, 32);
+  assert.equal(highCount, 34);
+  assert.ok(highCount > lowCount, 'a maximally influential real leader recruited no faster than nobody at all');
+});
+
+test('a real, highly-influential family head measurably speeds up runChaosFamilyAbsorption\'s own rate over an identical, headless absorbing family -- never WHICH family wins (still real unity, unchanged), the RATE it fires at', () => {
+  const orphanCount = 100;
+  const windowTicks = 200;
+
+  function orphanWorld() {
+    const w = sustainedDangerWorld({
+      population: 0, windowTicks, incidentSpacing: 50, incidentsPerSpacing: 10,
+    });
+    // The one real absorbing family's one living member.
+    w.npcs.push({ id: 1, communityId: 1, status: 'active', home_property_id: null });
+    familyRow(w, { id: 1, unity: 50 });
+    w.familyMemberships.push({ entity_id: 1, family_id: 1, role: 'member', generation_number: 1 });
+
+    // `orphanCount` real, distinct orphans, each in their OWN family
+    // (excluded from absorbing itself, same as every other test in
+    // this file) with a dead bearer and a real birth record.
+    let nextId = 100;
+    for (let i = 0; i < orphanCount; i += 1) {
+      const childId = nextId++;
+      const bearerId = nextId++;
+      const ownFamilyId = 1000 + i;
+      familyRow(w, { id: ownFamilyId, unity: 50 });
+      bornChild(w, { childId, bearerId, familyId: ownFamilyId, age: 10 });
+    }
+    return w;
+  }
+
+  const low = orphanWorld(); // family 1's head_npc_id stays the real schema default: null
+
+  const high = orphanWorld();
+  const leaderId = 99999;
+  high.npcs.push({ id: leaderId, communityId: 1, status: 'active', home_property_id: null });
+  high.families.find((f) => f.id === 1).head_npc_id = leaderId;
+  const org = {
+    id: 88888, name: 'Leader Org', type: 'faction', founder_id: null, leader_id: leaderId,
+    members: 0, assets: 0, income: 0, expenses: 0, influence: 100, security: 50, innovation: 50, reputation: 50,
+  };
+  high.organizations.push(org);
+  membership.joinOrganization(high, { entityId: leaderId, organizationId: org.id });
+  for (let i = 0; i < 19; i += 1) {
+    const memberId = 5000 + i;
+    high.npcs.push({ id: memberId, communityId: 1, status: 'active', home_property_id: null });
+    membership.joinOrganization(high, { entityId: memberId, organizationId: org.id });
+  }
+  for (const name of ['Charisma', 'Persuasion', 'Reputation', 'Network Reach']) setTrait(high, leaderId, 'social', name, 100);
+  setTrait(high, leaderId, 'reputation', 'Notoriety', 100);
+
+  let lowCount = 0;
+  let highCount = 0;
+  for (let tick = 400; tick < 400 + windowTicks; tick += 1) {
+    lowCount += recruitment.runChaosFamilyAbsorption(low, { tick }).length;
+    highCount += recruitment.runChaosFamilyAbsorption(high, { tick }).length;
+  }
+
+  // Measured, not guessed, on this exact fixture.
+  assert.equal(lowCount, 74);
+  assert.equal(highCount, 78);
+  assert.ok(highCount > lowCount, 'a maximally influential real family head absorbed no faster than a headless family');
+});
+
+test('runChaosRecruitment behaves exactly as it always did when the gang has no real leader_id at all -- omitting the new argument is not a behaviour change', () => {
+  const w = dangerousWorld();
+  const gang = organization(w);
+  assert.equal(gang.leader_id, null, 'this fixture\'s own default drifted away from the real schema default of no leader');
+  membership.joinOrganization(w, { entityId: 1, organizationId: gang.id });
+
+  let result = null;
+  for (let tick = 400; tick < 400 + 8000 && !result; tick += 1) {
+    const recruited = recruitment.runChaosRecruitment(w, { tick });
+    if (recruited.length > 0) result = recruited[0];
+  }
+  assert.ok(result, 'no recruitment happened across 8000 real seeded draws for a gang with no real leader');
 });
