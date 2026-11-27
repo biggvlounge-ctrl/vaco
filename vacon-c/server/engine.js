@@ -1473,6 +1473,8 @@ const ACTION_VERBS = {
   stripBuilding: (...args) => stripBuilding(...args),
   lockProperty: (...args) => lockProperty(...args),
   unlockProperty: (...args) => unlockProperty(...args),
+  buildHome: (...args) => buildHome(...args),
+  renovateProperty: (...args) => renovateProperty(...args),
   makeThing: (...args) => makeThing(...args),
   canMakeThing: (...args) => canMakeThing(...args),
   harvest: (...args) => harvest(...args),
@@ -1839,6 +1841,28 @@ function lockProperty(entityId, options = {}) {
 
 function unlockProperty(entityId, options = {}) {
   return property.unlockProperty(WorldState, entityId, Number(options.propertyId));
+}
+
+// Task #239, by direct instruction: "construction and building
+// houses... doing homework [home repairs]... remodeling." Both wrap
+// real, already-built mechanisms rather than inventing new ones:
+// `construction.js` (own real build/finance/lifecycle mechanic, only
+// ever reached passively per-tick before this) and `property.
+// renovateProperty` (the active half of maintenance, see that
+// function's own header). The identical "give a real passive
+// mechanism a real player verb" shape `foundBusiness` already took.
+function buildHome(entityId, options = {}) {
+  // eslint-disable-next-line global-require
+  const construction = require('./construction.js');
+  return construction.constructResidentialProperty(WorldState, {
+    builderId: entityId,
+    communityId: Number(options.communityId),
+    cityId: options.cityId == null ? null : Number(options.cityId),
+  });
+}
+
+function renovateProperty(entityId, options = {}) {
+  return property.renovateProperty(WorldState, entityId, Number(options.propertyId));
 }
 
 function makeThing(entityId, options = {}) {

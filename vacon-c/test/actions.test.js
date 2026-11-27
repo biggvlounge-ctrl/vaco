@@ -79,9 +79,9 @@ test('every verb an action names is one the engine actually supplies', () => {
   assert.deepEqual(
     actions.REQUIRED_VERBS,
     ['acceptMission', 'addScheduleEvent', 'applyHold', 'applyRecommendedSplit', 'askAround', 'assembleParty', 'assessTakeover', 'assessThreat', 'assignPartyRole', 'assignRole', 'attemptHeist', 'attemptTakeover',
-      'beginJourney', 'breakCamp', 'breakDownItem', 'broadcastMessage', 'buildBarricade', 'callBluff', 'canHarvest', 'canMakeThing', 'captureEntity', 'convertCrack', 'dealDrugs', 'demandTribute', 'designateStashHouse', 'directMission', 'disposeOfCapture', 'drawPlay', 'establishCamp', 'findOrCreateContact', 'foundBusiness', 'guessFugitiveLocation', 'guessFugitiveLocationWithParty', 'guessMissingRelationLocation', 'guessMissingRelationLocationWithParty', 'harvest', 'holdMeeting',
+      'beginJourney', 'breakCamp', 'breakDownItem', 'broadcastMessage', 'buildBarricade', 'buildHome', 'callBluff', 'canHarvest', 'canMakeThing', 'captureEntity', 'convertCrack', 'dealDrugs', 'demandTribute', 'designateStashHouse', 'directMission', 'disposeOfCapture', 'drawPlay', 'establishCamp', 'findOrCreateContact', 'foundBusiness', 'guessFugitiveLocation', 'guessFugitiveLocationWithParty', 'guessMissingRelationLocation', 'guessMissingRelationLocationWithParty', 'harvest', 'holdMeeting',
       'attemptInsideJob', 'collectDebt', 'enforceCollection', 'importSubstance', 'intimidate', 'investInTarget', 'issueLoan', 'joinCamp', 'leaveCamp', 'lockProperty', 'makeThing', 'manufactureAmmunition', 'placeStreetBet', 'placeWager', 'produceMarijuana', 'quoteTrade',
-      'reinforceHabit', 'releaseFromParty', 'repurposeProperty', 'resolveContest', 'restoreVehicle', 'revealCache', 'runPlay', 'saveLocation', 'searchLocation', 'sendMessage', 'sendSpy',
+      'reinforceHabit', 'releaseFromParty', 'renovateProperty', 'repurposeProperty', 'resolveContest', 'restoreVehicle', 'revealCache', 'runPlay', 'saveLocation', 'searchLocation', 'sendMessage', 'sendSpy',
       'stealVehicle', 'stripBuilding', 'resolveMission', 'studySource', 'talkTo', 'tradeWith', 'unlockProperty', 'unsaveLocation'].sort(),
   );
 });
@@ -608,4 +608,39 @@ test('status alone decides availability, because the two fields cannot disagree'
 
 test('available missions are refused for an entity that does not exist', () => {
   assert.throws(() => engine.availableMissions(999999), /no entity with id/);
+});
+
+// ---------------------------------------------------------------------------
+// Task #239: construction/renovation, through the real dispatcher
+// ---------------------------------------------------------------------------
+
+test('build-home reaches construction.js#constructResidentialProperty through the real dispatcher', () => {
+  const property3 = require('../server/property.js');
+  const city = engine.generateCity({ name: 'Dispatch Build City' });
+  const community = engine.generateCommunity({ cityId: city.id });
+  const { npc, player } = citizen({ savings: 100000 });
+  const before = property3.getHoldings(engine.WorldState, npc.id).count;
+
+  const out = engine.dispatchAction(player.id, {
+    action: 'build-home', communityId: community.id, cityId: city.id,
+  });
+
+  assert.equal(out.result.type, 'residential');
+  assert.equal(out.result.community_id, community.id);
+  const after = property3.getHoldings(engine.WorldState, npc.id).count;
+  assert.equal(after, before + 1, 'the real built home is a real new holding');
+});
+
+test('renovate-property reaches property.js#renovateProperty through the real dispatcher', () => {
+  const { npc, player } = citizen({ savings: 100000 });
+  const home = engine.generateProperty({
+    type: 'residential', value: 50000, condition: 40, lifecycleStage: 'operation', occupants: [npc.id],
+  });
+
+  const out = engine.dispatchAction(player.id, {
+    action: 'renovate-property', propertyId: home.id,
+  });
+
+  assert.equal(out.result.property.condition, 80, '40 + the real RENOVATION_CONDITION_GAIN (40)');
+  assert.ok(out.result.cost > 0, 'a real renovation always costs something');
 });

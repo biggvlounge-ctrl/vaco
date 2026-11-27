@@ -62,6 +62,7 @@
 'use strict';
 
 const { nextAfter } = require('./nextAfter.js');
+const economy = require('./economy.js');
 
 let nextOwnershipId = 1;
 
@@ -337,6 +338,73 @@ function unlockProperty(worldState, entityId, propertyId) {
   }
   property.locked = false;
   return property;
+}
+
+// ---------------------------------------------------------------------------
+// renovateProperty() — the active half of maintenance, by direct
+// instruction ("construction and building houses, doing homework
+// [home repairs], remodeling")
+// ---------------------------------------------------------------------------
+// `advancePropertyLifecycle`'s own `OCCUPANT_UPKEEP_PER_TICK`/
+// `OWNER_UPKEEP_PER_TICK` are PASSIVE — condition drifts up slowly just
+// from somebody living there or owning it. There was no ACTIVE verb
+// to spend real money and raise it on purpose, the identical gap
+// `vehicles.js`'s own header already names for a car before
+// `restoreVehicle` closed it: "`property.js`'s own maintenance repairs
+// a BUILDING, a different real mechanism" — different, and, until
+// this, passive-only.
+//
+// **The gain is not a second invented number.** `RENOVATION_
+// CONDITION_GAIN` is the identical real magnitude
+// `vehicles.RESTORATION_CONDITION_GAIN` already uses (40) — the same
+// real kind of claim ("one real repair pass raises condition by this
+// much"), reused rather than re-guessed.
+//
+// **The cost is not invented at all.** It is read directly off this
+// property's own real `currentValue` formula: exactly the market-value
+// gain this repair buys, before and after, on the property's own
+// already-real `value` and `lifecycle_stage`. A mansion costs more to
+// repair than a shack for the identical real reason `currentValue`
+// already prices a mansion higher — no flat per-point price this
+// registry has no citation for.
+const RENOVATION_CONDITION_GAIN = 40;
+
+function renovateProperty(worldState, entityId, propertyId, options = {}) {
+  const { tick = worldState.tick ?? 0 } = options;
+  const target = (worldState.properties || []).find((p) => p.id === Number(propertyId));
+  if (!target) throw new Error(`renovateProperty: no property ${propertyId}`);
+  if (!canLock(worldState, propertyId, entityId)) {
+    throw new Error(
+      `renovateProperty: entity ${entityId} is not a real occupant, staff member, or owner of property ${propertyId}`,
+    );
+  }
+
+  const beforeCondition = clamp(Number(target.condition) || 0, 0, 100);
+  if (beforeCondition >= 100) {
+    throw new Error(`renovateProperty: property ${propertyId} is already at full condition.`);
+  }
+  const afterCondition = Math.min(100, beforeCondition + RENOVATION_CONDITION_GAIN);
+
+  const before = currentValue(target);
+  const after = currentValue({ ...target, condition: afterCondition });
+  const cost = Math.max(0, after - before);
+
+  const finances = economy.getLatestFinances(worldState, entityId);
+  const savings = Number(finances?.savings ?? 0);
+  if (savings < cost) {
+    throw new Error(`renovateProperty: entity ${entityId} has ${savings} savings, needs ${cost}.`);
+  }
+
+  economy.generateIndividualFinances(worldState, entityId, {
+    income: finances?.income ?? 0,
+    savings: savings - cost,
+    debt: finances?.debt ?? 0,
+    assets: finances?.assets ?? 0,
+    tick,
+  });
+
+  target.condition = afterCondition;
+  return { property: target, cost, conditionGain: afterCondition - beforeCondition };
 }
 
 // ---------------------------------------------------------------------------
@@ -654,6 +722,8 @@ module.exports = {
   canLock,
   lockProperty,
   unlockProperty,
+  RENOVATION_CONDITION_GAIN,
+  renovateProperty,
   CONDITION_DECAY_PER_TICK,
   OCCUPANT_UPKEEP_PER_TICK,
   OWNER_UPKEEP_PER_TICK,

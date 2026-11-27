@@ -310,6 +310,35 @@ const ACTIONS = {
     run: (verbs, actorId, body) => verbs.unlockProperty(actorId, { propertyId: Number(body.propertyId) }),
   },
 
+  // Task #239, by direct instruction: "construction and building
+  // houses." Wraps the real, already-built `construction.
+  // constructResidentialProperty` directly -- the same real
+  // eligibility (no property owned yet, real savings covering the
+  // real terrain-adjusted cost) `runConstruction`'s own passive per-
+  // tick draw already checks, now reachable on demand rather than by
+  // chance alone.
+  'build-home': {
+    summary: 'Build a new home in a real community, financed from your own savings.',
+    modes: ['citizen', 'leader'],
+    requires: ['communityId'],
+    verbs: ['buildHome'],
+    run: (verbs, actorId, body) => verbs.buildHome(actorId, {
+      communityId: Number(body.communityId),
+      cityId: body.cityId == null ? null : Number(body.cityId),
+    }),
+  },
+
+  // "Doing homework [home repairs]... remodeling" -- the active half
+  // of maintenance. See `property.renovateProperty`'s own header for
+  // why neither the condition gain nor the cost is invented.
+  'renovate-property': {
+    summary: 'Repair/remodel a real property you occupy, staff, or own, financed from your own savings.',
+    modes: ['citizen', 'leader'],
+    requires: ['propertyId'],
+    verbs: ['renovateProperty'],
+    run: (verbs, actorId, body) => verbs.renovateProperty(actorId, { propertyId: Number(body.propertyId) }),
+  },
+
   // **Searching a landmark for what is in it.** The other half of
   // `strip-building`: salvage takes a building apart for what it is
   // MADE of, this carries out what it HELD. A library is worth

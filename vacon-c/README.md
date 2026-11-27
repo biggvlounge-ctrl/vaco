@@ -2891,6 +2891,27 @@ zoo-aquarium each get a real significance reading and a real,
 non-null card) and `test/routes.test.js` (the same two fields over
 HTTP). See CLAUDE.md's two-hundred-and-first standing rule.
 
+### Construction and renovation — two real player verbs over real, mostly-already-built mechanisms
+"Construction and building houses" was already fully real
+(`server/construction.js`, financed from the builder's own savings,
+real terrain-cost multiplier, real lifecycle timer) but reachable only
+through a passive per-tick dice roll — never a player's own choice.
+New `'build-home'` verb wraps the identical real
+`constructResidentialProperty`, the same fix `found-business` already
+got for the same reason. "Doing homework [home repairs]... remodeling"
+was the genuinely missing piece: `advancePropertyLifecycle`'s own
+occupant/owner upkeep is passive-only, with no active repair verb the
+way `vehicles.restoreVehicle` already has for a car. New
+`property.renovateProperty` + `'renovate-property'` verb close it with
+two non-invented numbers — the condition gain is the identical
+magnitude `vehicles.RESTORATION_CONDITION_GAIN` already uses (40), and
+the cost is read directly off the property's own real `currentValue`
+gain (before/after), never a flat invented per-point price. Gated on
+the same `canLock` real-stake check `lockProperty` already uses. 6 new
+tests in `test/property.test.js`, 2 dispatcher-level tests in
+`test/actions.test.js`. See CLAUDE.md's two-hundred-and-second
+standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

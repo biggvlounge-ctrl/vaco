@@ -718,3 +718,85 @@ test('unlockProperty refuses the identical real stranger check', () => {
   );
   assert.equal(home.locked, true);
 });
+
+// ---------------------------------------------------------------------------
+// renovateProperty — the active half of maintenance (task #239)
+// ---------------------------------------------------------------------------
+// By direct instruction: "construction and building houses, doing
+// homework [home repairs], remodeling." See property.js's own header
+// above `renovateProperty` for why neither the condition gain nor the
+// cost is a new invented number.
+
+function financeWorld() {
+  return { ...freshWorld(), individualFinances: [] };
+}
+
+test('a real occupant can renovate their own property, paying exactly the real currentValue gain it buys', () => {
+  const world = financeWorld();
+  const home = property.generateProperty(world, {
+    type: 'residential', value: 90000, condition: 50, lifecycleStage: 'operation', occupants: [7],
+  });
+  const economy = require('../server/economy.js');
+  economy.generateIndividualFinances(world, 7, { savings: 40000, tick: 0 });
+
+  const result = property.renovateProperty(world, 7, home.id);
+
+  assert.equal(home.condition, 90, '50 + the real RENOVATION_CONDITION_GAIN (40)');
+  assert.equal(result.conditionGain, 40);
+  // currentValue at condition 50 is 45000; at 90 it is 81000 -- the real
+  // gain this repair buys, never a flat invented per-point price.
+  assert.equal(result.cost, 36000);
+  assert.equal(economy.getLatestFinances(world, 7).savings, 40000 - 36000);
+});
+
+test('renovateProperty caps the gain at full condition rather than overshooting', () => {
+  const world = financeWorld();
+  const home = property.generateProperty(world, {
+    type: 'residential', value: 90000, condition: 70, lifecycleStage: 'operation', occupants: [7],
+  });
+  const economy = require('../server/economy.js');
+  economy.generateIndividualFinances(world, 7, { savings: 100000, tick: 0 });
+
+  const result = property.renovateProperty(world, 7, home.id);
+  assert.equal(home.condition, 100);
+  assert.equal(result.conditionGain, 30, '70 + 40 would overshoot 100, so the real gain is only 30');
+});
+
+test('renovateProperty refuses a property already at full condition', () => {
+  const world = financeWorld();
+  const home = property.generateProperty(world, {
+    type: 'residential', value: 90000, condition: 100, lifecycleStage: 'operation', occupants: [7],
+  });
+  const economy = require('../server/economy.js');
+  economy.generateIndividualFinances(world, 7, { savings: 100000, tick: 0 });
+  assert.throws(
+    () => property.renovateProperty(world, 7, home.id),
+    /already at full condition/,
+  );
+});
+
+test('renovateProperty refuses a real stranger with no occupancy, membership, or ownership', () => {
+  const world = financeWorld();
+  const home = property.generateProperty(world, {
+    type: 'residential', value: 90000, condition: 50, lifecycleStage: 'operation', occupants: [7],
+  });
+  assert.throws(
+    () => property.renovateProperty(world, 999, home.id),
+    /not a real occupant, staff member, or owner/,
+  );
+  assert.equal(home.condition, 50, 'a refused renovation changes nothing');
+});
+
+test('renovateProperty refuses without enough real savings to cover the real cost', () => {
+  const world = financeWorld();
+  const home = property.generateProperty(world, {
+    type: 'residential', value: 90000, condition: 50, lifecycleStage: 'operation', occupants: [7],
+  });
+  const economy = require('../server/economy.js');
+  economy.generateIndividualFinances(world, 7, { savings: 1000, tick: 0 });
+  assert.throws(
+    () => property.renovateProperty(world, 7, home.id),
+    /has 1000 savings, needs 36000/,
+  );
+  assert.equal(home.condition, 50, 'a refused renovation changes nothing');
+});

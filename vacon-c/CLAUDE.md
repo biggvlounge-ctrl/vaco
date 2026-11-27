@@ -11732,3 +11732,68 @@ each, since none of the four fixtures sets up any resident or staff;
 `test/routes.test.js` asserts the same two fields appear on an ordinary
 property fetched through the real HTTP route, since that is the one
 layer this task actually had to add anything to.
+
+**A two-hundred-and-second, closing task #239 — "construction and
+building houses, doing homework [home repairs], remodeling" — and
+two-thirds of it was found already built and simply unreachable by a
+player, the eleventh standing rule's own shape one more time.**
+
+**Checked before building anything.** `server/construction.js` already
+exists in full: §7 system 30's own real gap ("nothing is built by
+anyone... `lifecycle_stage` still walks its stages on a timer nobody
+influences") was closed long before this task, with
+`constructResidentialProperty` financing a new home from the builder's
+own real `individual_finances.savings`, real terrain-cost multiplier
+included, recorded `acquired_method: 'built'`, and handed straight to
+`property.advancePropertyLifecycle`'s own already-running planning →
+construction → operation timer. `tick.js` already calls
+`construction.runConstruction` every tick. **The only real gap was
+that this was reachable passively ONLY** — a per-tick dice roll
+(`BUILD_CHANCE_PER_TICK`), never a player's own choice, the identical
+shape `found-business` was in before task #128 — so the fix is the
+identical fix: a new `'build-home'` player verb
+(`engine.buildHome` → `construction.constructResidentialProperty`
+directly, the same real function the passive roll already calls,
+never a second one).
+
+**"Doing homework [repairs]... remodeling" was the genuinely missing
+third.** `advancePropertyLifecycle`'s own `OCCUPANT_UPKEEP_PER_TICK`/
+`OWNER_UPKEEP_PER_TICK` are real but entirely PASSIVE — condition
+drifts up slowly from somebody merely living there or owning it, with
+no verb to spend money and raise it on purpose. `vehicles.js`'s own
+header already named the identical gap for a car and closed it with
+`restoreVehicle`, explicitly contrasting itself with buildings:
+"`property.js`'s own maintenance repairs a BUILDING, a different real
+mechanism" — true, and passive-only, until now.
+
+**`property.renovateProperty` closes it with two numbers, neither
+invented fresh.** The condition gain is the identical real magnitude
+`vehicles.RESTORATION_CONDITION_GAIN` already uses (40) — the same
+real kind of claim ("one repair pass raises condition by this much"),
+reused rather than re-guessed for a comparable claim. The cost is not
+a number at all, but a READ: exactly the `currentValue` gain this
+repair buys, computed before and after on the property's own already-
+real `value`/`lifecycle_stage` — the identical market-value delta a
+buyer would see, never a flat invented per-condition-point price this
+registry has no citation for. Gated on `canLock`'s own real stake
+check (occupant, operating-org staff, or current owner) — the
+identical real-stake test `lockProperty`/`unlockProperty` (task #100)
+already established, reused rather than a second one. A new
+`'renovate-property'` player verb wraps it the same way.
+
+**"Remodeling" is not a second, distinct mechanic from "home
+repairs."** The user's own phrasing named them in the same breath, and
+this engine has exactly one real condition-restoration substrate
+(`condition`, 0-100) for a property to improve against — inventing a
+cosmetic "remodel" axis separate from `condition` with no document or
+measured fact behind it would be exactly the kind of second, invented
+number this file's own discipline exists to refuse. One real verb,
+named clearly, covers both phrasings honestly.
+
+6 new tests in `test/property.test.js` (the real cost/gain arithmetic
+pinned to an exact worked example, the gain capped at full condition,
+refusals for a stranger/insufficient savings/an already-full
+property), 2 new dispatcher-level tests in `test/actions.test.js`
+confirming both verbs live through `engine.dispatchAction`, and
+`actions.REQUIRED_VERBS`'s own exhaustive list updated to include
+`buildHome`/`renovateProperty`.
