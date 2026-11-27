@@ -11,6 +11,7 @@ const dialogue = require('../server/dialogue.js');
 const worldStore = require('../server/worldStore.js');
 const economy = require('../server/economy.js');
 const behavior = require('../server/behavior.js');
+const influence = require('../server/influence.js');
 
 let nextId = 941001;
 
@@ -36,6 +37,27 @@ function knows(w, { entityId, subjectEntityId, confidence, content = 'something'
   worldStore.addKnowledge(w, {
     entityId, subjectEntityId, factType: 'rumor', factContent: content,
     confidenceLevel: confidence, sourceEntityId: null, tick: w.tick,
+  });
+}
+
+// Real employment with a real occupation whose skill (Medicine) maps
+// to a real knowledge field -- see missionVariety.test.js's own
+// `offerEncounterMission` fixtures, task #102, which checked this
+// same real mapping directly before relying on it here.
+function employAsPhysician(w, entityId) {
+  w.organizations = w.organizations || [];
+  const org = { id: 7000 + entityId, type: 'hospital', name: `Hospital ${entityId}` };
+  w.organizations.push(org);
+  w.employmentRecords.push({
+    entity_id: entityId, employer_organization_id: org.id, status: 'active', position: 'physician',
+  });
+  return org;
+}
+
+function holds(w, { entityId, itemName }) {
+  w.inventory = w.inventory || [];
+  w.inventory.push({
+    id: w.inventory.length + 1, holder_entity_id: entityId, item_name: itemName, quantity: 1,
   });
 }
 
@@ -181,4 +203,79 @@ test('interactWith reports a real null mood (not a fabricated default) for an en
 
   const result = dialogue.interactWith(w, { playerEntityId: player, npcEntityId: npc });
   assert.equal(result.mood, null);
+});
+
+// ---------------------------------------------------------------------
+// Task #103 — a real value readout, and real multiple-choice options
+// ---------------------------------------------------------------------
+
+test('interactWith reports a real value readout matching influence.influenceRatingOf exactly, never a second number', () => {
+  const w = world();
+  const player = person(w);
+  const npc = person(w);
+  employAsPhysician(w, npc);
+
+  const result = dialogue.interactWith(w, { playerEntityId: player, npcEntityId: npc });
+  assert.equal(result.value, influence.influenceRatingOf(w, npc));
+});
+
+test('interactWith always offers at least the real "leave" option, even with nothing else real to offer', () => {
+  const w = world();
+  const player = person(w);
+  const npc = person(w);
+
+  const result = dialogue.interactWith(w, { playerEntityId: player, npcEntityId: npc });
+  assert.deepEqual(result.options, [{ action: 'leave' }]);
+});
+
+test('interactWith offers a real "study" option only when this specific npc is a real knowledge teacher for the player', () => {
+  const w = world();
+  const communityId = 1;
+  const player = person(w, { communityId });
+  const npc = person(w, { communityId });
+  employAsPhysician(w, npc);
+
+  const result = dialogue.interactWith(w, { playerEntityId: player, npcEntityId: npc });
+  const studyOption = result.options.find((o) => o.action === 'study');
+  assert.ok(studyOption, 'expected a real study option for a real same-community physician');
+  assert.equal(studyOption.source, 'experienced NPCs');
+  assert.equal(studyOption.field, 'medicine');
+  assert.equal(studyOption.teacherId, npc);
+  assert.ok(result.options.some((o) => o.action === 'leave'));
+});
+
+test('interactWith offers no "study" option for a real occupation whose skill has no real knowledge-field mapping', () => {
+  const w = world();
+  const communityId = 2;
+  const player = person(w, { communityId });
+  const npc = person(w, { communityId });
+  w.organizations = [{ id: 7100, type: 'business', name: 'Hunting Co' }];
+  w.employmentRecords.push({ entity_id: npc, employer_organization_id: 7100, status: 'active', position: 'hunter' });
+
+  const result = dialogue.interactWith(w, { playerEntityId: player, npcEntityId: npc });
+  assert.equal(result.options.find((o) => o.action === 'study'), undefined);
+});
+
+test('interactWith offers a real "trade" option naming the real distinct items this npc actually holds', () => {
+  const w = world();
+  const player = person(w);
+  const npc = person(w);
+  holds(w, { entityId: npc, itemName: 'Hammer' });
+  holds(w, { entityId: npc, itemName: 'Hammer' });
+  holds(w, { entityId: npc, itemName: 'Saw' });
+
+  const result = dialogue.interactWith(w, { playerEntityId: player, npcEntityId: npc });
+  const tradeOption = result.options.find((o) => o.action === 'trade');
+  assert.ok(tradeOption, 'expected a real trade option for an npc genuinely holding real items');
+  assert.equal(tradeOption.sellerId, npc);
+  assert.deepEqual([...tradeOption.itemNames].sort(), ['Hammer', 'Saw']);
+});
+
+test('interactWith offers no "trade" option for an npc holding nothing at all', () => {
+  const w = world();
+  const player = person(w);
+  const npc = person(w);
+
+  const result = dialogue.interactWith(w, { playerEntityId: player, npcEntityId: npc });
+  assert.equal(result.options.find((o) => o.action === 'trade'), undefined);
 });

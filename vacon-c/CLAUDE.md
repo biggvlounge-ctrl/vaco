@@ -12052,3 +12052,62 @@ the same community; a community where the only employed resident holds
 `hunter` (a real occupation with no real field mapping) honestly
 offers nothing; an empty community, and a citizen with no community at
 all, both honestly return null; a nonexistent entity throws.
+
+**A two-hundred-and-seventh, closing task #103 — "a real value
+readout + multiple-choice options on every interaction/encounter" —
+and it is `dialogue.js`'s own two deliberately-deferred halves
+(task #96's own header named both, by name, as later rounds) built
+with zero new mechanism.**
+
+**"A real value readout" is `influence.influenceRatingOf`, reused a
+fourth time, never a disagreeing second number.** That function is
+already this engine's own real, derived, never-stored 0-100 composite
+for "how much this person's standing is worth knowing" (the forty-
+eighth/forty-ninth standing rules); `interactWith` now returns it as
+`value` on every real interaction, alongside the `tone`/`trust`/
+`conflict` it already reported.
+
+**"Multiple-choice options" are real verbs this specific NPC is
+actually, currently a valid target for — never an invented dialogue
+tree.** `optionsFor` checks two real, already-independently-real
+preconditions and always includes a third, unconditional one:
+
+- `study` — present only when `knowledge.sourcesFor`'s own
+  "experienced NPCs" resolution already names THIS specific npc as a
+  real teacher for the player, the identical real substrate task
+  #102's `offerEncounterMission` reused one file earlier in this same
+  session.
+- `trade` — present only when this npc genuinely holds a real item
+  (`inventory.holdingsOf`), named by its real, deduplicated item
+  names.
+- `leave` — always real, needs no precondition, and is always
+  present, so "multiple choice" never silently degrades to an empty
+  list or a single forced option.
+
+**Deliberately narrow, on purpose.** `recruit`/`form alliance`-style
+options were considered and left out: `missionVariety.js`'s own
+`offerRecruitMission`/`offerAllianceMission` already name real
+opportunities of that shape through their own, separately-reachable
+`offer*Mission` calls, and folding them into every ordinary `talk-to`
+would duplicate rather than extend that real, already-working path.
+"Consult a knowledgeable org member before acting on an opportunity"
+(task #104) is its own later round, named as such in `dialogue.js`'s
+own header before this round started, and stays unbuilt here.
+
+**A real, unrelated, pre-existing defect found by this task's own
+regression sweep, fixed rather than worked around.**
+`test/inventory.test.js`'s own self-check — "the stated file count is
+the real one," closing a drift this document has recorded going stale
+three times before — was failing on committed `HEAD`, before any of
+this task's changes: `VACANCY_INVENTORY.md` stated "All 167 files,"
+and `server/` genuinely holds 171. Confirmed with `git stash` against
+the clean committed tree, so this was not something this round's
+own edits caused. Corrected to the real, counted number.
+
+8 new tests in `test/dialogue.test.js`: `value` matches
+`influence.influenceRatingOf` exactly; the options list is exactly
+`[{action:'leave'}]` with nothing else real to offer; a real
+same-community physician yields a real `study` option naming the
+exact `source`/`field`/`teacherId`; a real `hunter` (no field mapping)
+yields none; a real held item yields a real `trade` option naming the
+distinct item names; no held items yields none.

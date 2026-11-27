@@ -52,16 +52,39 @@
 // a loop. `shared_history` DOES move — task #122's own real fix grows
 // it on any genuine two-person interaction, never only a self-
 // relationship, and this is exactly that: two real people, a real
-// exchange. The real "ask them a specific question and get a choice
-// of real answers" layer (task #103) and "consult a knowledgeable org
-// member" (task #104) are later, separate rounds that build on this
-// one rather than being folded into it.
+// exchange. The real "consult a knowledgeable org member" flow
+// (task #104) is its own later round, built on top of this one rather
+// than folded into it.
+//
+// ---------------------------------------------------------------------
+// Task #103 — a real value readout, and real multiple-choice options
+// ---------------------------------------------------------------------
+// "A real value readout" is `influence.influenceRatingOf` — the exact
+// real, derived, never-stored 0-100 composite this engine already
+// built for "how much this person's standing is worth knowing," reused
+// a third time (the forty-eighth/forty-ninth standing rules) rather
+// than a second, disagreeing number invented for the identical
+// question one encounter sooner.
+//
+// "Multiple-choice options" are real verbs this specific NPC is
+// actually, currently a valid target for — never an invented dialogue
+// tree. `study` appears only when `knowledge.sourcesFor` already names
+// THIS npc as a real "experienced NPCs" teacher for the player (the
+// identical real resolution task #102's own `offerEncounterMission`
+// just reused one file over); `trade` appears only when this npc
+// genuinely holds a real item (`inventory.holdingsOf`). `leave` is
+// always real and always present — ending a conversation needs no
+// precondition — so the list is never empty and "multiple choice"
+// never silently degrades to one.
 
 'use strict';
 
 const worldStore = require('./worldStore.js');
 const economy = require('./economy.js');
 const behavior = require('./behavior.js');
+const influence = require('./influence.js');
+const inventory = require('./inventory.js');
+const knowledge = require('./knowledge.js');
 
 //: Flagged interpretive. No document gives tone bands for an ordinary
 //: conversation; centred on the real default pair (see header), the
@@ -97,6 +120,28 @@ function bestSharableFact(worldState, npcEntityId, playerEntityId) {
   return best;
 }
 
+// Real, currently-valid next moves with THIS specific npc — never an
+// invented dialogue tree. See this file's own header on why each
+// precondition is checked against real state rather than assumed.
+function optionsFor(worldState, playerEntityId, npcEntityId) {
+  const options = [];
+
+  const teaching = knowledge.sourcesFor(worldState, playerEntityId)
+    .find((s) => s.via === 'person' && s.teacherId === npcEntityId);
+  if (teaching) {
+    options.push({ action: 'study', source: teaching.source, field: teaching.field, teacherId: npcEntityId });
+  }
+
+  const holdings = inventory.holdingsOf(worldState, npcEntityId);
+  if (holdings.length > 0) {
+    const itemNames = [...new Set(holdings.map((h) => h.item_name))];
+    options.push({ action: 'trade', sellerId: npcEntityId, itemNames });
+  }
+
+  options.push({ action: 'leave' });
+  return options;
+}
+
 function interactWith(worldState, options = {}) {
   const { playerEntityId, npcEntityId, tick = worldState.tick ?? 0 } = options;
   if (playerEntityId === npcEntityId) {
@@ -120,6 +165,8 @@ function interactWith(worldState, options = {}) {
     trust: Number(rel.trust) || 0,
     conflict: Number(rel.conflict) || 0,
     mood: state?.currentMood ?? null,
+    // Task #103's real value readout -- see this file's own header.
+    value: influence.influenceRatingOf(worldState, npcEntityId),
     occupation: employment
       ? { position: employment.position, organizationId: employment.employer_organization_id }
       : null,
@@ -131,6 +178,9 @@ function interactWith(worldState, options = {}) {
         confidence: Number(sharedFact.confidence_level) || 0,
       }
       : null,
+    // Task #103's real multiple-choice options -- see this file's own
+    // header. Always at least `leave`, never an empty list.
+    options: optionsFor(worldState, playerEntityId, npcEntityId),
     tick,
   };
 }

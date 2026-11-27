@@ -3018,3 +3018,26 @@ encounter, the same "nothing of that kind exists" shape
 `discovery.search` already holds for an empty item category. 6 new
 tests in `test/missionVariety.test.js`. See CLAUDE.md's
 two-hundred-and-sixth standing rule.
+
+### A real value readout and real multiple-choice options on every interaction (closes task #103)
+`dialogue.js#interactWith` now also returns `value`
+(`influence.influenceRatingOf`, this engine's own real, derived 0-100
+"how much this person's standing is worth knowing" composite, reused
+rather than a disagreeing second number) and `options` — real,
+currently-valid next moves with this specific NPC, never an invented
+dialogue tree. `study` appears only when `knowledge.js#sourcesFor`
+already names this npc as a real "experienced NPCs" teacher for the
+player (the same real resolution task #102 reused one file earlier);
+`trade` appears only when the npc genuinely holds a real item
+(`inventory.holdingsOf`); `leave` is always real and always present,
+so the list is never empty. `recruit`/`form alliance`-style options
+were deliberately left out — `missionVariety.js`'s own dedicated
+`offer*Mission` functions already name those opportunities through
+their own reachable path, and task #104 ("consult a knowledgeable org
+member") stays its own later round. Also fixed in the same round: a
+real, pre-existing (not newly introduced) drift this task's own
+regression sweep caught — `VACANCY_INVENTORY.md` stated 167 server
+files against the real 171 on disk, confirmed stale on committed
+`HEAD` via `git stash` before correcting it. 8 new tests in
+`test/dialogue.test.js`. See CLAUDE.md's two-hundred-and-seventh
+standing rule.
