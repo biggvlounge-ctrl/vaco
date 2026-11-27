@@ -11857,3 +11857,65 @@ a real mission at a real degraded station in their own city; null with
 no real `train-station` in the city at all; null when the city's only
 one is already at full condition; null for a citizen with no real
 stake in its real operating organization.
+
+**A two-hundred-and-fourth, closing task #99 — "reputation... growth
+by what you actually do" — and it is a real writer added to a trait
+family that had stood with readers and no writer since the twelfth
+standing rule first named it.**
+
+**The substrate was already real and already half-built.**
+`leadership.recordService` has tallied real compliance since Leader
+mode's own reopening (the forty-seventh standing rule) — five real
+call sites (`directMission`/`assignRole` compliance in `leadership.js`
+itself, `party.js` compliance, a clean `heists.js` completion, an
+undetected `espionage.js` completion), read only by the leader-
+dashboard roster view. The `reputation` trait family (`Fear Factor`,
+`Trustworthiness`, `Notoriety`, `Faction Standing`) has real readers —
+`intimidation.js`, `influence.js`'s `AURA_TRAIT`, `leadership.js`'s own
+fear-factor compliance bonus, `archetypes.js`'s "Trustworthy" tag — and
+had zero writers anywhere; `grep -rn "applyKeyModifier.*reputation"
+server/*.js` before this round returned nothing. The twelfth standing
+rule named this exact family as one of seven with no reader at the
+time; it has readers now and still had no writer, which is the same
+gap one step further along.
+
+**No new mechanism, no new number.** `recordService` already IS the
+real tally this task asks for; it needed only to also move the trait
+its own five contexts are plainly instances of — real, verifiable
+compliance is exactly what "trustworthy" means. The magnitude reused
+is `control.SHARED_UNDERTAKING`, the same "one real event's worth of
+trust" constant `meetings.js` and `territory.js#buildBarricade` already
+share, rather than a fourth invented number for a comparable claim.
+Applied through `entityTraits.applyKeyModifier`, the same real, already
+-built Key write-back every other trait mutation in this engine goes
+through — never a second, bespoke field write.
+
+**Deliberately scoped to reputation only, not skill.** Task #126
+("trait growth from real actions — combat/exercise — not just passive
+habits") is a separate, still-pending backlog item asking about a
+different half of the same sentence; building skill growth here would
+have preempted it rather than closed it; this task's own real
+substrate (`recordService`) has nothing to do with combat or exercise
+in the first place.
+
+**Surfaced on the citizen's own dashboard, not only the leader's.**
+`players.js#getCitizenDashboard` gained a `serviceRecord` field reading
+the identical `leadership.serviceRecordOf` the leader dashboard already
+calls — "a human player can see which of their own rank-and-file has a
+real track record" (that function's own words), now also true of a
+citizen looking at themselves.
+
+**A real gap in the existing test file's own fixture convention, found
+and closed rather than worked around.** `test/leadership.test.js`'s
+private `person()` builds NPCs with no `entity_traits` rows at all, so
+`applyKeyModifier` would silently no-op (return `null`, never throw)
+against every existing fixture in the file — the sixth standing rule's
+shape, a step short of actually happening, since the no-op path is a
+real, intended one. Two new tests: one builds a real, fully-shaped
+`entity_traits` row (every field `applyKeyModifier` itself reads —
+`base_value` through `key_modifier` — not the sparse shape the file's
+existing `setFearFactor` helper uses only for a read) and asserts
+`recordService` raises it by exactly `control.SHARED_UNDERTAKING`; the
+other asserts the tally still increments, with no throw, for an entity
+with no trait row at all — the no-op path proven safe rather than
+merely assumed so.

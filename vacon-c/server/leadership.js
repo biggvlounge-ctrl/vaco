@@ -87,7 +87,7 @@
 
 'use strict';
 
-const { getLiveEntity } = require('./entityTraits.js');
+const { getLiveEntity, applyKeyModifier } = require('./entityTraits.js');
 const worldStore = require('./worldStore.js');
 const membership = require('./membership.js');
 const missions = require('./missions.js');
@@ -217,12 +217,34 @@ function complianceDraw(worldState, leaderEntityId, subordinateId, tag, tick) {
 // actually been relied on and come through, so a human player can see
 // which of their own rank-and-file has a real track record, without
 // this file guessing at a threshold for "important" that nobody
-// measured. `directMission`, `assignRole`, and `espionage.js#sendSpy`
-// are the three real call sites, each incrementing on an actual
-// COMPLIED outcome only — a refusal is not usage.
+// measured. Five real call sites, each incrementing on an actual
+// COMPLIED/successful outcome only, never a refusal: `directMission`
+// and `assignRole` compliance (this file), a party member's compliance
+// (`party.js#assembleParty`), a clean undetected heist (`heists.js`),
+// and an undetected espionage mission (`espionage.js#sendSpy`).
+//
+// **Task #99, "reputation... growth by what you actually do."** Every
+// one of those five real call sites is already a real act of
+// reliability — exactly what `reputation.Trustworthiness` (read by
+// `archetypes.js`'s own "Trustworthy" tag, never written by anything
+// before this) is FOR. `control.SHARED_UNDERTAKING` is reused rather
+// than invented: the identical real magnitude `meetings.js`'s own
+// trust move and `territory.js#buildBarricade`'s own territory move
+// already use for "one real event's worth of change" — a comparable
+// real claim gets the comparable real number, not a second one.
+// Required at call time, not module scope, to avoid a real circular-
+// require risk this file's own size invites (`leadership.js` already
+// requires five other real modules) — the same caution
+// `factionCapacityOf`'s own `authority.js` require documents.
 function recordService(worldState, entityId) {
   const record = worldState.serviceRecord || (worldState.serviceRecord = {});
   record[entityId] = (record[entityId] || 0) + 1;
+  // eslint-disable-next-line global-require
+  const control = require('./control.js');
+  applyKeyModifier(
+    worldState, entityId, 'reputation', 'Trustworthiness',
+    control.SHARED_UNDERTAKING, worldState.tick ?? 0,
+  );
   return record[entityId];
 }
 

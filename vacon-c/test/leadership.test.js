@@ -826,6 +826,40 @@ test('directMission and assignRole both really record service on compliance, and
   assert.equal(leadership.serviceRecordOf(w, loyalSoldier.id), 2, 'a second real compliance -- this time via assignRole -- increments the same real counter');
 });
 
+// Task #99: "reputation... growth by what you actually do." A real
+// `entity_traits` row (every field `applyKeyModifier` itself reads,
+// not the sparse shape `setFearFactor` above uses only for a read) so
+// the real write path is actually exercised, not silently no-op'd.
+function setTrustworthiness(worldState, entityId, value) {
+  worldState.entityTraits.push({
+    id: worldState.entityTraits.length + 1, entity_id: entityId,
+    trait_id: getTraitId('reputation', 'Trustworthiness'),
+    current_value: value, base_value: value,
+    temporary_modifier: 0, permanent_modifier: 0, experience_modifier: 0,
+    environmental_modifier: 0, relationship_modifier: 0, key_modifier: 0,
+    last_updated_tick: 0,
+  });
+}
+
+test('recordService raises the real reputation.Trustworthiness trait by the real SHARED_UNDERTAKING magnitude, never a second invented number', () => {
+  const w = world();
+  const someone = person(w);
+  setTrustworthiness(w, someone.id, 50);
+
+  leadership.recordService(w, someone.id);
+
+  const control = require('../server/control.js');
+  const row = w.entityTraits.find((r) => r.entity_id === someone.id);
+  assert.equal(row.current_value, 50 + control.SHARED_UNDERTAKING);
+});
+
+test('recordService does not throw for an entity with no real entity_traits row at all -- a silent no-op, never a crash', () => {
+  const w = world();
+  const someone = person(w);
+  assert.doesNotThrow(() => leadership.recordService(w, someone.id));
+  assert.equal(leadership.serviceRecordOf(w, someone.id), 1, 'the real tally still increments even when the trait write is a no-op');
+});
+
 // -- describeLeadership ------------------------------------------------
 // Placed at the end of the file on purpose, not beside isLeaderOf
 // above -- this file's own `nextId` is a module-level counter shared

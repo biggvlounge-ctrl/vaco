@@ -2946,3 +2946,29 @@ shape as the other eleven, same flat reward (40), gated on the
 identical real stake `renovateProperty` itself re-checks. 4 new tests
 in `test/missionVariety.test.js`. See CLAUDE.md's two-hundred-and-
 third standing rule.
+
+### Reputation now actually grows from what you do — a real writer for a real, readers-only trait family (closes task #99)
+`leadership.recordService`'s real five-context compliance tally
+(directed-mission/role compliance, party compliance, a clean heist, an
+undetected espionage run) already existed; it now also raises the
+entity's own real `reputation.Trustworthiness` trait by
+`control.SHARED_UNDERTAKING` on every call, through the identical real
+`entityTraits.applyKeyModifier` Key write-back every other trait
+mutation in this engine goes through — never a bespoke field write, and
+never a new magnitude invented for a claim ("one real event's worth of
+trust") this file already has a shared constant for. The `reputation`
+family (`Fear Factor`, `Trustworthiness`, `Notoriety`, `Faction
+Standing`) has had real readers since before this change
+(`intimidation.js`, `influence.js`, `leadership.js`'s own fear-factor
+bonus, `archetypes.js`) and, checked directly first, zero writers
+anywhere — this closes that gap for the one dimension this task's own
+real substrate actually measures. Deliberately scoped to reputation
+only: task #126 (trait growth from combat/exercise) is a separate,
+still-pending item this does not fold in. Also surfaced on the
+citizen's own dashboard (`players.js#getCitizenDashboard`'s new
+`serviceRecord` field), not only the leader's. 2 new tests in
+`test/leadership.test.js` — one against a real, fully-shaped
+`entity_traits` row (pinning the exact +`SHARED_UNDERTAKING` rise), one
+confirming the tally still increments with no throw when an entity has
+no trait row to write to at all. See CLAUDE.md's two-hundred-and-
+fourth standing rule.

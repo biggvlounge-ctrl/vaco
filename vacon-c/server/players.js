@@ -33,6 +33,7 @@ const influence = require('./influence.js');
 const characterCreation = require('./characterCreation.js');
 const heat = require('./heat.js');
 const localEvents = require('./events.js');
+const leadership = require('./leadership.js');
 
 let nextPlayerId = 1;
 
@@ -186,6 +187,13 @@ function getCitizenDashboard(worldState, playerId) {
     // — same shared lookup `GET /api/entities/:id/family-tree` uses,
     // so there is one real source of truth for this, not two.
     extendedFamily: characterCreation.describeFamilyTree(worldState, npcId),
+    // Task #99: the real tally `leadership.recordService` already
+    // builds from five real contexts (directed-mission/role compliance,
+    // party compliance, a clean heist, undetected espionage) — "a
+    // human player can see which of their own rank-and-file has a real
+    // track record" (that function's own words), now shown to the
+    // citizen about THEMSELVES, not only to their leader about them.
+    serviceRecord: leadership.serviceRecordOf(worldState, npcId),
     // Real, independent per-faction heat — see `server/heat.js`'s own
     // header. Read live for the identical reason every other dashboard
     // field above it is: a value nothing stores is a value nothing can
