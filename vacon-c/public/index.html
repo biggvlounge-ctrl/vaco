@@ -435,6 +435,75 @@ function renderFactions(body) {
 // NPCS — generation, and a person's inner life
 // ---------------------------------------------------------------------------
 
+// Task #105, by direct instruction: "the npcs on the screen actually
+// speak not just text." The browser's own real Web Speech API
+// (window.speechSynthesis) speaks the identical real content this
+// page already renders in an open NPC's detail card -- their real
+// role and status, plus the single most-confident real fact already
+// shown in the "Knows" table below. Nothing is invented for this; it
+// is the data already on screen, read aloud.
+//
+// "On the screen" is the real constraint, held two independent ways
+// so an NPC whose card is not the one visible never keeps talking in
+// the background: an IntersectionObserver speaks only while that
+// specific card is actually scrolled into view and stops the instant
+// it scrolls out, and a MutationObserver watches for the card being
+// removed from the document at all (a tab switch, another "Open"
+// click, "Generate" re-rendering the population) and stops it then
+// too -- the IntersectionObserver spec does not guarantee a final
+// callback on removal in every browser, so this is the real
+// belt-and-suspenders, not a decorative second check. Only one
+// utterance ever plays (speechSynthesis's own queue is cancelled
+// before a new one starts), so two visible cards never overlap.
+var npcVoice = { cardId: null };
+
+function npcSpeechText(npc, knowledge) {
+  var parts = [(npc.role ? npc.role : 'An unassigned resident') + ', status ' + (npc.status || 'unknown') + '.'];
+  var best = null;
+  (knowledge || []).forEach(function (k) {
+    if (!best || (k.confidence_level || 0) > (best.confidence_level || 0)) best = k;
+  });
+  if (best && best.fact_content) parts.push('They know: ' + best.fact_content);
+  return parts.join(' ');
+}
+
+function stopNpcSpeech(cardId) {
+  if (npcVoice.cardId === cardId) {
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    npcVoice.cardId = null;
+  }
+}
+
+function speakNpcCard(cardId, text) {
+  if (!window.speechSynthesis || !text) return;
+  window.speechSynthesis.cancel();
+  npcVoice.cardId = cardId;
+  var utter = new SpeechSynthesisUtterance(text);
+  utter.onend = function () { if (npcVoice.cardId === cardId) npcVoice.cardId = null; };
+  utter.onerror = function () { if (npcVoice.cardId === cardId) npcVoice.cardId = null; };
+  window.speechSynthesis.speak(utter);
+}
+
+function speakWhileOnScreen(cardEl, cardId, text) {
+  if (!text || !window.IntersectionObserver || !window.MutationObserver) return;
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) speakNpcCard(cardId, text);
+      else stopNpcSpeech(cardId);
+    });
+  }, { threshold: 0.5 });
+  io.observe(cardEl);
+
+  var removalWatch = new MutationObserver(function () {
+    if (!cardEl.isConnected) {
+      stopNpcSpeech(cardId);
+      io.disconnect();
+      removalWatch.disconnect();
+    }
+  });
+  removalWatch.observe(document.body, { childList: true, subtree: true });
+}
+
 function npcDetail(id) {
   return VACO.api('/api/npcs/' + id).then(function (d) {
     var npc = d.npc || {};
@@ -472,7 +541,9 @@ function npcDetail(id) {
       { label: 'Respect', render: function (r) { return moraleBar(r.respect); } },
     ], d.relationships || [], { empty: 'Knows nobody yet.' }));
 
-    return VACO.card('NPC ' + id + (npc.role ? ' — ' + npc.role : ''), [stack]);
+    var card = VACO.card('NPC ' + id + (npc.role ? ' — ' + npc.role : ''), [stack]);
+    speakWhileOnScreen(card, 'npc-' + id, npcSpeechText(npc, d.knowledge));
+    return card;
   });
 }
 

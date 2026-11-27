@@ -561,6 +561,16 @@ That app is either on another machine or was never carried over, and
 it is now the highest-value outstanding retrieval: Document 4 prices
 Phases 2 and 3 as *adding components to a working app*.
 
+**Task #105, by direct instruction** ("the npcs on the screen
+actually speak not just text"): `vacon-c/public/index.html`'s own
+`npcDetail` card now speaks its real content aloud through the
+browser's native `window.speechSynthesis`, scoped to the one card
+actually on screen by an `IntersectionObserver` (stops the instant it
+scrolls out) and a `MutationObserver` on `document.body` (stops the
+instant the card leaves the document — a tab switch, another "Open,"
+"Generate"). No new file, no new dependency, no server change — see
+CLAUDE.md's two-hundred-and-ninth standing rule for the verification.
+
 ## 6. Phase records — `vacon-c/dev-docs/`
 
 Ten phase folders, each with a plan and tasks: trait split, trait

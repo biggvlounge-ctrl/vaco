@@ -3060,3 +3060,29 @@ nothing. New `consult-heist` player verb, mirroring `assess-takeover`'s
 own shape. 7 new tests in `test/heists.test.js`, 1 new dispatcher test
 in `test/actions.test.js`. See CLAUDE.md's two-hundred-and-eighth
 standing rule.
+
+### NPCs on screen actually speak, scoped strictly to what's on screen (closes task #105)
+No voice/TTS mechanism existed anywhere in this repo, and the engine
+has no concept of "on-screen" — checked directly before asking, then
+answered directly: "the npcs on the screen actually speak not just
+text." `public/index.html`'s own `npcDetail` card already has real
+content worth speaking (role, status, the most-confident real fact
+from the "Knows" table) without needing `talk-to`/`interactWith`
+wired in. The browser's native `window.speechSynthesis` speaks that
+same real text, no invention, no new dependency. "On-screen only" is
+held two independent ways: an `IntersectionObserver` speaks only while
+the one open card is actually scrolled into view and stops the
+instant it scrolls out, and a `MutationObserver` on `document.body`
+catches the card leaving the document entirely (tab switch, a new
+"Open" click, "Generate") and cancels then too, since the observer
+spec alone doesn't guarantee a callback on removal in every browser.
+One shared voice state means only one utterance ever plays —
+`cancel()` before every `speak()` — so a second visible card can
+never overlap the first, and a card that isn't the one open can never
+speak at all. No server change. Verified live with Playwright against
+the real running server and real generated NPCs (stubbed
+`speechSynthesis` to record calls): `speak()` fires once with the
+real rendered text while the card is on screen, `cancel()` fires again
+the instant the tab is switched away, and no further `speak()` call
+follows. Full suite re-run clean after: 2978 tests, 0 fail. See
+CLAUDE.md's two-hundred-and-ninth standing rule.

@@ -12166,3 +12166,66 @@ leader can; a nonexistent target and a sponsor with no other real
 living member both handled honestly, never a crash; a real,
 never-mutating read, proven rather than assumed) and 1 new dispatcher
 test in `test/actions.test.js`.
+
+**A two-hundred-and-ninth, closing task #105 — "the npcs on the
+screen actually speak not just text" — and it is a correction to my
+own first reading of the request before it is anything else.**
+
+The task queue's own line read "scope voice synthesis to on-screen/
+visible NPCs only," which presumes a voice mechanism already exists
+somewhere to be scoped. `grep -rln "speechSynthesis\|SpeechSynthesis\|
+text-to-speech\|voice synthesis" server/*.js public/*.html *.md`
+returned nothing anywhere in this repository, and the engine itself
+has no concept of "on-screen" at all — it is a headless API with no
+rendering layer. Rather than inventing a mechanism to satisfy a
+mis-stated gap, this was raised directly, and the real, explicit
+answer — "the npcs on the screen actually speak not just text" —
+is what this closes: real, literal spoken output, in the one place
+this project actually has a screen.
+
+**`public/index.html` is that place, and it already had real content
+worth speaking — this did not need `talk-to`/`interactWith` (task
+#96) wired in to have something honest to say.** `renderNpcs`'s
+`npcDetail` card already renders an NPC's real role, status and
+"Knows" table from `GET /api/npcs/:id`; nothing invented here is
+dialogue the engine never produced, the same restraint `dialogue.js`'s
+own header already names declining to invent `recruit`/`form
+alliance` options. `npcSpeechText` speaks that same real content —
+role, status, and the single most-confident real fact already in the
+"Knows" table — never a second, parallel text stream only the speech
+mechanism knows about.
+
+**"On-screen/visible NPCs only" is the literal scope and it is held
+two independent ways, because the IntersectionObserver spec alone does
+not guarantee it.** An `IntersectionObserver` on the one open
+`npcDetail` card speaks only while that card is actually scrolled into
+view (`threshold: 0.5`) and stops the instant it scrolls out — the
+real "visible" reading of the request. But the spec does not promise
+a final callback across every browser when the observed element is
+simply removed from the document (a tab switch, a second "Open"
+click, "Generate" re-rendering the population), so a
+`MutationObserver` on `document.body` is the real belt-and-suspenders:
+it watches for the card's own `isConnected` to go false and cancels
+speech then too. Both paths funnel through one shared `npcVoice`
+state so only one utterance plays at a time — `speechSynthesis.cancel()`
+runs before every new `speak()` — meaning a second visible card can
+never overlap the first's voice, and an NPC whose card is not the one
+currently open can never speak at all, by construction rather than by
+a check that could be skipped.
+
+**No server change, no new dependency, no new test file — a UI
+behavior with no `node --test` surface of its own, verified the way
+this project's own standing practice for frontend work already
+requires rather than skipped.** Started the real server
+(`VACO_SERVICE_AUTH_MODE=off`, local testing only — the ecosystem-wide
+service-auth gate from `lib/serviceAuth.cjs` has nothing to do with
+this task and was never touched), generated two real NPCs through the
+real API, and drove the real page with Playwright: stubbed
+`window.speechSynthesis` to record calls rather than produce audio,
+opened an NPC's real detail card, confirmed `speak()` fired once with
+the real rendered text while the card was on screen, then switched to
+the World tab and confirmed `cancel()` fired a second time and no
+further `speak()` call followed — the card was gone, and the NPC
+stopped talking. Full suite re-run after: 2978 tests, 0 fail, 6
+cancelled (the established resource-contention signature), 17
+skipped, same as before this round.
