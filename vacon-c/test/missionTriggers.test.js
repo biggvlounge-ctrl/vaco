@@ -293,3 +293,146 @@ test('a mission from a political/religious/business main character still respect
   }
   assert.equal(w.missions.length, 1);
 });
+
+// ---------------------------------------------------------------------
+// maybeTriggerItemMission — task #101, "finding a police uniform
+// ignites an infiltration mission." No uniform is a real item
+// anywhere in this catalogue (checked directly); the real analogue is
+// disguise.js's own mask/wig. Deliberately no tick loop in these
+// tests, unlike maybeTriggerMission's own above — this function has
+// no probability roll (see its own header for why).
+// ---------------------------------------------------------------------
+
+test('a non-item find (a book, an artifact) never triggers an item mission', () => {
+  const w = baseWorld();
+  withControllingFaction(w);
+  assert.equal(
+    missionTriggers.maybeTriggerItemMission(w, 1, 501, { kind: 'book', itemName: 'Blueprints' }, { tick: 0 }),
+    null,
+  );
+  assert.equal(
+    missionTriggers.maybeTriggerItemMission(w, 1, 501, { kind: 'artifact', name: 'a relic' }, { tick: 0 }),
+    null,
+  );
+  assert.equal(missionTriggers.maybeTriggerItemMission(w, 1, 501, null, { tick: 0 }), null);
+});
+
+test('an ordinary found item (not a real disguise item) never triggers an item mission', () => {
+  const w = baseWorld();
+  withControllingFaction(w);
+  assert.equal(
+    missionTriggers.maybeTriggerItemMission(
+      w, 1, 501, { kind: 'item', itemName: 'Hammer', category: 'tools' }, { tick: 0 },
+    ),
+    null,
+  );
+});
+
+test('finding a real disguise item with a real controlling faction deterministically ignites a real infiltration mission', () => {
+  const w = baseWorld();
+  const faction = withControllingFaction(w);
+  const mission = missionTriggers.maybeTriggerItemMission(
+    w, 1, 501, { kind: 'item', itemName: 'mask', category: 'clothing' }, { tick: 0 },
+  );
+  assert.ok(mission);
+  assert.equal(mission.location_property_id, 501);
+  assert.equal(mission.controlling_faction_id, faction.id);
+  assert.equal(mission.reward, 40, 'the same flat reward every offer*Mission sibling already uses, never a second invented number');
+  assert.match(mission.objective, /Use the mask you found to infiltrate/);
+  assert.equal(w.missions.length, 1);
+});
+
+test('a found wig works identically to a found mask', () => {
+  const w = baseWorld();
+  withControllingFaction(w);
+  const mission = missionTriggers.maybeTriggerItemMission(
+    w, 1, 501, { kind: 'item', itemName: 'wig', category: 'clothing' }, { tick: 0 },
+  );
+  assert.ok(mission);
+  assert.match(mission.objective, /Use the wig you found to infiltrate/);
+});
+
+test('a real disguise find with no real leader anywhere: honestly nothing', () => {
+  const w = baseWorld();
+  const mission = missionTriggers.maybeTriggerItemMission(
+    w, 1, 501, { kind: 'item', itemName: 'mask', category: 'clothing' }, { tick: 0 },
+  );
+  assert.equal(mission, null);
+});
+
+test('a real disguise find routes through issuing_organization_id for a political/religious/business leader, same as the location trigger', () => {
+  const w = baseWorld();
+  const government = withGovernment(w);
+  const mission = missionTriggers.maybeTriggerItemMission(
+    w, 1, 501, { kind: 'item', itemName: 'mask', category: 'clothing' }, { tick: 0 },
+  );
+  assert.ok(mission);
+  assert.equal(mission.controlling_faction_id, null);
+  assert.equal(mission.issuing_organization_id, government.id);
+  assert.equal(mission.issued_by_entity_id, 801);
+});
+
+test('a disguise find never stacks a second mission on a location that already has one open', () => {
+  const w = baseWorld();
+  withControllingFaction(w);
+  missions.generateMission(w, { locationId: 501, objective: 'already working this one' });
+  assert.equal(w.missions.length, 1);
+
+  const mission = missionTriggers.maybeTriggerItemMission(
+    w, 1, 501, { kind: 'item', itemName: 'mask', category: 'clothing' }, { tick: 0 },
+  );
+  assert.equal(mission, null);
+  assert.equal(w.missions.length, 1, 'still exactly the one mission, never a second');
+});
+
+test('searchLocation: finding a real disguise item at a real controlled location surfaces itemMissionGenerated end to end', () => {
+  const npc = engine.generateNPC();
+  const player = engine.generatePlayer({ linkedEntityId: npc.id });
+  const community = engine.generateCommunity({});
+  const property = engine.generateProperty({
+    type: 'commercial', value: 90000, communityId: community.id, landmarkCategory: 'mall',
+  });
+  // A real `mall` pool draws only ['clothing', 'luxury goods'] -- never
+  // a book or an artifact -- so every one of this property's finds is
+  // guaranteed to be an item. Overriding the world's own real item
+  // catalogue to hold only the two real disguise items under
+  // 'clothing' (never `salvage.registerItems`'s full set, which would
+  // also register `woven_garment` and dilute the odds) makes a
+  // clothing-category draw land on a real disguise item every time,
+  // rather than this test depending on a three-way pick inside it.
+  if (!Array.isArray(engine.WorldState.barterItems)) engine.WorldState.barterItems = [];
+  engine.WorldState.barterItems.push(
+    { name: 'mask', category: 'clothing', baseValue: 10, origin: 'producible' },
+    { name: 'wig', category: 'clothing', baseValue: 10, origin: 'producible' },
+  );
+  // `landmarks.significanceOf` reads `historical_records.significance`
+  // through `properties.history_ref` -- the real link `engine
+  // .generateProperty` leaves null by default (see that function's own
+  // comment). Linking one by hand, at the maximum 100, gives this
+  // property the most finds the real `FINDS_PER_SIGNIFICANCE` formula
+  // can ever produce (10) -- generous headroom against the real 50/50
+  // category draw landing on 'luxury goods' instead, rather than a
+  // seed-dependent coin flip.
+  const record = { id: engine.WorldState.historicalRecords.length + 9000, significance: 100, where_location_id: property.id };
+  engine.WorldState.historicalRecords.push(record);
+  property.history_ref = record.id;
+
+  const faction = engine.generateFaction({ name: 'Mall Outfit', traitValueFor: () => 80, leaderId: npc.id });
+  engine.WorldState.territoryBlocks.push({
+    id: engine.WorldState.territoryBlocks.length + 1,
+    faction_id: faction.id, city_id: community.city_id, community_id: community.id, status: 'controlled',
+  });
+
+  let sawItemMission = false;
+  for (let i = 0; i < 10; i += 1) {
+    engine.WorldState.tick = i;
+    const result = engine.dispatchAction(player.id, { action: 'search-location', propertyId: property.id });
+    if (result.result.itemMissionGenerated) {
+      sawItemMission = true;
+      assert.match(result.result.found.itemName, /mask|wig/);
+      assert.match(result.result.itemMissionGenerated.objective, /infiltrate/);
+      break;
+    }
+  }
+  assert.ok(sawItemMission, 'expected a real disguise find to surface itemMissionGenerated within this property\'s own finite, measured supply');
+});

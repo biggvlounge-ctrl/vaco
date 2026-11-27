@@ -11919,3 +11919,76 @@ existing `setFearFactor` helper uses only for a read) and asserts
 other asserts the tally still increments, with no throw, for an entity
 with no trait row at all — the no-op path proven safe rather than
 merely assumed so.
+
+**A two-hundred-and-fifth, closing task #101 — "finding a police
+uniform ignites an infiltration mission" — and it is a second,
+independent trigger read off WHAT a search turns up, beside the one
+already built (task #98) that only ever reads WHERE it happened.**
+
+**Checked directly first: no uniform exists anywhere in this real
+catalogue.** `items.js`'s seventeen `SOURCED_ITEMS` and `salvage.js`'s
+own `PRODUCTS` were both read start to finish — no police uniform, no
+costume, nothing of that shape. The request's own example is a KIND of
+thing, not a literal item, and the real analogue this engine already
+has for "an item that lets you pass as someone you are not" is
+`disguise.js`'s own `mask`/`wig` — the same real items
+`policing.evasionOf` already reads for the identical reason, findable
+through `discovery.search`'s own real `clothing`-category pool
+(`clothing-store`/`mall`/`discount-store`/`big-box-store`).
+
+**`missionTriggers.maybeTriggerItemMission` is the new function, in
+the same file task #98 built**, because it needs the identical real
+main-character resolution (`mainCharacters.mainCharactersOf`, the same
+fixed `CATEGORY_ORDER`, the same `issuing_organization_id`/
+`controllingFactionId` routing by category) that function already has
+— reused directly rather than duplicated a second time. The real
+difference is the trigger condition: `maybeTriggerMission` fires on
+every `search-location` call regardless of what, if anything, was
+found, gated by a real measured probability (0.1) so a job does not
+appear on every single visit. A disguise find is read off the SAME
+search's own real result instead, and gets NO probability roll at
+all — finding a disguise item at all is already the rare event, since
+`discovery.SEARCH_CHANCE` (for the passive pass) and a real finite,
+significance-bounded supply (for a player's own direct search) both
+already gate whether anybody ever finds anything, and a disguise item
+is only one of several names a `clothing`-category find can land on.
+Stacking a second independent roll on an already-rare event would
+make this near-unreachable in any real playthrough — so, once found,
+the mission fires on real preconditions alone (a leader-installed main
+character exists; no mission is already open at this location), the
+same deterministic shape `missionVariety.js`'s own `offer*Mission`
+family already uses throughout this file.
+
+**`server.js#searchLocation`'s own existing wiring point, extended by
+one line, not rebuilt.** `engine.js#searchLocation` already called
+`discovery.search` then `missionTriggers.maybeTriggerMission` (task
+#98); it now also calls `maybeTriggerItemMission` with the just-
+returned `result.found`, surfaced as a new `itemMissionGenerated`
+field beside the existing `missionGenerated` one. The real "one open
+job per location" cap both functions already share means a location-
+triggered mission from the first call naturally blocks a second one
+from the item-triggered call at the same property — no new bookkeeping
+needed, the same real `hasOpenMissionAt` check both read.
+
+**Reward reuses `missionVariety.MISSION_SPY_REWARD` (40)** — the
+identical flat number every other `offer*Mission` sibling in that file
+already uses, never a thirteenth invented figure for a comparable
+claim — lazily required, same circular-require caution this file's own
+`camps.js`/`construction.js` precedents already established, since
+`missionTriggers.js`'s own module-scope requires are kept minimal on
+purpose.
+
+8 new tests in `test/missionTriggers.test.js`: a non-item find (book,
+artifact, or nothing at all) never triggers; an ordinary found item
+(a hammer) never triggers; a found mask or wig with a real controlling
+faction deterministically ignites a real mission naming "infiltrate"
+and the real `40` reward; the same disguise find with no real leader
+anywhere, or with a location's one open slot already filled, honestly
+returns null; the same political/religious/business
+`issuing_organization_id` routing `maybeTriggerMission` already has,
+proven to also hold here; and one real end-to-end dispatcher test
+(`search-location` through `engine.dispatchAction`) using a real,
+linked `historical_records` significance row and a world catalogue
+narrowed to exactly the two real disguise items, so the real
+`clothing`-category draw is guaranteed to land on one within this
+property's own finite, measured supply.

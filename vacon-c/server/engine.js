@@ -1893,6 +1893,13 @@ function canHarvest(entityId, options = {}) {
 // here; `missionTriggers.js` itself is what returns `null` honestly
 // when this location's community has no real criminal main character,
 // or already has an open job, or the draw just does not land.
+//
+// Task #101 adds a second, independent trigger read off what the
+// search actually turned up (`result.found`) rather than only where
+// it happened — `maybeTriggerItemMission` returns null for anything
+// but a real disguise item, and for a disguise item it still returns
+// null if the first trigger just filled this same location's one open
+// slot (see that function's own header).
 function searchLocation(entityId, options = {}) {
   const propertyId = Number(options.propertyId);
   const result = discovery.search(WorldState, entityId, propertyId, {
@@ -1901,7 +1908,10 @@ function searchLocation(entityId, options = {}) {
   const missionGenerated = missionTriggers.maybeTriggerMission(WorldState, entityId, propertyId, {
     tick: WorldState.tick,
   });
-  return { ...result, missionGenerated };
+  const itemMissionGenerated = missionTriggers.maybeTriggerItemMission(
+    WorldState, entityId, propertyId, result.found, { tick: WorldState.tick },
+  );
+  return { ...result, missionGenerated, itemMissionGenerated };
 }
 
 // `weapons.js`'s manufacturing gate, the player-facing half — see its

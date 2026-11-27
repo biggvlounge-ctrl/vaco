@@ -2972,3 +2972,26 @@ citizen's own dashboard (`players.js#getCitizenDashboard`'s new
 confirming the tally still increments with no throw when an entity has
 no trait row to write to at all. See CLAUDE.md's two-hundred-and-
 fourth standing rule.
+
+### Item-find-triggered missions — a second trigger reading what you found, not only where (closes task #101)
+Checked directly first: no "police uniform" exists anywhere in the
+real catalogue (`items.js`'s seventeen `SOURCED_ITEMS`, `salvage.js`'s
+`PRODUCTS`) — the request's own example is a kind of thing, not a
+literal item. The real analogue already built for "an item that lets
+you pass as someone you are not" is `disguise.js`'s own `mask`/`wig`.
+New `missionTriggers.maybeTriggerItemMission` reuses the identical
+real main-character resolution task #98's own `maybeTriggerMission`
+already has (`mainCharacters.mainCharactersOf`, the same category
+order, the same `issuing_organization_id`/`controllingFactionId`
+routing) — called a second time from `engine.js#searchLocation`, now
+reading the search's own real `result.found` rather than only its
+location. Deliberately no probability roll: finding a disguise item at
+all is already the rare event, so a second independent roll stacked on
+top would make this near-unreachable in real play; it fires on real
+preconditions alone once found, the same deterministic shape every
+`missionVariety.js` `offer*Mission` already uses. Reward reuses the
+real, already-shared `missionVariety.MISSION_SPY_REWARD` (40), never a
+thirteenth invented number. 8 new tests in
+`test/missionTriggers.test.js`, including one real end-to-end
+dispatcher test through `search-location`. See CLAUDE.md's
+two-hundred-and-fifth standing rule.

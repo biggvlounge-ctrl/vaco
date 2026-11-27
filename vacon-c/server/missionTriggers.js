@@ -239,6 +239,85 @@ function maybeTriggerMission(worldState, entityId, propertyId, options = {}) {
   return mission;
 }
 
+// ---------------------------------------------------------------------
+// Item-find-triggered missions — task #101
+// ---------------------------------------------------------------------
+// "Finding a police uniform ignites an infiltration mission" is this
+// request's own example of a KIND of thing, not a literal item —
+// checked directly first, no uniform exists anywhere in the real
+// catalogue (`items.js`'s seventeen `SOURCED_ITEMS`, `salvage.js`'s
+// `PRODUCTS`). The real analogue already built for "an item that lets
+// you pass as someone you are not" is `disguise.js`'s own `mask`/
+// `wig` — the same real items `policing.evasionOf` already reads for
+// the identical reason, findable through `discovery.search`'s own
+// real `clothing`-category pool (`clothing-store`/`mall`/`discount-
+// store`/`big-box-store`).
+//
+// Deliberately NO probability roll, unlike `maybeTriggerMission`
+// above. That one fires on EVERY `search-location` call regardless of
+// what, if anything, is found, so it needs a real chance to keep from
+// offering a job on every single visit. Finding a disguise item AT
+// ALL is already the rare event here — `discovery.SEARCH_CHANCE`
+// gates whether anybody searches at all, and a disguise item is one
+// of several names a `clothing`-category find can land on — so a
+// second independent roll stacked on top would make this
+// near-unreachable in any real playthrough. This fires on real
+// preconditions alone instead, the same deterministic shape
+// `missionVariety.js`'s own `offer*Mission` family already uses.
+function maybeTriggerItemMission(worldState, entityId, propertyId, found, options = {}) {
+  if (!found || found.kind !== 'item') return null;
+  // eslint-disable-next-line global-require
+  const disguise = require('./disguise.js');
+  if (!disguise.DISGUISE_ITEM_NAMES.includes(found.itemName)) return null;
+  // Shares the real "one open job per location at a time" bound
+  // `maybeTriggerMission` above already enforces — the same reasoning
+  // applies unchanged: a second offer stacked on the first is not a
+  // richer world, it is an unread queue.
+  if (hasOpenMissionAt(worldState, propertyId)) return null;
+
+  const property = (worldState.properties || []).find((p) => p.id === propertyId);
+  if (!property || property.community_id == null) return null;
+
+  const characters = mainCharacters.mainCharactersOf(worldState, property.community_id);
+  if (!characters) return null;
+
+  // The identical fixed-order, first-real-leader resolution
+  // `maybeTriggerMission` already uses — see this file's own header
+  // for why that order is fixed rather than a random pick.
+  let category = null;
+  let leader = null;
+  for (const candidate of CATEGORY_ORDER) {
+    const candidateLeader = characters[candidate];
+    if (candidateLeader && candidateLeader.leaderId != null) {
+      category = candidate;
+      leader = candidateLeader;
+      break;
+    }
+  }
+  if (!category) return null;
+
+  const organization = worldState.organizations.find((o) => o.id === leader.organizationId);
+  const place = property.name ?? `location ${property.id}`;
+  const objective = `Use the ${found.itemName} you found to infiltrate `
+    + `${organization?.name ?? 'whoever runs this ground'} near ${place}`;
+
+  // eslint-disable-next-line global-require
+  const missionVariety = require('./missionVariety.js');
+  const missionOptions = {
+    locationId: propertyId, objective, reward: missionVariety.MISSION_SPY_REWARD,
+  };
+  if (category === 'criminal') {
+    missionOptions.controllingFactionId = leader.organizationId;
+  }
+  const mission = missions.generateMission(worldState, missionOptions);
+  if (category !== 'criminal') {
+    mission.issuing_organization_id = leader.organizationId;
+    mission.issued_by_entity_id = leader.leaderId;
+  }
+  return mission;
+}
+
 module.exports = {
   MISSION_TRIGGER_CHANCE, CATEGORY_ORDER, hasOpenMissionAt, maybeTriggerMission,
+  maybeTriggerItemMission,
 };
