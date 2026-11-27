@@ -405,3 +405,124 @@ test('attemptHeist: a real cargo-handling target (distribution-center/port-termi
   assert.equal(retried.blockedByTool, undefined, 'bolt_cutters clears the real cargo gate');
 });
 
+// ---------------------------------------------------------------------
+// consultBeforeHeist — task #104, "consult a real, knowledgeable org
+// member before acting on an opportunity." attemptHeist never had a
+// real preview at all; see heists.js's own header on this function.
+// ---------------------------------------------------------------------
+
+test('consultBeforeHeist: real validation errors', () => {
+  assert.throws(
+    () => heists.consultBeforeHeist(w, 1, { organizationId: 1 }),
+    /requires targetOrganizationId/,
+  );
+  assert.throws(
+    () => heists.consultBeforeHeist(w, 1, { targetOrganizationId: 1 }),
+    /requires exactly one of organizationId or familyId/,
+  );
+  assert.throws(
+    () => heists.consultBeforeHeist(w, 1, { organizationId: 1, familyId: 2, targetOrganizationId: 1 }),
+    /requires exactly one of organizationId or familyId/,
+  );
+});
+
+test('consultBeforeHeist: names the real org member with the HIGHEST real robberyAptitudeOf as advisor, and previews their odds solo', () => {
+  const leader = person(flatTraits(50));
+  const org = organization(leader.id, 'business');
+  const skilled = person((def) => {
+    if (def.family === 'criminal' && def.name === 'Stealth') return 90;
+    if (def.family === 'criminal' && def.name === 'Deception') return 90;
+    if (def.family === 'combat' && def.name === 'Tactical Awareness') return 90;
+    return 50;
+  });
+  membership.joinOrganization(w, { entityId: skilled.id, organizationId: org.id, role: 'member' });
+
+  const target = organization(null, 'business');
+  target.assets = 0;
+
+  const result = heists.consultBeforeHeist(w, leader.id, {
+    organizationId: org.id, targetOrganizationId: target.id,
+  });
+  assert.ok(result);
+  assert.equal(result.advisorEntityId, skilled.id, 'the real highest-aptitude member must be named advisor, not the sponsor by default');
+  assert.equal(result.advisorAptitude, heists.robberyAptitudeOf(w, skilled.id));
+  assert.deepEqual(result.crewEntityIds, [skilled.id], 'with no real crew named yet, the preview is of the advisor alone');
+  assert.equal(result.meanAptitude, heists.robberyAptitudeOf(w, skilled.id));
+  assert.equal(
+    result.successChance,
+    heists.successChanceFor(result.meanAptitude, 1, heists.targetDefenseOf(w, target.id)),
+    'must reuse the identical real successChanceFor attemptHeist itself runs, never a second estimate',
+  );
+});
+
+test('consultBeforeHeist: given a real crew, previews the SAME crew\'s real odds, not the lone advisor\'s', () => {
+  const leader = person(flatTraits(70));
+  const org = organization(leader.id, 'business');
+  const weak = person(flatTraits(20));
+  membership.joinOrganization(w, { entityId: weak.id, organizationId: org.id, role: 'member' });
+
+  const target = organization(null, 'business');
+  target.assets = 0;
+
+  const result = heists.consultBeforeHeist(w, leader.id, {
+    organizationId: org.id, targetOrganizationId: target.id, crewEntityIds: [leader.id, weak.id],
+  });
+  assert.deepEqual(result.crewEntityIds, [leader.id, weak.id]);
+  const expectedMean = (heists.robberyAptitudeOf(w, leader.id) + heists.robberyAptitudeOf(w, weak.id)) / 2;
+  assert.equal(result.meanAptitude, expectedMean);
+  assert.equal(
+    result.successChance,
+    heists.successChanceFor(expectedMean, 2, heists.targetDefenseOf(w, target.id)),
+  );
+});
+
+test('consultBeforeHeist: a real family head can consult their own family the identical way an org leader can', () => {
+  const head = person(flatTraits(40));
+  const fam = family(head.id);
+  const skilled = person((def) => {
+    if (def.family === 'criminal' && (def.name === 'Stealth' || def.name === 'Deception')) return 95;
+    if (def.family === 'combat' && def.name === 'Tactical Awareness') return 95;
+    return 50;
+  });
+  addToFamily(fam, skilled.id);
+
+  const target = organization(null, 'business');
+  const result = heists.consultBeforeHeist(w, head.id, {
+    familyId: fam.id, targetOrganizationId: target.id,
+  });
+  assert.ok(result);
+  assert.equal(result.advisorEntityId, skilled.id);
+});
+
+test('consultBeforeHeist: a nonexistent target returns null, never a crash', () => {
+  const leader = person(flatTraits(50));
+  const org = organization(leader.id, 'business');
+  assert.equal(
+    heists.consultBeforeHeist(w, leader.id, { organizationId: org.id, targetOrganizationId: 999999 }),
+    null,
+  );
+});
+
+test('consultBeforeHeist: a sponsor with no real other living member still consults themselves, never a crash', () => {
+  const leader = person(flatTraits(50));
+  const org = organization(leader.id, 'business');
+  const target = organization(null, 'business');
+  const result = heists.consultBeforeHeist(w, leader.id, {
+    organizationId: org.id, targetOrganizationId: target.id,
+  });
+  assert.ok(result);
+  assert.equal(result.advisorEntityId, leader.id);
+});
+
+test('consultBeforeHeist: a real, never-mutating read -- never moves assets, heat, or service', () => {
+  const leader = person(flatTraits(90));
+  const org = organization(leader.id, 'business');
+  const target = organization(null, 'business');
+  target.assets = 5000;
+
+  const before = JSON.stringify(target.assets);
+  heists.consultBeforeHeist(w, leader.id, { organizationId: org.id, targetOrganizationId: target.id });
+  assert.equal(JSON.stringify(target.assets), before, 'consulting must never move a real target\'s real assets');
+  assert.equal(leadership.serviceRecordOf(w, leader.id), 0, 'consulting must never record real service');
+});
+

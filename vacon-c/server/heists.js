@@ -97,6 +97,14 @@
 // (does a witness stay quiet afterward), and a second one under the
 // same name would be exactly the "two disagreeing answers to one
 // question" this file's own project has a standing rule against.
+//
+// ---------------------------------------------------------------------
+// Task #104 — consult before committing
+// ---------------------------------------------------------------------
+// `consultBeforeHeist` closes the one "look before you commit" gap
+// this file never had — `attempt-takeover` always had `assess-
+// takeover` beside it; `attemptHeist` had nothing. See that
+// function's own header for the full design.
 
 'use strict';
 
@@ -338,6 +346,98 @@ function attemptHeist(worldState, sponsorEntityId, options = {}) {
   };
 }
 
+// ---------------------------------------------------------------------
+// consultBeforeHeist — task #104, "consult a real, knowledgeable org
+// member before acting on an opportunity"
+// ---------------------------------------------------------------------
+// Checked directly first: unlike `attempt-takeover` (which already
+// has `assess-takeover`'s own real "look before you commit" preview),
+// `attempt-heist` had NO preview at all — a crew could only ever find
+// out its real odds by actually robbing somebody. This closes that
+// real gap, in the shape the request itself names: not a bare number,
+// but a real, NAMED advisor — the real living member of the sponsor's
+// own organization or family with the highest real `robberyAptitudeOf`
+// among them, the same real composite `attemptHeist` itself already
+// reads for every crew member.
+//
+// A pure read, the identical posture `tacticalAdvisor
+// .recommendSplit` already holds for the same reason: nothing here
+// moves, so no authority or compliance check applies — those only
+// gate `attemptHeist` itself, once a real decision is actually made.
+//
+// When no `crewEntityIds` are given yet, the preview is of the
+// advisor going alone — an honest floor, not a guess at who else
+// might join. When a real crew is already chosen, the SAME real
+// `successChanceFor`/`detectionChanceFor` this file's own
+// `attemptHeist` runs are previewed for that exact crew against the
+// real target, so what the advisor says and what actually happens can
+// never disagree.
+function consultBeforeHeist(worldState, sponsorEntityId, options = {}) {
+  const { organizationId = null, familyId = null, targetOrganizationId, crewEntityIds = null } = options;
+  if (targetOrganizationId == null) {
+    throw new Error('consultBeforeHeist requires targetOrganizationId.');
+  }
+  if ((organizationId == null) === (familyId == null)) {
+    throw new Error('consultBeforeHeist requires exactly one of organizationId or familyId.');
+  }
+  const target = (worldState.organizations || []).find((o) => o.id === Number(targetOrganizationId));
+  if (!target) return null;
+
+  let poolIds;
+  if (organizationId != null) {
+    const org = (worldState.organizations || []).find((o) => o.id === Number(organizationId));
+    if (!org) return null;
+    poolIds = (worldState.entityOrganizationMemberships || [])
+      .filter((m) => m.organization_id === org.id)
+      .map((m) => m.entity_id);
+  } else {
+    const family = (worldState.families || []).find((f) => f.id === Number(familyId));
+    if (!family) return null;
+    poolIds = (worldState.familyMemberships || [])
+      .filter((m) => m.family_id === family.id)
+      .map((m) => m.entity_id);
+  }
+  // The sponsor themselves counts as a real candidate advisor too —
+  // asking "who among us knows this best" never excludes the person
+  // asking, the same real pool `attemptHeist` draws its own crew from.
+  // Added explicitly rather than only read off membership rows: a
+  // sponsoring organization's own `leader_id` names them real
+  // authority over the org without necessarily also holding a real
+  // `entityOrganizationMemberships` row — `attemptHeist`'s own crew
+  // loop skips the identical membership check for exactly this id.
+  const living = [...new Set([...poolIds, Number(sponsorEntityId)])].filter((id) => {
+    const npc = (worldState.npcs || []).find((n) => n.id === id);
+    return npc && npc.status !== 'deceased';
+  });
+  if (living.length === 0) return null;
+
+  let advisorEntityId = null;
+  let advisorAptitude = -Infinity;
+  for (const id of living) {
+    const aptitude = robberyAptitudeOf(worldState, id);
+    if (aptitude > advisorAptitude) {
+      advisorAptitude = aptitude;
+      advisorEntityId = id;
+    }
+  }
+
+  const crew = Array.isArray(crewEntityIds) && crewEntityIds.length > 0
+    ? crewEntityIds.map(Number)
+    : [advisorEntityId];
+  const meanAptitude = crew.reduce((sum, id) => sum + robberyAptitudeOf(worldState, id), 0) / crew.length;
+  const defense = targetDefenseOf(worldState, target.id);
+
+  return {
+    advisorEntityId,
+    advisorAptitude,
+    crewEntityIds: crew,
+    meanAptitude,
+    defense,
+    successChance: successChanceFor(meanAptitude, crew.length, defense),
+    detectionChance: detectionChanceFor(meanAptitude, defense),
+  };
+}
+
 module.exports = {
   CREW_CAP,
   SIZE_BONUS_PER_MEMBER,
@@ -351,4 +451,5 @@ module.exports = {
   stakeOut,
   hasRecentStakeout,
   attemptHeist,
+  consultBeforeHeist,
 };

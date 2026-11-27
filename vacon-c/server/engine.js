@@ -972,6 +972,12 @@ function attemptHeist(entityId, options = {}) {
   return heists.attemptHeist(WorldState, entityId, options);
 }
 
+// Task #104 — the real "look before you commit" preview `attempt-
+// heist` never had, see heists.js#consultBeforeHeist's own header.
+function consultBeforeHeist(entityId, options = {}) {
+  return heists.consultBeforeHeist(WorldState, entityId, options);
+}
+
 // Same convention again: a real key, a real architect's own
 // knowledge, or real word-of-mouth gets you into a real hidden cache
 // — see hiddenCaches.js's own header for the full design.
@@ -1440,6 +1446,7 @@ const ACTION_VERBS = {
   assignRole: (...args) => assignRole(...args),
   sendSpy: (...args) => sendSpy(...args),
   attemptHeist: (...args) => attemptHeist(...args),
+  consultBeforeHeist: (...args) => consultBeforeHeist(...args),
   revealCache: (...args) => revealCache(...args),
   designateStashHouse: (...args) => designateStashHouse(...args),
   assembleParty: (...args) => assembleParty(...args),

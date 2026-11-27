@@ -79,7 +79,7 @@ test('every verb an action names is one the engine actually supplies', () => {
   assert.deepEqual(
     actions.REQUIRED_VERBS,
     ['acceptMission', 'addScheduleEvent', 'applyHold', 'applyRecommendedSplit', 'askAround', 'assembleParty', 'assessTakeover', 'assessThreat', 'assignPartyRole', 'assignRole', 'attemptHeist', 'attemptTakeover',
-      'beginJourney', 'breakCamp', 'breakDownItem', 'broadcastMessage', 'buildBarricade', 'buildHome', 'callBluff', 'canHarvest', 'canMakeThing', 'captureEntity', 'convertCrack', 'dealDrugs', 'demandTribute', 'designateStashHouse', 'directMission', 'disposeOfCapture', 'drawPlay', 'establishCamp', 'findOrCreateContact', 'foundBusiness', 'guessFugitiveLocation', 'guessFugitiveLocationWithParty', 'guessMissingRelationLocation', 'guessMissingRelationLocationWithParty', 'harvest', 'holdMeeting',
+      'beginJourney', 'breakCamp', 'breakDownItem', 'broadcastMessage', 'buildBarricade', 'buildHome', 'callBluff', 'canHarvest', 'canMakeThing', 'captureEntity', 'consultBeforeHeist', 'convertCrack', 'dealDrugs', 'demandTribute', 'designateStashHouse', 'directMission', 'disposeOfCapture', 'drawPlay', 'establishCamp', 'findOrCreateContact', 'foundBusiness', 'guessFugitiveLocation', 'guessFugitiveLocationWithParty', 'guessMissingRelationLocation', 'guessMissingRelationLocationWithParty', 'harvest', 'holdMeeting',
       'attemptInsideJob', 'collectDebt', 'enforceCollection', 'importSubstance', 'intimidate', 'investInTarget', 'issueLoan', 'joinCamp', 'leaveCamp', 'lockProperty', 'makeThing', 'manufactureAmmunition', 'placeStreetBet', 'placeWager', 'produceMarijuana', 'quoteTrade',
       'reinforceHabit', 'releaseFromParty', 'renovateProperty', 'repurposeProperty', 'resolveContest', 'restoreVehicle', 'revealCache', 'runPlay', 'saveLocation', 'searchLocation', 'sendMessage', 'sendSpy',
       'stealVehicle', 'stripBuilding', 'resolveMission', 'studySource', 'talkTo', 'tradeWith', 'unlockProperty', 'unsaveLocation'].sort(),
@@ -206,6 +206,23 @@ test('attempt-heist reaches heists.js#attemptHeist through the real dispatcher',
   });
   assert.equal(out.result.complied, true);
   assert.deepEqual(out.result.crew.sort(), [leaderNpc.id, crewMember.id].sort());
+});
+
+test('consult-heist reaches heists.js#consultBeforeHeist through the real dispatcher, and never mutates anything', () => {
+  const leaderNpc = engine.generateNPC();
+  const crewMember = engine.generateNPC();
+  const org = engine.generateOrganization({ type: 'gang', leaderId: leaderNpc.id });
+  membership.joinOrganization(engine.WorldState, { entityId: crewMember.id, organizationId: org.id });
+  const target = engine.generateOrganization({ type: 'business', leaderId: null });
+  target.assets = 10000;
+  const player = engine.generatePlayer({ linkedEntityId: leaderNpc.id });
+
+  const out = engine.dispatchAction(player.id, {
+    action: 'consult-heist', organizationId: org.id, targetOrganizationId: target.id,
+  });
+  assert.ok(out.result.consultation);
+  assert.ok([leaderNpc.id, crewMember.id].includes(out.result.consultation.advisorEntityId));
+  assert.equal(target.assets, 10000, 'consulting must never move a real target\'s real assets');
 });
 
 test('reveal-cache reaches hiddenCaches.js#revealCache through the real dispatcher', () => {

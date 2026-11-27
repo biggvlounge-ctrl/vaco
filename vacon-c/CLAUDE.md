@@ -12111,3 +12111,58 @@ same-community physician yields a real `study` option naming the
 exact `source`/`field`/`teacherId`; a real `hunter` (no field mapping)
 yields none; a real held item yields a real `trade` option naming the
 distinct item names; no held items yields none.
+
+**A two-hundred-and-eighth, closing task #104 — "consult a real,
+knowledgeable org member before acting on an opportunity" — and it
+closes a real, checked-directly gap this project's own "look before
+you commit" pattern never reached: `attempt-heist` had NO preview at
+all.**
+
+**Checked first, not assumed: `attempt-takeover` always had `assess-
+takeover` beside it (the Build Prompt's own "look before you spend
+what you are carrying" pattern, §103's `check` flag on `make-thing`
+the same shape again); `attempt-heist` never did.** `grep -n
+"assess.*[Hh]eist\|consult.*[Hh]eist" server/actions.js` before this
+round returned nothing — a crew could only ever learn its real odds
+by actually robbing somebody, the exact "a player has to be able to
+look before they spend" gap this project's own practice already
+closed for every other committing verb.
+
+**`heists.js#consultBeforeHeist` closes it in the shape the request
+itself names — a real, NAMED advisor, not a bare number.** Scans the
+sponsor's own real organization or family (always including the
+sponsor themselves, the identical real pool `attemptHeist`'s own crew
+draws from — a sponsoring leader's own `leader_id` names them real
+authority without necessarily also holding a real
+`entityOrganizationMemberships` row, caught and fixed by a failing
+test before this shipped) for the living member with the highest real
+`robberyAptitudeOf` — the same real, already-weighted composite
+`attemptHeist` itself reads for every crew member, never a second,
+disagreeing one. With no real crew named yet, the preview is of that
+advisor going alone — an honest floor, not a guess at who else might
+join; with a real crew already chosen, the SAME real
+`successChanceFor`/`detectionChanceFor`/`targetDefenseOf`
+`attemptHeist` itself runs are previewed for that exact crew against
+the real target, so what the advisor says and what actually happens
+can never disagree.
+
+**A pure read, the identical posture `tacticalAdvisor
+.recommendSplit` already holds for the same reason.** Nothing moves —
+no authority or compliance check applies, since those only gate
+`attemptHeist` itself once a real decision is actually made. Verified
+directly: a real target's real `assets` and the real sponsor's real
+`serviceRecordOf` are both read back unchanged after consulting.
+
+**New `consult-heist` player verb**, mirroring `assess-takeover`'s own
+shape one file over — `requires: ['targetOrganizationId']`, both
+`citizen`/`leader` modes, routed through `engine.js#consultBeforeHeist`
+exactly like every other thin wrapper in that file.
+
+7 new tests in `test/heists.test.js` (real validation errors; the
+real highest-aptitude member named advisor and previewed solo; a
+named real crew previewed by its own real mean aptitude, not the lone
+advisor's; a real family head consulting the identical way an org
+leader can; a nonexistent target and a sponsor with no other real
+living member both handled honestly, never a crash; a real,
+never-mutating read, proven rather than assumed) and 1 new dispatcher
+test in `test/actions.test.js`.

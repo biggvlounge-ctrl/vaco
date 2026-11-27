@@ -664,6 +664,22 @@ const ACTIONS = {
     }),
   },
 
+  'consult-heist': {
+    summary: 'Ask your own real org or family who knows this best, and what the real odds would '
+      + 'be against a real target -- before committing to attempt-heist.',
+    modes: ['citizen', 'leader'],
+    requires: ['targetOrganizationId'],
+    verbs: ['consultBeforeHeist'],
+    run: (verbs, actorId, body) => ({
+      consultation: verbs.consultBeforeHeist(actorId, {
+        organizationId: body.organizationId != null ? Number(body.organizationId) : null,
+        familyId: body.familyId != null ? Number(body.familyId) : null,
+        targetOrganizationId: Number(body.targetOrganizationId),
+        crewEntityIds: Array.isArray(body.crewEntityIds) ? body.crewEntityIds.map(Number) : null,
+      }),
+    }),
+  },
+
   'attempt-heist': {
     summary: 'Send a real crew (2-4 of your own people matter most) to rob a real organization\'s '
       + 'own real assets.',

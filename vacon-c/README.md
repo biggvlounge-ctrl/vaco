@@ -3041,3 +3041,22 @@ files against the real 171 on disk, confirmed stale on committed
 `HEAD` via `git stash` before correcting it. 8 new tests in
 `test/dialogue.test.js`. See CLAUDE.md's two-hundred-and-seventh
 standing rule.
+
+### Consult a real org member before a heist — the "look before you commit" gap attempt-heist never had (closes task #104)
+Checked first: `attempt-takeover` always had `assess-takeover` beside
+it; `attempt-heist` had no preview at all. New
+`heists.js#consultBeforeHeist` closes it in the shape the request
+itself names — a real, NAMED advisor, not a bare odds number. Scans
+the sponsor's own real organization or family (always including the
+sponsor themselves) for the living member with the highest real
+`robberyAptitudeOf`, the same real composite `attemptHeist` already
+reads for every crew member. With no crew named, previews that
+advisor going alone; with a real crew already chosen, reuses the SAME
+real `successChanceFor`/`detectionChanceFor`/`targetDefenseOf`
+`attemptHeist` itself runs, so the advisor's word and the real outcome
+can never disagree. A pure read — the identical posture
+`tacticalAdvisor.recommendSplit` already holds — verified to move
+nothing. New `consult-heist` player verb, mirroring `assess-takeover`'s
+own shape. 7 new tests in `test/heists.test.js`, 1 new dispatcher test
+in `test/actions.test.js`. See CLAUDE.md's two-hundred-and-eighth
+standing rule.
