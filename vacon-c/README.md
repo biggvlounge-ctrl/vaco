@@ -2758,6 +2758,63 @@ can skim a flat 2% of the house's own current real assets into a
 requester's savings. New `attempt-inside-job` player verb. 8 new
 tests. See CLAUDE.md's hundred-and-ninety-fifth standing rule.
 
+### Loan sharks and bookies, the real informal/criminal economy mechanic (closes task #66)
+`occupations.js`'s own bookmaker note already named and deliberately
+deferred this: "An illegal street-level bookie or loan shark outside
+a licensed casino has no real BLS code... that is a real, separate
+informal/criminal-economy mechanic, not an occupation." `server/
+loanSharking.js` closes it, reusing `drugTrade.gangOf`/`membership.
+gangTierFor`'s own real soldier/associate floor for who may run
+either role, never a second "how criminal is this person" gate.
+Loan sharking's rate is named as a term, not one sourced figure —
+"six-for-five"/the vig, commonly ~20% simple interest a week, divided
+across seven real ticks into a per-tick accrual (`amountOwed`, a pure
+function of the loan's own fields). Collection moves money exactly
+like `casino.placeWager` already does — claim-before-pay — and a
+short payment's honest remainder becomes real `individual_finances.
+debt`, the schema's own column for exactly this, rather than a second
+ledger. Enforcement reuses `heat.js`/`crime.js` directly rather than
+touching `keys.resolveAggression`'s own calibrated escalation system
+— a defaulted loan's enforcement puts the borrower on the lender's
+real gang's radar and records the violence under the real `violent`
+category. Street bookmaking reuses `contest.js`'s own real ratings
+and odds (never a second casino game) with a bookie's real, commonly-
+cited standard vig (0.0476 — the combined 104.76% implied probability
+of a standard -110/-110 American line), settled against the bookie's
+own real personal savings rather than an organization's assets — the
+real distinction between a licensed casino bookmaker (task #64) and
+an unlicensed street one. New `issue-loan`, `collect-debt`, `enforce-
+collection`, and `place-street-bet` player verbs — the collection pair
+splits the same "assess, then attempt" way `assess-takeover`/`attempt-
+takeover` already do. A real naming collision (the first draft's
+`participantIds` collided with `actions.js#ACTOR_FIELDS`'s own global
+refusal, caught live through the real dispatcher) was fixed by
+renaming to `contestantIds`, the correct call since a street bet's two
+contestants are never the actor the way `enter-contest`'s own
+`participantIds` always are. 22 new tests. All four verbs confirmed
+live through the real dispatcher. See CLAUDE.md's hundred-and-ninety-
+sixth standing rule.
+
+### Universal NPC interaction, procedural dialogue AI (closes task #96)
+"AI" here means procedural, never generative — this engine has no LLM
+dependency and stays deterministic, so `server/dialogue.js#
+interactWith` assembles a response entirely from real, already-
+existing facts about any living NPC a player talks to. Tone reads the
+real pair relationship; mood reads `behavior.getEntityState`'s own
+real `currentMood`; occupation reads `economy.getEmployment`'s own
+real position; an optional shared fact reads `worldStore.getKnowledge`
+on the specific npc, surfaced only when it is genuinely news to the
+player. A real mistake was caught before it shipped: `toneFor`'s first
+draft compared `trust - conflict` against a margin above zero, which
+would have read every brand-new stranger (the real schema default,
+trust 50/conflict 0) as "warm" — fixed by centring on the real default
+pair instead, `(trust - 50) - conflict`. Deliberately no trust change
+from an ordinary "talk to" (the same restraint `meetings.js`'s own
+header already argues for); `shared_history` does move, by the real
+flat 1 task #122 already established. New `talk-to` player verb. 13
+new tests, confirmed live through the real dispatcher. See CLAUDE.md's
+hundred-and-ninety-seventh standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

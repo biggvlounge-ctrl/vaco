@@ -105,6 +105,8 @@ const produce = require('./produce.js');
 const discovery = require('./discovery.js');
 const weapons = require('./weapons.js');
 const casino = require('./casino.js');
+const loanSharking = require('./loanSharking.js');
+const dialogue = require('./dialogue.js');
 const knowledge = require('./knowledge.js');
 const barter = require('./barter.js');
 const mortality = require('./mortality.js');
@@ -1248,6 +1250,14 @@ function callBluff(challengerId, options = {}) {
   });
 }
 
+// `dialogue.js#interactWith`'s player-facing half, task #96 — any
+// living NPC, never only ones a mission or encounter names.
+function talkTo(entityId, options = {}) {
+  return dialogue.interactWith(WorldState, {
+    playerEntityId: entityId, npcEntityId: options.npcEntityId, tick: WorldState.tick,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Territory/Community (block-tier)
 // ---------------------------------------------------------------------------
@@ -1468,6 +1478,11 @@ const ACTION_VERBS = {
   findOrCreateContact: (...args) => findOrCreateContact(...args),
   placeWager: (...args) => placeWager(...args),
   attemptInsideJob: (...args) => attemptInsideJob(...args),
+  issueLoan: (...args) => issueLoan(...args),
+  collectDebt: (...args) => collectDebt(...args),
+  enforceCollection: (...args) => enforceCollection(...args),
+  placeStreetBet: (...args) => placeStreetBet(...args),
+  talkTo: (...args) => talkTo(...args),
   intimidate: (...args) => intimidate(...args),
   assessThreat: (...args) => assessThreat(...args),
   callBluff: (...args) => callBluff(...args),
@@ -1887,6 +1902,37 @@ function attemptInsideJob(entityId, options = {}) {
   });
 }
 
+// `loanSharking.js`'s real player-facing verbs — task #66. The actor
+// is always the real lender/bookie (the "a player acts as themselves"
+// rule), never named in the body.
+function issueLoan(entityId, options = {}) {
+  return loanSharking.issueLoan(WorldState, {
+    lenderEntityId: entityId, borrowerEntityId: options.borrowerEntityId,
+    principal: options.principal, tick: WorldState.tick,
+  });
+}
+
+function collectDebt(entityId, options = {}) {
+  return loanSharking.collectDebt(WorldState, {
+    loanId: options.loanId, entityId, tick: WorldState.tick,
+  });
+}
+
+function enforceCollection(entityId, options = {}) {
+  return loanSharking.enforceCollection(WorldState, {
+    loanId: options.loanId, entityId, tick: WorldState.tick,
+  });
+}
+
+function placeStreetBet(entityId, options = {}) {
+  return loanSharking.placeStreetBet(WorldState, {
+    bettorEntityId: entityId, bookieEntityId: options.bookieEntityId,
+    contestantIds: options.contestantIds, pickedEntityId: options.pickedEntityId,
+    stake: options.stake, discipline: options.discipline, contestId: options.contestId ?? null,
+    tick: WorldState.tick,
+  });
+}
+
 // ---------------------------------------------------------------------
 // Study — §24, the player-facing half
 // ---------------------------------------------------------------------
@@ -2288,6 +2334,11 @@ module.exports = {
   findOrCreateContact,
   placeWager,
   attemptInsideJob,
+  issueLoan,
+  collectDebt,
+  enforceCollection,
+  placeStreetBet,
+  talkTo,
   vaultStudiosLink,
   vultureLink,
   dreamsLink,

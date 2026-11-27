@@ -11307,3 +11307,193 @@ money moved on a refusal), and two deterministic searches for a real
 seeded losing and winning tick, each checking the exact real money
 movement on both sides. `test/actions.test.js`'s own exact
 `REQUIRED_VERBS` list updated to include `placeWager`.
+
+**A hundred-and-ninety-sixth, closing task #66 — loan sharks and
+bookies, the real informal/criminal economy mechanic
+`occupations.js`'s own bookmaker note already named and deliberately
+deferred.**
+
+**The starting point was already on file, word for word.**
+`occupations.js`'s `bookmaker` entry says, verbatim: "An illegal
+street-level bookie or loan shark outside a licensed casino has no
+real BLS code (illegal activity is not surveyed) and is deliberately
+NOT given one here -- that is a real, separate informal/criminal-
+economy mechanic, not an occupation, named rather than silently
+invented." `server/loanSharking.js` is that mechanic, built the same
+"named, not guessed" way everything else in this registry answers a
+gap a file already declared.
+
+**Who may run either role reuses `drugTrade.js`'s own real gate,
+never a second "how criminal is this person" check.** `drugTrade.
+gangOf`/`membership.gangTierFor`'s real soldier/associate floor
+already answers "is this a real street-level operator of a real
+gang" for dealing drugs — DOJ/NGIC material `drugTrade.js` already
+cites groups loansharking and illegal gambling alongside narcotics as
+the same gang revenue streams, so `loanSharking.operatorGangFor`
+reuses that exact check unchanged rather than inventing a parallel
+one. A gang LEADER is refused — leadership is not street-level, the
+same floor `dealDrugs` already draws.
+
+**Loan sharking's real rate is named as a term, not asserted as one
+precise sourced figure — the identical posture `crime.
+BASE_DEPRIVATION_RISK` already holds.** "Six-for-five"/the vig is the
+real, widely-documented term for loan-shark interest in criminology
+and organized-crime literature, commonly referring to roughly 20%
+simple interest per week; `WEEKLY_VIG_RATE = 0.20` divided across
+seven real ticks (this file's own "a tick is a day") is
+`DAILY_VIG_RATE`, applied as simple interest from the loan's own real
+`issuedTick` — a pure function of the loan's own fields and the tick
+asked about (`amountOwed`), never a stored, driftable running
+balance.
+
+**Collection and its real inverse move money exactly the way `casino.
+placeWager`/`investments.invest` already do — claim-before-pay,
+never a bare field mutation.** `issueLoan` refuses a lender who does
+not really have the principal to lend; `collectDebt` pays the real
+balance in full when the borrower can, and when they cannot, the
+honest remainder becomes real `individual_finances.debt` on them —
+the schema's own column for exactly this fact, never a second ledger
+invented beside it. `entityId`, when given, must be the loan's own
+real lender, the identical "a player acts as themselves" discipline
+`missions.js`'s own "only the holder can resolve" check already
+holds, applied here so one person's real loan cannot be collected by
+somebody else's say-so.
+
+**Enforcement reuses `heat.js` and `crime.js` directly rather than
+inventing a third violence mechanism — the seventeenth standing
+rule's own warning, applied before the mistake instead of after.**
+Touching `keys.resolveAggression` for a loan-specific escalation path
+was not even considered this time, having already been named and
+rejected for the identical reason guiding `casino.js#attemptInsideJob`
+away from `control.js`: that resolver is heavily tested and already
+calibrated through four measured attempts, and a second, untested
+caller risks re-breaking exactly the balance that work fixed.
+`enforceCollection`, callable only against a loan already real and
+already in default, puts the borrower on the lender's own real gang's
+radar via `heat.raiseHeat` and records the real enforcement violence
+under `violent` — "aggression between two entities with standing
+conflict that escalates," `crime.js`'s own CATEGORIES description of
+exactly this — rather than a category invented for the occasion.
+
+**Street bookmaking reuses `contest.js`'s own real ratings and odds,
+not a second casino game borrowed out of context.** A bookie takes
+bets on real contests, so `contest.rateEntity`/`contest.
+winProbability` (confirmed generic by reading them directly before
+reuse) compute the real favourite/underdog probability the SAME call
+`resolveContest` itself resolves a bout from — never a second,
+disagreeing probability model. `BOOKMAKER_VIG` (0.0476) is the real,
+commonly-cited "standard vig": American sports-betting odds of -110 on
+both sides of a two-way line imply a combined 104.76% probability, and
+that 4.76% overround is the industry's own standard term for a
+bookmaker's built-in margin — reused here the same way `casino.js`
+already reuses roulette's own exact 2/38, never a second invented
+house edge. Settlement is against the BOOKIE's own real personal
+savings, not an organization's assets — the real distinction
+`occupations.js`'s own note draws between a licensed casino's
+SOC-coded bookmaker (task #64, a business's real assets) and an
+unlicensed street one. **No territory gate, on purpose**: unlike
+`extortion.js` (which specifically targets where the state's reach is
+weak), unlicensed street betting is a real phenomenon in heavily
+policed cities too — a transaction below the state's notice, not one
+that needs its absence, so gating this on `authority.writOf` would
+model a fact that is not true. **No new crime category either**: an
+unlicensed wager between two consenting parties has no real victim
+the way violent/property/theft/fraud do, and `crime.js`'s own
+CATEGORIES comment calls its vocabulary deliberate and fixed — this
+logs to its own `worldState.streetBetEvents`, the identical posture
+`casino.casinoWagerEvents` already holds for a licensed wager.
+
+**A real naming collision was found and corrected before it shipped,
+not worked around.** The first draft named the bet's two real
+contestants `participantIds`, the exact literal field name `actions.
+js#ACTOR_FIELDS` already refuses globally — not because that check
+understood the new meaning, but because `enter-contest`'s own
+`participantIds` always means "the actor is one of these," and a
+street bet's two contestants are the opposite: people the actor (a
+third-party bettor) is watching from OUTSIDE the contest, never
+including them. Confirmed live, through the real dispatcher
+(`engine.dispatchAction`), not only in a fixture — the first attempt
+threw exactly the refusal `actions.js`'s own header predicts for a
+smuggled actor field. Renamed to `contestantIds` throughout
+`loanSharking.js`, `engine.js`, and `actions.js`, which is the correct
+fix: a different real concept earns a different real name, not a
+workaround around someone else's naming convention.
+
+New `issue-loan`, `collect-debt`, `enforce-collection`, and
+`place-street-bet` player verbs, wired through `engine.js`'s thin-
+wrapper/`ACTION_VERBS` injection discipline the same way every other
+action verb already is — `collect-debt`/`enforce-collection` split
+the same "assess, then attempt" way `assess-takeover`/`attempt-
+takeover` already do, so a lender collects first and only escalates
+to real enforcement once a collection has actually come up short.
+22 new tests (`test/loanSharking.test.js`), using the identical real
+`engine.generateNPC`/`generateOrganization`/`membership.
+joinOrganization` fixture shape `test/drugTrade.test.js#soldierIn`
+already established (never a bare hand-built world, so `contest.
+rateEntity`'s own real trait reads have something real to read). All
+four verbs confirmed live through the real dispatcher, not only
+through their modules — a full issue/collect/default/enforce cycle
+and a real street bet, both end to end.
+
+**A hundred-and-ninety-seventh, closing task #96 — universal NPC
+interaction, "procedural dialogue AI."**
+
+**"AI" here means procedural, never generative.** This engine has no
+LLM dependency and stays deterministic by design, so `server/
+dialogue.js#interactWith` assembles a response entirely from real,
+already-existing facts about the specific NPC a player talks to —
+never a scripted line, never an external text model. "Universal"
+is the other half of the task's own name: ANY living NPC can be the
+subject, not only one a mission or encounter already names.
+
+**Nothing here is a second vocabulary — four real readers, one new
+assembly.** Tone reads the real pair relationship (`worldStore.
+getOrCreateRelationship`, `'social'`, the identical generic type
+`attemptInsideJob`'s own loyalty check already uses between two
+otherwise-unrelated people). Mood reads `behavior.getEntityState`'s
+own real `currentMood` directly, never recomputed a second way.
+Occupation reads `economy.getEmployment`'s own real position string.
+An optional shared fact reads `worldStore.getKnowledge` on the
+SPECIFIC npc being talked to — the real per-row structure `gossip.
+js#askAround` already reads community-wide, scoped here to one
+informant and surfaced only when it is genuinely news: the player
+holds no real row for that subject, or holds one at lower confidence
+than this NPC's own.
+
+**A real mistake caught before it shipped, the twelfth standing
+rule's own shape one file further on.** `getOrCreateRelationship`'s
+real schema default is `trust: 50, conflict: 0`, not zero — so a
+first version of `toneFor` comparing `trust - conflict` against a
+margin above zero would have read EVERY brand-new stranger as
+"warm" (50 - 0 = 50), exactly the recalibration mistake that rule
+already catalogues. `toneFor` centres on the real default pair
+instead — `(trust - 50) - conflict`, which is 0 for two people who
+have never interacted — so a stranger reads as `neutral`, and only
+real relationship movement away from that default reads as
+`warm`/`hostile`. Caught by reading `getOrCreateRelationship`'s own
+defaults directly before writing the comparison, not after a test
+failed.
+
+**Deliberately no trust change from talking alone.** `meetings.js`'s
+own header already argues against inventing a persuasion/trust
+modifier for an ordinary exchange, and a casual, freely-repeatable
+"talk to" is exactly the case that argument protects against — a
+player could otherwise farm trust on a loop. `shared_history` DOES
+move, by a flat 1 — task #122's own real fix already grows it on any
+genuine two-person interaction, never only a self-relationship, and
+this is exactly that.
+
+**Deliberately scoped, not a partial build.** The real "ask them a
+specific question and get a choice of real answers" layer (task
+#103) and "consult a knowledgeable org member before acting" (task
+#104) are later, separate rounds building ON this one, not folded
+into it — `interactWith`'s own return shape (tone, mood, occupation,
+one sharable fact) is the real substrate those two tasks need, named
+here so neither has to rediscover it.
+
+New `talk-to` player verb (`npcEntityId`). 13 new tests (`test/
+dialogue.test.js`), covering the real tone-band fix directly (a
+fresh stranger reads `neutral`, never `warm`), the fact-sharing
+"genuinely news" comparison from both directions, and confirming
+`interactWith` moves `shared_history` and never `trust`. Confirmed
+live through the real dispatcher.

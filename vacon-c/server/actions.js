@@ -372,6 +372,17 @@ const ACTIONS = {
     run: (verbs, actorId, body) => verbs.callBluff(actorId, { targetId: Number(body.targetId) }),
   },
 
+  // **`dialogue.js#interactWith` — task #96, universal NPC
+  // interaction.** Any real living NPC, never only ones a mission or
+  // encounter already names.
+  'talk-to': {
+    summary: 'Talk to any real person -- their real mood, occupation, and tone toward you, plus anything they genuinely know that is news to you.',
+    modes: ['citizen', 'leader'],
+    requires: ['npcEntityId'],
+    verbs: ['talkTo'],
+    run: (verbs, actorId, body) => verbs.talkTo(actorId, { npcEntityId: Number(body.npcEntityId) }),
+  },
+
   'ask-around': {
     summary: 'Ask around your own neighbourhood for whatever anybody there really knows about someone -- the most confident real rumor among your neighbours, or nothing at all if nobody does.',
     modes: ['citizen', 'leader'],
@@ -945,6 +956,63 @@ const ACTIONS = {
     run: (verbs, actorId, body) => verbs.attemptInsideJob(actorId, {
       propertyId: Number(body.propertyId),
       insiderEntityId: Number(body.insiderEntityId),
+    }),
+  },
+
+  // **`loanSharking.js` — task #66's loan-sharking half.** The actor
+  // is always the real lender; `requires` real soldier/associate gang
+  // standing, enforced inside `issueLoan` itself.
+  'issue-loan': {
+    summary: 'Lend a real amount at a real predatory vig to a borrower -- requires real street-level gang standing.',
+    modes: ['citizen', 'leader'],
+    requires: ['borrowerEntityId', 'principal'],
+    verbs: ['issueLoan'],
+    run: (verbs, actorId, body) => verbs.issueLoan(actorId, {
+      borrowerEntityId: Number(body.borrowerEntityId),
+      principal: Number(body.principal),
+    }),
+  },
+
+  // Collection and enforcement are two separate verbs, the same
+  // "assess, then attempt" split `assess-takeover`/`attempt-takeover`
+  // already established -- a lender collects first, and only escalates
+  // to real enforcement violence once a collection has actually come
+  // up short.
+  'collect-debt': {
+    summary: 'Attempt to collect on a real loan -- paid in full if the borrower really can, a real partial payment (and real debt) otherwise.',
+    modes: ['citizen', 'leader'],
+    requires: ['loanId'],
+    verbs: ['collectDebt'],
+    run: (verbs, actorId, body) => verbs.collectDebt(actorId, { loanId: Number(body.loanId) }),
+  },
+
+  'enforce-collection': {
+    summary: 'Send real enforcement violence after a loan already in real default.',
+    modes: ['citizen', 'leader'],
+    requires: ['loanId'],
+    verbs: ['enforceCollection'],
+    run: (verbs, actorId, body) => verbs.enforceCollection(actorId, { loanId: Number(body.loanId) }),
+  },
+
+  // **`loanSharking.js` — the street-bookmaking half.** The actor is
+  // always the real bettor, watching from outside the contest --
+  // `contestantIds` deliberately does not share `enter-contest`'s own
+  // `participantIds` name, since that name means "the actor is always
+  // one of these," the opposite of what a bet's two contestants are
+  // here. `bookieEntityId` names the real street-level gang operator
+  // taking the bet.
+  'place-street-bet': {
+    summary: 'Bet on a real contest through an unlicensed street bookie -- real contest.js odds, shaded by the bookie\'s own standard vig.',
+    modes: ['citizen', 'leader'],
+    requires: ['bookieEntityId', 'contestantIds', 'pickedEntityId', 'stake'],
+    verbs: ['placeStreetBet'],
+    run: (verbs, actorId, body) => verbs.placeStreetBet(actorId, {
+      bookieEntityId: Number(body.bookieEntityId),
+      contestantIds: (body.contestantIds || []).map(Number),
+      pickedEntityId: Number(body.pickedEntityId),
+      stake: Number(body.stake),
+      discipline: body.discipline,
+      contestId: body.contestId ?? null,
     }),
   },
 };
