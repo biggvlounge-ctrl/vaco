@@ -2732,6 +2732,32 @@ between a player's `individual_finances.savings` and the house's real
 `organizations.assets`. New `place-wager` player verb. 11 new tests.
 See CLAUDE.md's hundred-and-ninety-fourth standing rule.
 
+### Casino takeover confirmed heavy, a real gaming-chip item, and a real inside-job mechanic (closes task #65)
+"Heavy composition" is confirmed by measurement, not rebuilt:
+`control.compositionFor`'s own `FORCE_PARITY = 1` scales a target's
+composition 1:1 with its real staff headcount, and a real generated
+casino (`institutionStaffing: true`) measured `defenders: 19, total:
+19` — substantial, against `landmarks.CREWS.casino`'s own named
+ceiling of 39 real seats. A correctly-operated casino (type
+`business`) has no specialist chokepoint at all (`postFor('business')`
+is deliberately `null`) — its real difficulty is pure headcount. A
+real, reproducible defect was found while measuring this (a casino
+property's own operator sometimes points at an already-existing,
+differently-typed organization rather than a fresh one) and is named
+in CLAUDE.md rather than silently fixed outside this task's scope.
+`casino.registerItems` closes `discovery.js`'s own already-declared
+"no cash/chips item category" gap with a real `Gaming Chip` item
+(`luxury goods`, `remnant`) — no change needed to `discovery.js`'s own
+pool table at all, since its real resolution already filters the
+whole catalogue by category. `attemptInsideJob` is a real,
+self-contained alternative to brute-force takeover rather than a
+discount bolted onto `control.js`'s own tested composition system: a
+real casino employee, gated by the identical `leadership.
+complianceDraw` primitive this engine already trusts everywhere,
+can skim a flat 2% of the house's own current real assets into a
+requester's savings. New `attempt-inside-job` player verb. 8 new
+tests. See CLAUDE.md's hundred-and-ninety-fifth standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

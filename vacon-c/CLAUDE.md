@@ -11154,6 +11154,94 @@ including the direct 0.75/1.25-band proof and a default-parameter
 backward-compatibility check (a gang with no real `leader_id` behaves
 exactly as it always did).
 
+**A hundred-and-ninety-fifth, closing task #65 — casino takeover
+(confirmed heavy, not rebuilt), a real gaming-chip item, and a real
+"inside job" mechanic.**
+
+**"Heavy composition" is confirmed by measurement, not asserted.**
+`control.compositionFor`'s own real `FORCE_PARITY = 1` means a
+target's composition `total` scales 1:1 with its real staff headcount
+(`defenders`) — so a casino is exactly as heavy as its own real crew
+actually is. Measured on a real generated world
+(`institutionStaffing: true`, the opt-in flag that actually hires
+`landmarks.CREWS.casino`'s real posts): a real casino's own composition
+reached `defenders: 19, total: 19` — a substantial real force, against
+`landmarks.CREWS.casino`'s own named theoretical ceiling of 39 real
+seats (dealer 20, pitboss 4, cashier 6, bookmaker 3, manager 2,
+surveillance 4) once fully staffed. `occupations.postFor('business')`
+is deliberately `null` — a casino's own real operating org type — so
+a correctly-operated casino has NO specialist chokepoint at all; its
+real difficulty is pure headcount, which is the honest reading of
+"heavy composition" for a floor about numbers of guards, not one rare
+specialist.
+
+**A real, confirmed, reproducible defect was found while taking this
+measurement, and is named here rather than silently worked around or
+silently fixed as a drive-by change outside this task's own scope.**
+Across several real generated worlds with `institutionStaffing: true`,
+a casino property's own `operating_organization_id` was repeatedly
+observed pointing at an ALREADY-EXISTING, differently-typed
+organization (a real hospital's own "City 1 Infirmary," a real
+school's own org) rather than a fresh `type: 'business'` one — so
+`compositionFor`'s own specialist requirement read `physician`/
+`teacher` for a casino, which is wrong on its face. The organization
+in question operates only the ONE casino property (confirmed directly
+— not a double-booking), which means the real defect is upstream, in
+`worldgen.js`'s own landmark-business-generation pass misattributing
+an already-created organization to a later, unrelated property rather
+than generating a fresh one for it. **Not fixed here** — this is a
+real, separate `worldgen.js` defect this task did not introduce and
+is not scoped to repair; named so it is not lost the way the
+twenty-second standing rule's own ignored-file lesson warns against.
+
+**`casino.js#registerItems` closes `discovery.js`'s own already-
+declared gap, word for word: "there is no 'cash'/'chips' item
+category anywhere in §26's real twenty... `luxury goods` is the
+closest real fit for a gaming chip's actual economic role."** A real
+`Gaming Chip` item (category `luxury goods`, origin `remnant`) is
+registered through the identical `worldState.barterItems` extension
+point `weapons.js`/`salvage.js`/`produce.js`/`media.js`'s walkie-
+talkie already use, idempotent by name. **No change to
+`discovery.js`'s own `POOLS.casino` entry was needed at all** —
+`search`'s own real resolution filters the WHOLE catalogue by
+category (`items.itemsFor(worldState).filter((i) => i.category ===
+category)`), confirmed by reading that function directly before
+writing this, so a real item in an already-listed category becomes
+findable with zero changes to the pool table. Wired into
+`worldgen.js`'s and `restore.js`'s own registration passes, same
+call-site convention every other catalogue extension already follows.
+
+**`attemptInsideJob` is a real, self-contained alternative to
+brute-force takeover, not a discount bolted onto `control.js`'s own
+composition system.** Touching `control.assess`/`attempt` to grant a
+takeover-specific bonus was considered and rejected: that function is
+heavily tested, central, and already correctly calibrated (the
+seventeenth standing rule's own four-attempt case study), and grafting
+an untested discount onto it risks re-breaking exactly the balance
+that work fixed. Instead, a real casino employee (confirmed via
+`economy.getEmployment` against the SPECIFIC casino's own house
+organization, never any employee anywhere) can be approached by a
+real requester, gated by the identical real `leadership.complianceDraw`
+primitive this engine already uses everywhere for "will this person
+actually cooperate" — their own real `relationships.loyalty` toward
+the requester, plus the requester's own Fear Factor, the same formula
+`directMission`/`assignRole`/`sendSpy` already trust. On compliance, a
+flat, named, interpretive `INSIDE_JOB_SKIM_FRACTION` (2%) of the
+house's own CURRENT real `organizations.assets` moves into the
+requester's own `individual_finances.savings` — scaled to whatever the
+house's real size happens to be, never a flat sum that would be
+meaningless against a small casino and trivial against a huge one,
+the same restraint `salvage.js`'s own "quantities are small and
+deliberately so" already holds. A new `attempt-inside-job` player
+verb.
+
+8 new tests (`test/casino.test.js`): `registerItems`'s own idempotence
+and no-array-yet cases, a refusal for a candidate who is not a real
+employee of THIS specific casino, the two deterministic ends of the
+real compliance draw (full loyalty always complies and moves the real
+money; zero loyalty never does and moves none), confirmed on both
+sides of the ledger each time.
+
 **A hundred-and-ninety-fourth, closing task #64 — the real "mechanics
 included, not only data" half of the casino system, under this file's
 own standing override of the gambling/casino compliance gate.**

@@ -134,6 +134,7 @@ const veteranPacks = require('./veteranPacks.js');
 const buildingPacks = require('./buildingPacks.js');
 const merchandise = require('./merchandise.js');
 const weapons = require('./weapons.js');
+const casino = require('./casino.js');
 const worldStore = require('./worldStore.js');
 const characterCreation = require('./characterCreation.js');
 const hiddenCaches = require('./hiddenCaches.js');
@@ -3275,6 +3276,11 @@ function generateWorld(options = {}) {
   // with a pile of scrap. See `weapons.js`'s own header for the three
   // interpretive calls this closes.
   summary.weaponsItems = weapons.registerItems(w);
+  // **Task #65's real gaming chip — see `casino.js`'s own header.**
+  // Same posture as every catalogue above, registered through
+  // `worldState.barterItems` so a real casino's own `luxury goods`
+  // discovery pool can actually find one.
+  summary.casinoItems = casino.registerItems(w);
   // **The walkie-talkie, task #199.** Same posture as every catalogue
   // above — registered through `worldState.barterItems`, handed out
   // to nobody at generation.

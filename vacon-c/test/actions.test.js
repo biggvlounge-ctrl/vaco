@@ -80,7 +80,7 @@ test('every verb an action names is one the engine actually supplies', () => {
     actions.REQUIRED_VERBS,
     ['acceptMission', 'addScheduleEvent', 'applyHold', 'applyRecommendedSplit', 'askAround', 'assembleParty', 'assessTakeover', 'assessThreat', 'assignPartyRole', 'assignRole', 'attemptHeist', 'attemptTakeover',
       'beginJourney', 'breakCamp', 'breakDownItem', 'broadcastMessage', 'buildBarricade', 'callBluff', 'canHarvest', 'canMakeThing', 'captureEntity', 'convertCrack', 'dealDrugs', 'demandTribute', 'designateStashHouse', 'directMission', 'disposeOfCapture', 'drawPlay', 'establishCamp', 'findOrCreateContact', 'foundBusiness', 'guessFugitiveLocation', 'guessFugitiveLocationWithParty', 'guessMissingRelationLocation', 'guessMissingRelationLocationWithParty', 'harvest', 'holdMeeting',
-      'importSubstance', 'intimidate', 'investInTarget', 'joinCamp', 'leaveCamp', 'lockProperty', 'makeThing', 'manufactureAmmunition', 'placeWager', 'produceMarijuana', 'quoteTrade',
+      'attemptInsideJob', 'importSubstance', 'intimidate', 'investInTarget', 'joinCamp', 'leaveCamp', 'lockProperty', 'makeThing', 'manufactureAmmunition', 'placeWager', 'produceMarijuana', 'quoteTrade',
       'reinforceHabit', 'releaseFromParty', 'repurposeProperty', 'resolveContest', 'restoreVehicle', 'revealCache', 'runPlay', 'saveLocation', 'searchLocation', 'sendMessage', 'sendSpy',
       'stealVehicle', 'stripBuilding', 'resolveMission', 'studySource', 'tradeWith', 'unlockProperty', 'unsaveLocation'].sort(),
   );

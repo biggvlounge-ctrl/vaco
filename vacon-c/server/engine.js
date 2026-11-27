@@ -1467,6 +1467,7 @@ const ACTION_VERBS = {
   manufactureAmmunition: (...args) => manufactureAmmunition(...args),
   findOrCreateContact: (...args) => findOrCreateContact(...args),
   placeWager: (...args) => placeWager(...args),
+  attemptInsideJob: (...args) => attemptInsideJob(...args),
   intimidate: (...args) => intimidate(...args),
   assessThreat: (...args) => assessThreat(...args),
   callBluff: (...args) => callBluff(...args),
@@ -1875,6 +1876,17 @@ function placeWager(entityId, options = {}) {
   });
 }
 
+// `casino.js#attemptInsideJob`'s player-facing half, task #65 — the
+// actor is the real REQUESTING entity, never the insider themselves
+// (an insider is a real employee `leadership.complianceDraw` decides
+// cooperates or not, named by `insiderEntityId` in the body).
+function attemptInsideJob(entityId, options = {}) {
+  return casino.attemptInsideJob(WorldState, {
+    entityId: options.insiderEntityId, requestingEntityId: entityId,
+    propertyId: options.propertyId, tick: WorldState.tick,
+  });
+}
+
 // ---------------------------------------------------------------------
 // Study — §24, the player-facing half
 // ---------------------------------------------------------------------
@@ -2275,6 +2287,7 @@ module.exports = {
   getMainCharacters,
   findOrCreateContact,
   placeWager,
+  attemptInsideJob,
   vaultStudiosLink,
   vultureLink,
   dreamsLink,

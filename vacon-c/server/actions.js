@@ -932,6 +932,21 @@ const ACTIONS = {
       stake: Number(body.stake),
     }),
   },
+
+  // **`casino.js#attemptInsideJob` — task #65's own "inside jobs."**
+  // The actor is the real requester; `insiderEntityId` names the real
+  // casino employee being approached, never implying the actor
+  // already controls them.
+  'attempt-inside-job': {
+    summary: 'Approach a real employee of an operating casino to skim from the house before any takeover is attempted -- gated on their real loyalty toward you.',
+    modes: ['citizen', 'leader'],
+    requires: ['propertyId', 'insiderEntityId'],
+    verbs: ['attemptInsideJob'],
+    run: (verbs, actorId, body) => verbs.attemptInsideJob(actorId, {
+      propertyId: Number(body.propertyId),
+      insiderEntityId: Number(body.insiderEntityId),
+    }),
+  },
 };
 
 const ACTION_NAMES = Object.keys(ACTIONS);

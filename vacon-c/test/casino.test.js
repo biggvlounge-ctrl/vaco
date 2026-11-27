@@ -14,6 +14,7 @@ const assert = require('node:assert/strict');
 
 const casino = require('../server/casino.js');
 const economy = require('../server/economy.js');
+const worldStore = require('../server/worldStore.js');
 const { getTraitId } = require('../server/traitDefinitions.js');
 
 function world({ tick = 1000 } = {}) {
@@ -25,6 +26,8 @@ function world({ tick = 1000 } = {}) {
     individualFinances: [],
     entityTraits: [],
     historicalRecords: [],
+    employmentRecords: [],
+    relationships: [],
   };
   economy.reseedIds(w);
   return w;
@@ -208,4 +211,88 @@ test('a winning wager pays the real stake back plus even money from the house\'s
     }
   }
   assert.ok(row, 'no winning roulette draw happened across 2000 real seeded ticks');
+});
+
+// ---------------------------------------------------------------------
+// Task #65 — a real gaming-chip item, closing discovery.js's own
+// declared gap
+// ---------------------------------------------------------------------
+
+test('registerItems adds a real Gaming Chip item once, idempotent by name', () => {
+  const w = world();
+  w.barterItems = [];
+  const added = casino.registerItems(w);
+  assert.equal(added, 1);
+  assert.ok(w.barterItems.some((i) => i.name === casino.GAMING_CHIP_ITEM && i.category === 'luxury goods'));
+
+  const addedAgain = casino.registerItems(w);
+  assert.equal(addedAgain, 0, 'registering a second time duplicated the real item');
+  assert.equal(w.barterItems.filter((i) => i.name === casino.GAMING_CHIP_ITEM).length, 1);
+});
+
+test('registerItems works on a world with no real barterItems array at all yet', () => {
+  const w = world();
+  assert.equal(w.barterItems, undefined);
+  const added = casino.registerItems(w);
+  assert.equal(added, 1);
+  assert.ok(Array.isArray(w.barterItems));
+});
+
+// ---------------------------------------------------------------------
+// Task #65 — inside jobs
+// ---------------------------------------------------------------------
+
+function employ(w, { entityId, organizationId, position = 'dealer' }) {
+  w.employmentRecords.push({
+    entity_id: entityId, employer_organization_id: organizationId, status: 'active', position,
+  });
+}
+
+test('attemptInsideJob refuses a candidate who is not a real current employee of this specific casino', () => {
+  const w = world();
+  const house = houseOrg(w, { id: 50 });
+  const otherHouse = houseOrg(w, { id: 51 });
+  casinoProperty(w, { id: 10, operatingOrganizationId: house.id });
+  person(w, { id: 2 });
+  employ(w, { entityId: 2, organizationId: otherHouse.id });
+
+  assert.throws(
+    () => casino.attemptInsideJob(w, { entityId: 2, requestingEntityId: 1, propertyId: 10 }),
+    /not a real current employee/,
+  );
+});
+
+test('a maximally loyal real employee always complies with a real requester, skimming a real, bounded fraction of the house\'s own assets', () => {
+  const w = world();
+  const house = houseOrg(w, { id: 50, assets: 100000 });
+  casinoProperty(w, { id: 10, operatingOrganizationId: house.id });
+  person(w, { id: 1 }); // the requester
+  person(w, { id: 2 }); // the insider
+  employ(w, { entityId: 2, organizationId: house.id });
+  worldStore.getOrCreateRelationship(w, 1, 2, 'social').loyalty = 100;
+
+  const result = casino.attemptInsideJob(w, { entityId: 2, requestingEntityId: 1, propertyId: 10, tick: 1000 });
+
+  assert.equal(result.complied, true);
+  assert.equal(result.skimmed, Math.round(100000 * casino.INSIDE_JOB_SKIM_FRACTION));
+  assert.equal(house.assets, 100000 - result.skimmed);
+  assert.equal(economy.getLatestFinances(w, 1).savings, result.skimmed);
+  assert.ok(w.historicalRecords.some((r) => r.event_type === 'casino_inside_job'));
+});
+
+test('a zero-loyalty real employee never complies, and no real money moves on a refusal', () => {
+  const w = world();
+  const house = houseOrg(w, { id: 50, assets: 100000 });
+  casinoProperty(w, { id: 10, operatingOrganizationId: house.id });
+  person(w, { id: 1 });
+  person(w, { id: 2 });
+  employ(w, { entityId: 2, organizationId: house.id });
+  worldStore.getOrCreateRelationship(w, 1, 2, 'social').loyalty = 0;
+
+  const result = casino.attemptInsideJob(w, { entityId: 2, requestingEntityId: 1, propertyId: 10, tick: 1000 });
+
+  assert.equal(result.complied, false);
+  assert.equal(result.skimmed, 0);
+  assert.equal(house.assets, 100000, 'a refused inside job still moved the house\'s own real money');
+  assert.equal(economy.getLatestFinances(w, 1).savings, 0, 'a refused inside job still credited the requester with money');
 });

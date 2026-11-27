@@ -58,8 +58,58 @@
 
 const economy = require('./economy.js');
 const contest = require('./contest.js');
+const leadership = require('./leadership.js');
 const worldStore = require('./worldStore.js');
 const { seededDraw } = require('./seeded.js');
+
+// ---------------------------------------------------------------------
+// Task #65 — a real item for "post-collapse casino money/chips"
+// ---------------------------------------------------------------------
+// `discovery.js`'s own `casino` pool already names the real gap
+// directly: "there is no 'cash'/'chips' item category anywhere in
+// §26's real twenty... `luxury goods` is the closest real fit for a
+// gaming chip's actual economic role (a high-value token), not a
+// literal claim that chips and luxury goods are the same real-world
+// thing." Registered through the identical `worldState.barterItems`
+// extension point `weapons.js`/`salvage.js`/`produce.js` already use,
+// idempotent by name. `discovery.js`'s own pool resolution filters the
+// WHOLE real catalogue by category (`items.itemsFor(worldState)
+// .filter((i) => i.category === category)`), so a real `Gaming Chip`
+// item in `luxury goods` becomes findable at a casino with no change
+// to that file's own `POOLS.casino` entry at all. Origin `remnant`:
+// nobody mints new chips once the mint that issued them is gone, the
+// same finite-stock reasoning `items.js` already gives a cut diamond.
+const GAMING_CHIP_ITEM = 'Gaming Chip';
+
+function registerItems(worldState) {
+  if (!Array.isArray(worldState.barterItems)) worldState.barterItems = [];
+  if (worldState.barterItems.some((i) => i?.name === GAMING_CHIP_ITEM)) return 0;
+  worldState.barterItems.push({ name: GAMING_CHIP_ITEM, category: 'luxury goods', origin: 'remnant' });
+  return 1;
+}
+
+// ---------------------------------------------------------------------
+// Task #65 — inside jobs
+// ---------------------------------------------------------------------
+// A real casino employee, approached by a real requesting entity, can
+// skim from the house's own real `organizations.assets` before any
+// outright takeover is even attempted — an alternative to brute-force
+// composition, the real "inside man" GTA-style casino-heist beat.
+// Compliance is the identical real primitive this engine already uses
+// everywhere for "will this person actually cooperate":
+// `leadership.complianceDraw`, gated on the employee's own real
+// `relationships.loyalty` toward the requester (and their fear of
+// them) — never a guaranteed defection, for the same reason every
+// other directive in this engine is a real probability draw rather
+// than an invented certainty.
+//
+// A flat, named, interpretive fraction — `INSIDE_JOB_SKIM_FRACTION`
+// — not a bankrupting one: the same restraint `salvage.js`'s own
+// "quantities are small and deliberately so" already holds, scaled
+// to whatever the house's real current assets happen to be rather
+// than a flat sum that would be meaningless against a tiny casino
+// and trivial against a huge one.
+const INSIDE_JOB_SKIM_FRACTION = 0.02;
 
 const GAMES = {
   // American double-zero roulette's EXACT mathematical edge (2 losing
@@ -202,12 +252,71 @@ function wagersBy(worldState, entityId) {
   return (worldState.casinoWagerEvents || []).filter((r) => r.entityId === entityId);
 }
 
+// The candidate must be a REAL, currently active employee of THIS
+// casino's own house — never any employee anywhere, which would let
+// a stranger claim insider access to a building they have never
+// worked in.
+function attemptInsideJob(worldState, options = {}) {
+  const {
+    entityId, requestingEntityId, propertyId, tick = worldState.tick ?? 0,
+  } = options;
+
+  if (!entityId) throw new Error('attemptInsideJob requires an entityId');
+  if (!requestingEntityId) throw new Error('attemptInsideJob requires a requestingEntityId');
+
+  const house = casinoHouseFor(worldState, propertyId);
+  const employment = economy.getEmployment(worldState, entityId);
+  if (!employment || employment.employer_organization_id !== house.id) {
+    throw new Error(`attemptInsideJob: entity ${entityId} is not a real current employee of this casino`);
+  }
+
+  const { complied, gatingValue, complianceChance } = leadership.complianceDraw(
+    worldState, requestingEntityId, entityId, 'casino-inside-job', tick,
+  );
+
+  if (!complied) {
+    return {
+      entityId, requestingEntityId, propertyId, houseOrganizationId: house.id,
+      complied, gatingValue, complianceChance, skimmed: 0,
+    };
+  }
+
+  const skimmed = Math.round((Number(house.assets) || 0) * INSIDE_JOB_SKIM_FRACTION);
+  house.assets = (Number(house.assets) || 0) - skimmed;
+
+  const finances = economy.getLatestFinances(worldState, requestingEntityId);
+  economy.generateIndividualFinances(worldState, requestingEntityId, {
+    income: finances?.income ?? 0,
+    savings: (Number(finances?.savings) || 0) + skimmed,
+    debt: finances?.debt ?? 0,
+    assets: finances?.assets ?? 0,
+    tick,
+  });
+
+  worldStore.addHistoricalRecord(worldState, {
+    event_type: 'casino_inside_job',
+    description: `a real insider at ${house.name} skims ${skimmed} before any takeover is attempted`,
+    when_tick: tick,
+    participants: [entityId, requestingEntityId],
+    where_location_id: propertyId,
+  });
+
+  return {
+    entityId, requestingEntityId, propertyId, houseOrganizationId: house.id,
+    complied, gatingValue, complianceChance, skimmed,
+  };
+}
+
 module.exports = {
   GAMES,
   GAME_NAMES,
+  GAMING_CHIP_ITEM,
+  INSIDE_JOB_SKIM_FRACTION,
+  registerItems,
   skillModulatorFor,
   winChanceFor,
   casinoHouseFor,
   placeWager,
   wagersBy,
+  attemptInsideJob,
 };
