@@ -413,7 +413,67 @@ function groupCohesionMultiplierFor(worldState, entityId) {
   return 0.5 + Math.max(...scores);
 }
 
-function driftExperience(worldState, entityId, tick, index = null, groupMultiplier = 1) {
+// ---------------------------------------------------------------------
+// combatTrainingMultiplierFor — task #182, by direct backlog
+// instruction: "a real military-trained member boosts an org's
+// combat-training rate"
+// ---------------------------------------------------------------------
+// Scoped to the ONE habit this file already models as real combat
+// practice — `sparring` (`EXERCISES.sparring`, "a real fight, not a
+// friendly game") — never `groupCohesionMultiplierFor`'s own flat,
+// every-habit rate. A veteran teaching a crew real tactics makes them
+// better fighters; it does not make them better accountants or more
+// rested, so this multiplies only `sparring`'s own contribution rather
+// than widening `groupCohesionMultiplierFor`'s scope to cover it.
+//
+// "Military-trained" is `occupations.officer` — checked directly
+// before reusing it: the taxonomy's own one Tier-5 occupation sourced
+// from "military tactics" with the `Combat` skill, named separately
+// from `enforcer`/`guard` (law enforcement) precisely so it means a
+// military background and nothing else. A real member of this
+// person's own real organization holding that occupation — or the
+// organization's own real `leader_id`, who may hold no separate
+// `entityOrganizationMemberships` row — is the one real signal
+// checked; everybody else in that same real organization gets the
+// benefit of training alongside them.
+//
+// MAX, not a count or an average, the same "whichever real group
+// actually has one" shape `groupCohesionMultiplierFor` already uses:
+// belonging to a second organization with no real veteran in it does
+// not dilute the benefit of training inside the one that has one.
+//
+// **A flat, named, honestly-flagged interpretive figure, not a
+// continuous real measurement** — unlike cohesion, which is already a
+// real stored 0..1 score this file reads rather than invents, "is
+// there a real veteran in this room" is binary and has no comparable
+// real scale to map onto a multiplier. Kept inside the same 0.5-1.5
+// band `groupCohesionMultiplierFor`'s own real range already
+// establishes for a rate-changing factor in this file, rather than a
+// second, differently-scaled constant with no real reference either.
+const COMBAT_TRAINING_BOOST = 1.25;
+function combatTrainingMultiplierFor(worldState, entityId) {
+  // eslint-disable-next-line global-require
+  const occupations = require('./occupations.js');
+  // eslint-disable-next-line global-require
+  const membership = require('./membership.js');
+
+  const orgIds = membership.organizationsOf(worldState, entityId).map((o) => o.id);
+  for (const orgId of orgIds) {
+    const org = (worldState.organizations || []).find((o) => o.id === orgId);
+    const candidateIds = new Set(membership.membersOf(worldState, orgId).map((n) => n.id));
+    if (org && org.leader_id != null) candidateIds.add(Number(org.leader_id));
+    for (const candidateId of candidateIds) {
+      if (occupations.occupationOf(worldState, candidateId) === 'officer') {
+        return COMBAT_TRAINING_BOOST;
+      }
+    }
+  }
+  return 1;
+}
+
+function driftExperience(
+  worldState, entityId, tick, index = null, groupMultiplier = 1, combatMultiplier = 1,
+) {
   const rows = rowsFor(worldState, entityId, index);
   if (rows.length === 0) return 0;
 
@@ -423,9 +483,15 @@ function driftExperience(worldState, entityId, tick, index = null, groupMultipli
     const targets = occupationExercise(worldState, entityId, habit.habit_name);
     if (!targets) continue;
     const share = clamp(Number(habit.strength) / 100, 0, 1);
+    // Task #182: applied per-HABIT at accumulation time, never to
+    // the final per-trait pressure -- sparring and compete both
+    // exercise physical.Stamina, and multiplying the combined
+    // pressure would wrongly boost a stamina gain that came from
+    // playing a game, not training alongside a real veteran.
+    const habitMultiplier = habit.habit_name === 'sparring' ? combatMultiplier : 1;
     for (const [family, name, sign = 1] of targets) {
       const key = `${family} ${name}`;
-      exercised.set(key, (exercised.get(key) ?? 0) + share * sign);
+      exercised.set(key, (exercised.get(key) ?? 0) + share * sign * habitMultiplier);
     }
   }
 
@@ -698,6 +764,7 @@ function runTraitDrift(worldState, options = {}) {
   for (const npc of worldState.npcs || []) {
     moved += driftExperience(
       worldState, npc.id, tick, index, groupCohesionMultiplierFor(worldState, npc.id),
+      combatTrainingMultiplierFor(worldState, npc.id),
     );
     moved += driftEnvironment(
       worldState, npc.id, tick,
@@ -751,6 +818,8 @@ module.exports = {
   recompute,
   occupationExercise,
   groupCohesionMultiplierFor,
+  COMBAT_TRAINING_BOOST,
+  combatTrainingMultiplierFor,
   driftExperience,
   driftEnvironment,
   driftRelationships,

@@ -2667,6 +2667,26 @@ one pre-existing exact-equality test and one other file's "maximally
 influential" fixture updated to account for the two new real terms.
 See CLAUDE.md's hundred-and-ninety-first standing rule.
 
+### Real military-trained member boosts an org's combat-training rate (closes task #182)
+Reuses task #17's training/cohesion loop rather than starting a
+second one. `combatTrainingMultiplierFor` checks every real
+organization an entity belongs to for a real `officer` (the real
+military-trained signal — tier 5, skill `Combat`, source "military
+tactics") among its members OR its leader, MAX across groups, the
+same shape `groupCohesionMultiplierFor` already takes. Scoped to the
+one habit the task names, not the uniform `groupMultiplier`:
+`sparring` and `compete` both exercise the shared trait
+`physical.Stamina`, so `combatMultiplier` applies only inside the
+`exercised` accumulation loop, per-habit, when
+`habit.habit_name === 'sparring'` — every other habit's contribution
+to a shared trait is untouched. `COMBAT_TRAINING_BOOST = 1.25` is a
+flat, named, interpretive figure inside the same 0.5-1.5 band
+cohesion's own real score already uses. A genuine, narrow, pre-
+existing NUL byte in the `exercised` Map's key separator was found,
+confirmed with `od -c`, and left exactly as-is (unrelated to this
+task, causes no bug). 8 new tests. See CLAUDE.md's hundred-and-
+ninety-second standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

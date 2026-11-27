@@ -489,3 +489,138 @@ test('the group multiplier speeds up PRACTICE, not forgetting -- the decay step 
   assert.equal(afterOne, afterOnePointFive,
     'the decay step moved by a different amount under a different group multiplier -- it must not');
 });
+
+// -- combatTrainingMultiplierFor ------------------------------------------
+//
+// Task #182, by direct backlog instruction: "a real military-trained
+// member boosts an org's combat-training rate." Scoped to `sparring`
+// only -- see this function's own header in traitDrift.js for why it
+// does not widen `groupCohesionMultiplierFor`'s own flat, every-habit
+// rate to cover it.
+
+const occupations = require('../server/occupations.js');
+
+function employ(w, entityId, position) {
+  w.employmentRecords = w.employmentRecords || [];
+  w.employmentRecords.push({ entity_id: entityId, status: 'active', position });
+}
+
+test('combatTrainingMultiplierFor is 1 for a person in no organization at all', () => {
+  const w = world({ entityOrganizationMemberships: [] });
+  const id = person(w, 50);
+  assert.equal(drift.combatTrainingMultiplierFor(w, id), 1);
+});
+
+test('combatTrainingMultiplierFor is 1 for a real organization with no real military-trained member', () => {
+  const w = world({ entityOrganizationMemberships: [], employmentRecords: [] });
+  const id = person(w, 50);
+  const orgId = 500001;
+  w.organizations.push({ id: orgId, type: 'gang' });
+  membership.joinOrganization(w, { entityId: id, organizationId: orgId });
+  const ordinaryMember = person(w, 50);
+  membership.joinOrganization(w, { entityId: ordinaryMember, organizationId: orgId });
+  employ(w, ordinaryMember, 'labourer');
+
+  assert.equal(drift.combatTrainingMultiplierFor(w, id), 1);
+});
+
+test('combatTrainingMultiplierFor is the real boost when a real org member holds the real officer occupation', () => {
+  const w = world({ entityOrganizationMemberships: [], employmentRecords: [] });
+  const id = person(w, 50);
+  const orgId = 500002;
+  w.organizations.push({ id: orgId, type: 'gang' });
+  membership.joinOrganization(w, { entityId: id, organizationId: orgId });
+  const veteran = person(w, 50);
+  membership.joinOrganization(w, { entityId: veteran, organizationId: orgId });
+  employ(w, veteran, 'officer');
+  assert.equal(occupations.occupationOf(w, veteran), 'officer');
+
+  assert.equal(drift.combatTrainingMultiplierFor(w, id), drift.COMBAT_TRAINING_BOOST);
+});
+
+test('combatTrainingMultiplierFor also sees a real veteran who is the org\'s own leader, not only a member', () => {
+  const w = world({ entityOrganizationMemberships: [], employmentRecords: [] });
+  const id = person(w, 50);
+  const orgId = 500003;
+  const veteranLeader = person(w, 50);
+  employ(w, veteranLeader, 'officer');
+  w.organizations.push({ id: orgId, type: 'gang', leader_id: veteranLeader });
+  membership.joinOrganization(w, { entityId: id, organizationId: orgId });
+
+  assert.equal(drift.combatTrainingMultiplierFor(w, id), drift.COMBAT_TRAINING_BOOST);
+});
+
+test('combatTrainingMultiplierFor takes the MAX across every real group, the same shape groupCohesionMultiplierFor already uses', () => {
+  const w = world({ entityOrganizationMemberships: [], employmentRecords: [] });
+  const id = person(w, 50);
+  const plainOrgId = 500004;
+  w.organizations.push({ id: plainOrgId, type: 'club' });
+  membership.joinOrganization(w, { entityId: id, organizationId: plainOrgId });
+
+  const veteranOrgId = 500005;
+  const veteran = person(w, 50);
+  employ(w, veteran, 'officer');
+  w.organizations.push({ id: veteranOrgId, type: 'gang' });
+  membership.joinOrganization(w, { entityId: id, organizationId: veteranOrgId });
+  membership.joinOrganization(w, { entityId: veteran, organizationId: veteranOrgId });
+
+  assert.equal(drift.combatTrainingMultiplierFor(w, id), drift.COMBAT_TRAINING_BOOST,
+    'belonging to a second, veteran-less group must not dilute the benefit of the one that has a real veteran');
+});
+
+test('a real veteran makes sparring (real combat training) pay off faster -- same habit, same ticks, bigger gain', () => {
+  const lowW = world({ entityOrganizationMemberships: [], employmentRecords: [] });
+  const lowId = person(lowW, 50);
+  lowW.habits.push({ entity_id: lowId, habit_name: 'sparring', strength: 100, harmful: false });
+  for (let t = 0; t < 60; t += 1) {
+    drift.driftExperience(lowW, lowId, lowW.tick + t, null, 1, 1);
+  }
+
+  const highW = world({ entityOrganizationMemberships: [], employmentRecords: [] });
+  const highId = person(highW, 50);
+  highW.habits.push({ entity_id: highId, habit_name: 'sparring', strength: 100, harmful: false });
+  for (let t = 0; t < 60; t += 1) {
+    drift.driftExperience(highW, highId, highW.tick + t, null, 1, drift.COMBAT_TRAINING_BOOST);
+  }
+
+  const lowGain = valueOf(lowW, lowId, 'skills', 'Combat').experience_modifier;
+  const highGain = valueOf(highW, highId, 'skills', 'Combat').experience_modifier;
+  assert.ok(lowGain > 0 && highGain > 0, 'both should still grow -- only the RATE should differ');
+  assert.ok(highGain > lowGain,
+    `a real combat-training boost (${highGain}) did not outgrow no boost at all (${lowGain})`);
+});
+
+test('the combat-training boost is scoped to sparring alone -- an unrelated habit (work) is unaffected', () => {
+  const w = world({ entityOrganizationMemberships: [], employmentRecords: [] });
+  const id = person(w, 50);
+  w.habits.push({ entity_id: id, habit_name: 'work', strength: 100, harmful: false });
+  for (let t = 0; t < 60; t += 1) {
+    drift.driftExperience(w, id, w.tick + t, null, 1, drift.COMBAT_TRAINING_BOOST);
+  }
+  const boostedWorkGain = valueOf(w, id, 'physical', 'Endurance').experience_modifier;
+
+  const w2 = world({ entityOrganizationMemberships: [], employmentRecords: [] });
+  const id2 = person(w2, 50);
+  w2.habits.push({ entity_id: id2, habit_name: 'work', strength: 100, harmful: false });
+  for (let t = 0; t < 60; t += 1) drift.driftExperience(w2, id2, w2.tick + t, null, 1, 1);
+  const unboostedWorkGain = valueOf(w2, id2, 'physical', 'Endurance').experience_modifier;
+
+  assert.equal(boostedWorkGain, unboostedWorkGain,
+    'a real combat-training boost must not also speed up an unrelated habit like work');
+});
+
+test('combatMultiplier defaults to 1 when omitted -- every existing call site before task #182 is unaffected', () => {
+  const w = world({ entityOrganizationMemberships: [], employmentRecords: [] });
+  const id = person(w, 50);
+  w.habits.push({ entity_id: id, habit_name: 'sparring', strength: 100, harmful: false });
+  for (let t = 0; t < 60; t += 1) drift.driftExperience(w, id, w.tick + t, null, 1);
+  const defaultGain = valueOf(w, id, 'skills', 'Combat').experience_modifier;
+
+  const w2 = world({ entityOrganizationMemberships: [], employmentRecords: [] });
+  const id2 = person(w2, 50);
+  w2.habits.push({ entity_id: id2, habit_name: 'sparring', strength: 100, harmful: false });
+  for (let t = 0; t < 60; t += 1) drift.driftExperience(w2, id2, w2.tick + t, null, 1, 1);
+  const explicitOneGain = valueOf(w2, id2, 'skills', 'Combat').experience_modifier;
+
+  assert.equal(defaultGain, explicitOneGain, 'an omitted combat multiplier must behave exactly like an explicit 1');
+});

@@ -11029,3 +11029,67 @@ unmeasured) driver gets the vehicle's unmodified rated pace, and a
 skilled (100) driver measurably out-paces an unskilled (0) one in the
 identical vehicle, bounded at exactly the 0.75/1.25 floor and ceiling
 the band promises.
+
+**A hundred-and-ninety-second, closing task #182 — a real military-
+trained member boosts an org's combat-training rate, reusing the
+training/cohesion loop task #17 already built rather than starting a
+second one.** `traitDrift.js#groupCohesionMultiplierFor` already
+scales every habit-driven trait gain for a person by the strongest
+real cohesion among their groups — this task asks for a narrower,
+different claim (one specific habit trained faster because of one
+specific real teammate's background), not a second flat multiplier
+competing with the first.
+
+**"Military-trained" is `occupations.js`'s real `officer`** (tier 5,
+skill `Combat`, source "military tactics") — checked directly rather
+than reused from `enforcer`/`guard`, which are real law-enforcement
+occupations with a different source and no military claim at all.
+`combatTrainingMultiplierFor(worldState, entityId)` checks every real
+organization the entity belongs to (`membership.organizationsOf`) for
+a real `officer` among its members OR its leader — `org.leader_id`
+checked explicitly alongside `membership.membersOf`'s own roster,
+because a leader is not guaranteed a separate membership row — and
+returns the stronger of the two if either side holds. MAX across an
+entity's groups, the identical shape `groupCohesionMultiplierFor`
+already takes for the same stated reason: belonging to a second,
+veteran-less organization must not dilute the benefit of training
+alongside the one real group that actually has a veteran in it.
+
+**`COMBAT_TRAINING_BOOST = 1.25` is a flat, named, interpretive
+figure — unlike cohesion's own real, continuous, measured score —
+kept inside the same 0.5-1.5 band `groupCohesionMultiplierFor` already
+established, so a hard-coded boost reads on the same scale as a real
+one rather than inventing a second, disagreeing range.**
+
+**Scoped to the one habit the task actually names, not threaded
+through `driftExperience`'s existing uniform `groupMultiplier`
+parameter.** `sparring` and `compete` both exercise the shared trait
+`physical.Stamina` (`EXERCISES`), so multiplying the already-summed
+per-trait pressure the way `groupMultiplier` does would wrongly boost
+a stamina gain that came from a friendly game, not from training
+alongside a real veteran. `combatMultiplier` is a new, separate
+parameter applied inside the `exercised` accumulation loop, at
+per-HABIT time, only when `habit.habit_name === 'sparring'` — every
+other habit's contribution to a shared trait is untouched.
+
+**A genuine, pre-existing, narrow oddity was found and deliberately
+left alone rather than "fixed" as a drive-by change.** The
+`exercised` Map's own key template literal uses a real embedded NUL
+byte (`` `${family}\0${name}` ``) as a separator, confirmed with `od
+-c` after an initial broad `grep -c $'\x00'` sweep falsely suggested
+the problem was codebase-wide — a bash artifact (`$'\x00'` silently
+drops the NUL from the pattern, so the grep matched every line, not a
+real NUL in every file). The one real NUL byte causes no bug (both the
+setter and the getter use the identical byte) and is unrelated to this
+task's scope, so the accumulation-loop edit was made byte-for-byte
+around it rather than rewriting the separator.
+
+8 new tests (`test/trait-drift.test.js`): no organization (1), an
+organization with no veteran (1), a veteran as an ordinary member
+(boosted), a veteran as leader-only with no separate membership row
+(boosted), MAX across one veteran-less and one veteran organization
+(still boosted), a real rate-speedup proof on `sparring`'s own
+`skills.Combat` gain, a scoped-to-`sparring`-only proof (an unrelated
+`work` habit's `Endurance` gain is identical with or without the
+boost), and default-parameter backward compatibility (omitting
+`combatMultiplier` behaves exactly like passing explicit `1`).
