@@ -3112,3 +3112,25 @@ below it did, speech stopped when scrolled away, and a real "Talk"
 produced a real `"Oh -- hello."` through the actual player dispatcher.
 Full suite re-run clean after: 2978 tests, 0 fail. See CLAUDE.md's
 two-hundred-and-ninth standing rule's own correction.
+
+### A real objectives/checklist system -- hundreds of concrete things to do (closes task #106)
+Never a second, invented quest list. `server/objectives.js#objectivesFor`
+is a real, computed-live read over exactly five action types whose
+validity is fully captured by "the target exists," not a guess at the
+other sixty-plus registered actions that each need their own real
+domain-specific validity check (`attempt-heist`'s crew/asset
+threshold, `attempt-takeover`'s composition math). The five:
+`talk-to`/`ask-around` (any other real living NPC), `search-location`
+(reuses `discovery.searchableIn` directly across every real
+community), `accept-mission` (mirrors `listMissions({status:
+'available'})` exactly), and `consult-heist` (a pure, non-mutating
+read, offered only once the entity genuinely holds a real
+organization or family membership to consult as --
+`heists.js#consultBeforeHeist` throws without exactly one of those,
+caught before this shipped). "Hundreds" is what these five produce
+crossed with a real, populated world -- a fresh, empty world honestly
+returns none. New `GET /api/players/:id/objectives` route, same shape
+as `study-sources`/`survival-status`/`tutorial-progress`. 9 new tests
+in `test/objectives.test.js`, 1 new live-HTTP test in
+`test/routes.test.js`. See CLAUDE.md's two-hundred-and-tenth standing
+rule.

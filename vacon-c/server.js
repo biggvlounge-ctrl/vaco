@@ -1168,6 +1168,21 @@ app.get('/api/players/:id/tutorial-progress', (req, res) => {
   }
 });
 
+// Task #106 — a real, computed-live list of concrete things this
+// player could do right now. Same shape as `study-sources`/
+// `survival-status`/`tutorial-progress`: a read, resolved off the
+// player's own linked entity, never cached.
+app.get('/api/players/:id/objectives', (req, res) => {
+  const player = (engine.WorldState.players || []).find((p) => p.id === Number(req.params.id));
+  if (!player) return res.status(404).json({ error: `no player with id ${req.params.id}` });
+  try {
+    const limit = req.query.limit !== undefined ? Number(req.query.limit) : undefined;
+    return res.json(engine.objectivesFor(player.linked_entity_id, { limit }));
+  } catch (err) {
+    return res.status(404).json({ error: err.message });
+  }
+});
+
 // Task #97 — every location this player has bookmarked, each with
 // `control.assess`'s own real requirements card computed LIVE. Same
 // shape as `study-sources`/`survival-status`/`tutorial-progress`:

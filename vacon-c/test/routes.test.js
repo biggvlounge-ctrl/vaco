@@ -1244,6 +1244,23 @@ test('trade is offered, and a real HTTP caller can price or attempt one with a r
     assert.match(result.reason, /holds none/);
   });
 
+test('objectives answers a real, live read over HTTP, bounded by a real limit', { skip: SKIP }, async () => {
+  const { npc } = await (await post('/npc/generate')).json();
+  const { npc: other } = await (await post('/npc/generate')).json();
+  const player = await (await post('/players', { linkedEntityId: npc.id })).json();
+
+  const full = await (await get(`/players/${player.id}/objectives`)).json();
+  assert.ok(full.total >= 2, 'at least talk-to and ask-around for the real other NPC');
+  assert.ok(full.objectives.some((o) => o.action === 'talk-to' && o.params.npcEntityId === other.id));
+  assert.ok(!full.objectives.some((o) => o.params.npcEntityId === npc.id), 'never a target naming yourself');
+
+  const bounded = await (await get(`/players/${player.id}/objectives?limit=1`)).json();
+  assert.equal(bounded.objectives.length, 1);
+  assert.equal(bounded.total, full.total);
+
+  assert.equal((await get('/players/999999/objectives')).status, 404);
+});
+
 test('survival-status answers a real, live read over HTTP', { skip: SKIP }, async () => {
   const { npc } = await (await post('/npc/generate')).json();
   const player = await (await post('/players', { linkedEntityId: npc.id })).json();

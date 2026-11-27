@@ -12320,3 +12320,66 @@ between two brand-new strangers) through the actual
 this frontend has ever sent through `talk-to`. Full suite re-run
 after: 2978 tests, 0 fail, 6 cancelled, 17 skipped — unchanged, since
 nothing server-side moved.
+
+**A two-hundred-and-tenth, closing task #106 — "a real, large
+objectives/checklist system (hundreds of concrete things to do)."**
+Never a second, invented quest list: `server/objectives.js#objectivesFor`
+is a real, computed-live read (the same posture
+`tutorialMissions.tutorialProgressFor` already holds for "where am I
+in this") over exactly the action types whose real validity is fully
+captured by "the target exists" — and no others.
+
+**Deliberately five, not sixty-plus.** `actions.js`'s own `ACTIONS`
+registry names well over sixty verbs; most need a real, domain-
+specific validity check this module would have to duplicate to avoid
+listing a "concrete thing to do" that is not actually doable —
+`attempt-heist` needs a crew and `heists.js`'s own real asset
+threshold, `attempt-takeover` needs `control.viableTargetsFor`'s own
+composition math. Guessing at validity for those would risk exactly
+the kind of invented, not-really-real checklist entry this project's
+whole discipline exists to catch. So this stays to five:
+`talk-to`/`ask-around` (any other real, living NPC — `worldState.npcs`
+already excludes the dead), `search-location` (reuses
+`discovery.searchableIn` — "everywhere in this area still worth
+searching" — directly, across every real community present, rather
+than a second copy of its `landmark_category`/`poolFor`/`remainingAt`
+filter), `accept-mission` (mirrors `missions.listMissions({status:
+'available'})` exactly), and `consult-heist` (a pure, non-mutating
+read, task #104's own posture).
+
+**`consult-heist` needed a real validity check of its own, caught
+before it shipped rather than after.** `heists.js#consultBeforeHeist`
+throws unless exactly one of `organizationId`/`familyId` is real — so
+a naive "every real organization is a valid consult-heist target"
+would have produced an objective that errors on the first click for
+any entity holding neither. `sponsorContextFor` reads the entity's own
+real `entityOrganizationMemberships`/`familyMemberships` row first;
+with neither, the function returns `null` and this module offers zero
+`consult-heist` objectives — the same "honest nothing" shape task
+#102's Combat-skill-has-no-field case already holds, rather than a
+guess at which organization to consult as.
+
+**"Hundreds" is not a hand-written list — it is what five real action
+types, crossed with a real, populated world, actually produce.** A
+fresh, empty world correctly returns `{ total: 0, objectives: [] }`;
+this is reported honestly rather than padded to look fuller. A
+`limit` option bounds the returned array without lying about
+`total`, so a caller can page through a genuinely large list without
+losing the real count.
+
+New `GET /api/players/:id/objectives` route, same shape as
+`study-sources`/`survival-status`/`tutorial-progress` — a read,
+resolved off the player's own linked entity, never cached. 9 new
+tests in `test/objectives.test.js` and 1 new live-HTTP test in
+`test/routes.test.js`.
+
+**This round's own file and route both moved two real, checked counts
+`test/inventory.test.js` holds `VACANCY_INVENTORY.md` to** — its
+stated server-file count (171 → 172 for `objectives.js`) and its
+stated route count (129 → 130 for the new route, named and footnoted
+the same way every other recent addition already is). Not a
+pre-existing drift this round happened to surface — a direct,
+expected consequence of adding a real file and a real route, updated
+in the same commit rather than left for the next person's regression
+sweep to catch (`test/inventory.test.js` would have failed on this
+round's own change, not somebody else's).

@@ -119,6 +119,7 @@ const behavior = require('./behavior.js');
 const actions = require('./actions.js');
 const politics = require('./politics.js');
 const media = require('./media.js');
+const objectives = require('./objectives.js');
 
 // ---------------------------------------------------------------------------
 // In-memory WorldState
@@ -2115,6 +2116,13 @@ function tutorialProgressFor(entityId) {
   return tutorialMissions.tutorialProgressFor(WorldState, entityId);
 }
 
+// Task #106 — a real, computed-live checklist of concrete things this
+// entity could do right now. See `objectives.js`'s own header for
+// what is and is not in it, and why.
+function objectivesFor(entityId, options = {}) {
+  return objectives.objectivesFor(WorldState, entityId, options);
+}
+
 // Task #97 — three verbs over `savedLocations.js`'s own plain bookmark
 // list. Saving and unsaving are writes, gated the same way every
 // other action-verb wrapper here is: the entity must be real.
@@ -2453,6 +2461,7 @@ module.exports = {
   survivalStatusFor,
   seedTutorialStart,
   tutorialProgressFor,
+  objectivesFor,
   saveLocation,
   unsaveLocation,
   savedLocationsOf,
