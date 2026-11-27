@@ -3134,3 +3134,21 @@ as `study-sources`/`survival-status`/`tutorial-progress`. 9 new tests
 in `test/objectives.test.js`, 1 new live-HTTP test in
 `test/routes.test.js`. See CLAUDE.md's two-hundred-and-tenth standing
 rule.
+
+### Collapse-origin lore (closes task #108)
+`dev-docs/COLLAPSE_ORIGIN_LORE.md` -- narrative only, no code changed.
+Gives the master spec's own deliberately-unspecified collapse a
+real-feeling origin, with the real parts marked real and the invented
+part marked invented. Two anchors were already real and already in
+this engine: `countryPacks.js`'s own dated Israel-Iran
+war/Strait-of-Hormuz oil-supply disruption, and Haiti's own real gang
+crisis. Chad's troop commitment to Haiti's UN-backed Gang Suppression
+Force was checked fresh via WebSearch (March-April 2026 reporting) and
+confirmed real. A global digital-currency/grid collapse was checked
+and found NOT to be real -- so that is the one invented piece, built
+across a real, documented gap (IMF/BIS CBDC cyber-risk research, a
+real NERC grid-vulnerability estimate, a real CSIS finding that the
+Iran war has heightened cyber threats to US energy infrastructure) --
+rather than blended in as if it were also real. No calendar anchor
+for tick 0 is claimed, since none exists in the engine to anchor to.
+See CLAUDE.md's two-hundred-and-eleventh standing rule.

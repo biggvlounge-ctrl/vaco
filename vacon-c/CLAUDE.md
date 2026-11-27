@@ -12383,3 +12383,61 @@ expected consequence of adding a real file and a real route, updated
 in the same commit rather than left for the next person's regression
 sweep to catch (`test/inventory.test.js` would have failed on this
 round's own change, not somebody else's).
+
+**A two-hundred-and-eleventh, closing task #108 — "collapse-origin
+lore (digital-currency grid transition, Iran/Hormuz, Haiti/Chad
+troops)." Narrative only — no code changed, the same posture task
+#132 ("regional cryptid/folklore landmarks... for lore") is already
+scoped to.** `dev-docs/COLLAPSE_ORIGIN_LORE.md` gives the master
+spec's own deliberately-unspecified collapse (§1: "the game begins
+after a civilization-collapse event," no cause ever named) a real-
+feeling origin, built the same way everything else in this file is:
+real anchors checked directly, the invented part marked as invented
+rather than blended in.
+
+**Two of the three named anchors were already real and already in
+this engine — pointed to, not re-researched.** `countryPacks.js`'s own
+`israeli.warStatus`/`iranian.warStatusRef` entries already carry a
+real, dated Israel-Iran war and a real Strait-of-Hormuz closure
+(~20% of global oil supply disrupted, a worldwide fuel crisis) with
+their own real sourcing and confidence flags; `haitian.gangCrisis2026`
+already carries Haiti's own real, severe gang crisis. Chad's troops
+were the one real piece this round had to check rather than assume:
+WebSearch confirmed Chad committing up to 1,500 troops/police to the
+UN-backed Gang Suppression Force succeeding the earlier Kenya-led
+mission (March-April 2026 reporting — Reuters, AFP, africanews.com,
+multiple Caribbean outlets), a real, current, citable fact this
+engine's own `countryPacks.js` had not yet named.
+
+**The fourth piece — a global digital-currency/grid collapse — was
+checked and found NOT to be real, which is exactly why it is the
+one invented piece of this story, said so rather than left
+ambiguous.** Two separate searches (CBDC-cyberattack scenarios;
+digital-currency-transition grid failure) turned up real STUDIED
+RISK — IMF/BIS material on CBDC cyber resilience, a real NERC
+estimate of ~60 new grid vulnerabilities a day, a real CSIS finding
+that the Iran war has measurably heightened cyber threats to US
+energy infrastructure — and no real event. The lore document's own
+"fictional synthesis" section is built across exactly that gap: the
+real cyber-threat finding is the proximate mechanism, a near-future
+completed CBDC rollout (the real-world trend, taken one step past
+where it currently stands) is what gives a single cyberattack
+enough concentrated, load-bearing surface to take power and payment
+down together.
+
+**No calendar anchor invented for tick 0, stated as a real limitation
+rather than papered over.** Nothing in `behavior.js`/`worldgen.js`
+ties a tick count to a real date beyond "a tick is a day"
+(`TICK_INTERVALS`'s own header); the lore document says so directly
+and dates its own events only loosely ("shortly after" the real 2026
+anchors above) rather than inventing a false precise mapping.
+
+**A real, separate, future mechanic named rather than built here.**
+This engine has no discoverable-lore-document mechanic at all —
+`discovery.js`'s own book pools grant a knowledge FIELD, never
+narrative text — so there is no existing hook to attach this document
+to in-world, and building one was not this task. The lore document's
+own closing section names that gap explicitly, the same restraint
+this file's own recurring "declare it, do not build past what was
+asked" posture (`statistics.js`'s own declared-absent entries,
+`usgsImport.js`'s terrain-with-no-consumer) already holds elsewhere.
