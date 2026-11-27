@@ -571,6 +571,17 @@ instant the card leaves the document — a tab switch, another "Open,"
 "Generate"). No new file, no new dependency, no server change — see
 CLAUDE.md's two-hundred-and-ninth standing rule for the verification.
 
+**Corrected, same task, by direct instruction** ("either through
+passing, if they're loud enough, or in conversation" — not a card
+being read): the card-stats narration above is replaced by two real
+channels — PASSING (a Population-row NPC speaks only if their own
+LIVE `reputation.Notoriety` clears a measured cutoff) and IN
+CONVERSATION (a real "Play as" + "Talk" reaches the real `talk-to`
+dispatcher, `dialogue.js#interactWith`, for the first time from this
+frontend). Same files, same no-new-dependency posture, one shared
+page-wide `MutationObserver` in place of one per element. See
+CLAUDE.md's two-hundred-and-ninth standing rule's own correction.
+
 ## 6. Phase records — `vacon-c/dev-docs/`
 
 Ten phase folders, each with a plan and tasks: trait split, trait

@@ -3086,3 +3086,29 @@ real rendered text while the card is on screen, `cancel()` fires again
 the instant the tab is switched away, and no further `speak()` call
 follows. Full suite re-run clean after: 2978 tests, 0 fail. See
 CLAUDE.md's two-hundred-and-ninth standing rule.
+
+**Corrected, same round, by direct instruction: that was reading a
+document, not an NPC speaking.** Told plainly — "the actual NPC
+speaks... either through passing, if they're loud enough, or in
+conversation" — the card-stats narration above is replaced with two
+real channels. PASSING: a Population-list NPC never opened speaks a
+short real-role line, but only if their own LIVE `reputation.Notoriety`
+("aura," task #235, read through `getLiveEntity` per the ninth
+standing rule, never the list's frozen sheet) clears a MEASURED cutoff
+— 65, the real 80th percentile of 2,000 generated NPCs (p50 51 / p75
+62 / p80 65 / p90 72) — so an ordinary person stays quiet passing by.
+IN CONVERSATION: a real "Play as" binds a real player
+(`POST /api/players`, reusing one already linked to that entity if one
+exists — the same search-before-create discipline task #104's
+`contacts.js` holds), and a "Talk" button on any other open NPC calls
+the real `talk-to` dispatcher and speaks back its real tone/occupation/
+shared-fact, phrased as a line — the first time this frontend has ever
+reached `dialogue.js#interactWith`. The on-screen scoping mechanism
+itself was correct and is kept, refactored to one shared
+`MutationObserver` for the whole page rather than one per watched
+element (now potentially dozens at once). Verified live: 4 real
+NPCs above the measured cutoff spoke when scrolled into view and none
+below it did, speech stopped when scrolled away, and a real "Talk"
+produced a real `"Oh -- hello."` through the actual player dispatcher.
+Full suite re-run clean after: 2978 tests, 0 fail. See CLAUDE.md's
+two-hundred-and-ninth standing rule's own correction.

@@ -12229,3 +12229,94 @@ further `speak()` call followed — the card was gone, and the NPC
 stopped talking. Full suite re-run after: 2978 tests, 0 fail, 6
 cancelled (the established resource-contention signature), 17
 skipped, same as before this round.
+
+**Corrected, same round, by direct instruction, and it is a correction
+to what was built above, not a second task.** Told plainly that the
+first version was wrong: "[It's not] supposed to be the card document
+is read. The actual NPC speaks. Any NPC that's on your screen, you can
+hear them speak either through passing, if they're loud enough, or in
+conversation." The first version spoke `npcDetail`'s own stat fields
+on open — a document being read, exactly what this says it is not.
+Real speech is one of two real channels, neither one a card
+recitation, and this round replaces the first version's content and
+trigger entirely while keeping its one correct piece — the on-screen
+scoping mechanism — reused rather than rebuilt.
+
+**PASSING**: an NPC merely visible in the Population list, never
+opened, speaks a short line built from their own real `role` — but
+only if real-ly "loud enough." `reputation.Notoriety` is the one real
+trait this engine already built for exactly "how much this person
+draws attention" (`influence.js`'s own "aura" component, task #235),
+reused a second time rather than invented a second, disagreeing
+"volume" field. Read LIVE (`GET /api/npcs/:id`, `entityTraits
+.getLiveEntity`) rather than off the Population list's own frozen
+birth-time sheet — the ninth standing rule says a live trait reader
+has to go through `getLiveEntity`, and Notoriety is exactly the kind
+of field another mechanism can move. The cutoff is MEASURED, not a
+guessed round number (the seventeenth standing rule):
+
+    node -e "const engine = require('./server/engine.js');
+      const vals = []; for (let i = 0; i < 2000; i++) vals.push(engine.generateNPC().traits.reputation.Notoriety);
+      vals.sort((a,b)=>a-b); console.log(...)"
+
+2,000 freshly generated NPCs put the real distribution at p50 51 /
+p75 62 / p80 65 / p90 72. 65 (the 80th percentile) is "loud enough" —
+an ordinary person (median ~51) stays quiet passing by, same as
+everyone else on the street, and only the real top ~20% draw ambient
+attention.
+
+**IN CONVERSATION**: the player actually talks to an NPC through the
+real `dialogue.js#interactWith` ("talk-to", task #96/#103) — never
+fabricated — and hears the real tone/occupation/shared-fact that call
+returns, phrased as a line (`conversationLine`) instead of reported as
+a field list. Checked directly before building: this frontend had
+never once reached `talk-to` — confirmed by the original investigation
+("zero references to `talk-to`/`talkTo`/`interactWith`... and no
+concept of a bound player at all") and true again here. Making this
+real, not fabricated, needed a real player bound to a real NPC first,
+which this frontend also never had: `boundPlayerEntityId`/
+`setBoundPlayerEntityId` keep that one choice in `localStorage` (a
+per-viewer convenience with nothing in it to verify against the
+simulation), and `playerIdFor` reuses a real player already linked to
+that entity if one exists rather than creating a second — the
+identical "search before generate" discipline `contacts.js
+#findOrCreateContact` (task #104) already holds, one file over. A
+"Play as" button per Population row binds it; a "Talk" button on any
+OTHER open NPC's card (never your own — `interactWith` itself refuses
+a player talking to themselves) calls the real dispatcher
+(`POST /api/players/:id/action`, `action: 'talk-to'`) and speaks
+`response.result`'s real fields.
+
+**The on-screen scoping mechanism itself was correct and is reused,
+refactored from one-MutationObserver-per-card to one shared
+`MutationObserver` for the whole page.** The first version's design —
+an `IntersectionObserver` per watched element, plus a `MutationObserver`
+fallback for removal the observer spec does not guarantee — was sound
+and is unchanged in effect (`watchOnScreen`). What changed is that the
+PASSING channel now watches potentially dozens of Population rows at
+once, and a `MutationObserver` per row (each independently watching
+the same `document.body`) would not have been wrong, only wasteful at
+real population scale — so there is now exactly one, registering a
+list of `{el, voiceId, io}` and checking `el.isConnected` on any
+page-wide mutation, same observable behavior, one watcher instead of N.
+
+**Verified live, both channels, through the real running server —
+not fabricated results.** Generated 23 real NPCs; read each one's live
+Notoriety back (`GET /api/npcs/:id`) and found four real candidates
+above the measured 65 cutoff (74, 84, 65, 70) and one well below (38).
+Scrolled each into view individually with Playwright (a single big
+`scrollTo` jump skips the intersecting frame for rows the jump passes
+over without painting, which is a test-methodology artifact, not a
+product bug — caught by first getting a confusingly low count, then
+verifying with per-row `scrollIntoViewIfNeeded` calls instead):
+exactly 4 `speak()` calls, one per loud NPC, zero for the quiet one.
+Confirmed stop-on-leave separately: entering view speaks, scrolling
+away calls `cancel()` again with no further `speak()`. For IN
+CONVERSATION: bound entity 1 as "you" via `localStorage`, clicked
+"Talk" on a different real NPC's open card, and got back a real
+`"Oh -- hello."` (neutral tone, no real occupation or shared fact yet
+between two brand-new strangers) through the actual
+`POST /api/players/:id/action` dispatcher — the first real traffic
+this frontend has ever sent through `talk-to`. Full suite re-run
+after: 2978 tests, 0 fail, 6 cancelled, 17 skipped — unchanged, since
+nothing server-side moved.
