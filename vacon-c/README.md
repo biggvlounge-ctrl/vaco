@@ -2927,3 +2927,22 @@ and default `available` status; a mission request against a
 nonexistent artifact confirmed rejected with a real, specific error.
 `vaco-shell`'s own registry updated with this project's real new URL
 (`http://localhost:8809`), closing that side's own `url: null` gap.
+
+### Railway restoration mission — a real, named override of the Transportation deferral
+"The train network... getting trains back available... railways back
+and running," closed as a real override of this project's own locked
+"Transportation... do not touch" scope line — surfaced explicitly
+here, never a silent bypass, on the same footing explicit human
+instruction already reopened Leader mode under. Deliberately the
+narrowest real thing asked for: no inter-city travel, scheduling, or
+routing was added, and the road-network import stays closed exactly
+as before. `train-station` was already a real, founding landmark
+category with a real, generated operating business (checked directly
+before writing anything), so "restoring the railway" is
+`missionVariety.offerRailwayMission` pointing `property
+.renovateProperty` (the active repair mechanic two tasks up) at a real
+degraded station — the twelfth `offer*Mission` in this file, same
+shape as the other eleven, same flat reward (40), gated on the
+identical real stake `renovateProperty` itself re-checks. 4 new tests
+in `test/missionVariety.test.js`. See CLAUDE.md's two-hundred-and-
+third standing rule.

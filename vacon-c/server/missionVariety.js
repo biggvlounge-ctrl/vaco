@@ -57,6 +57,7 @@ const authority = require('./authority.js');
 const extortion = require('./extortion.js');
 const businesses = require('./businesses.js');
 const drugTrade = require('./drugTrade.js');
+const property = require('./property.js');
 
 const MISSION_RECRUIT_REWARD = 40;
 const MISSION_ALLIANCE_REWARD = 40;
@@ -69,6 +70,7 @@ const MISSION_EXPANSION_REWARD = 40;
 const MISSION_EXTORTION_REWARD = 40;
 const MISSION_BUSINESS_REWARD = 40;
 const MISSION_DRUG_REWARD = 40;
+const MISSION_RAILWAY_REWARD = 40;
 
 function communityAnchor(worldState, communityId) {
   return (worldState.properties || []).find((p) => p.community_id === communityId) ?? null;
@@ -667,6 +669,75 @@ function offerDrugMission(worldState, npcId, options = {}) {
   return { mission, itemName: holding.item_name, quantity: holding.quantity };
 }
 
+// **The twelfth `offer*Mission`, by direct instruction — "the train
+// network... getting trains back available, up and running, railways
+// back and running" — and a real, named override of this project's
+// own standing Transportation deferral, not a silent bypass of it.**
+// Reached from the locked scope list's "Explicitly deferred — do not
+// touch: ... Transportation", the identical gate that keeps airport/
+// plane travel (task #197) and inter-city road routing (`world-layer/
+// imports/overtureTransportationImport.js`'s own header) closed. The
+// thirty-second standing rule's own words apply exactly here too:
+// "an explicit, binding project policy... the distinction... is worth
+// surfacing before writing the reader" — surfaced here, and overridden
+// here, on the same footing Leader mode's own reopening ("explicit
+// human instruction") already established for a locked scope item,
+// never a quiet workaround.
+//
+// **Deliberately the narrowest real thing the instruction actually
+// asked for.** "Getting trains back available... railways back and
+// running" is restoring a REAL, already-generated landmark to working
+// order — not inter-city train travel, routing, or a new transport
+// mechanic, none of which were asked for and all of which the
+// Transportation deferral still covers untouched. `train-station` is
+// already a real, founding Key landmark category (`landmarks.js`'s own
+// twenty-four, staffed by `navigator`), already given a real operating
+// business organization by `worldgen.js`'s own landmark-operator pass
+// (named explicitly alongside airport/art-museum/zoo-aquarium in that
+// pass's own comment) — so "restoring the railway" is exactly
+// `property.renovateProperty` (task #239) pointed at a real
+// `train-station`, never a second repair mechanic invented beside it.
+//
+// Reads the IDENTICAL real precondition `renovateProperty` itself
+// re-checks — `canLock`'s own real-stake test — via the station's real
+// operating organization, never a second, looser gate that could offer
+// a mission the real verb would then refuse.
+function offerRailwayMission(worldState, npcId, options = {}) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`offerRailwayMission: no NPC ${npcId}`);
+  if (npc.communityId == null) return null;
+
+  const community = (worldState.communities || []).find((c) => c.id === npc.communityId);
+  if (!community) return null;
+
+  // Matched by the station's own real community's city, never by a
+  // property's bare `city_id` alone — the identical "resolve a city
+  // through a property's real community" read `offerExpansionMission`
+  // already uses, so a hand-built fixture that never set `city_id`
+  // directly is read the same honest way a generated world is.
+  const station = (worldState.properties || []).find((p) => {
+    if (p.landmark_category !== 'train-station') return false;
+    if (Number(p.condition) >= 100) return false;
+    const stationCommunity = (worldState.communities || []).find((c) => c.id === p.community_id);
+    return stationCommunity && stationCommunity.city_id === community.city_id;
+  });
+  if (!station) return null;
+  if (!property.canLock(worldState, station.id, npcId)) return null;
+
+  const anchor = options.anchorPropertyId != null
+    ? (worldState.properties || []).find((p) => p.id === options.anchorPropertyId)
+    : station;
+  if (!anchor) return null;
+
+  const mission = missions.generateMission(worldState, {
+    locationId: anchor.id,
+    objective: 'Get the railway running again — restore this real train station, the real '
+      + 'work your own stake in its operating organization already qualifies you for',
+    reward: options.reward ?? MISSION_RAILWAY_REWARD,
+  });
+  return { mission, stationPropertyId: station.id };
+}
+
 module.exports = {
   MISSION_RECRUIT_REWARD,
   MISSION_ALLIANCE_REWARD,
@@ -679,6 +750,7 @@ module.exports = {
   MISSION_EXTORTION_REWARD,
   MISSION_BUSINESS_REWARD,
   MISSION_DRUG_REWARD,
+  MISSION_RAILWAY_REWARD,
   offerRecruitMission,
   offerAllianceMission,
   offerSpyMission,
@@ -690,4 +762,5 @@ module.exports = {
   offerExtortionMission,
   offerBusinessMission,
   offerDrugMission,
+  offerRailwayMission,
 };

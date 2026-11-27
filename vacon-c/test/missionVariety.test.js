@@ -866,3 +866,64 @@ test('offerDrugMission returns null for a real soldier/associate holding no real
 
   assert.equal(missionVariety.offerDrugMission(engine.WorldState, dealer.id), null);
 });
+
+// ---------------------------------------------------------------------
+// offerRailwayMission — task #240, by direct instruction: "the train
+// network... getting trains back available... railways back and
+// running." See missionVariety.js's own header on this function for
+// why this is a real, named override of the Transportation deferral,
+// never a silent one, and for why it reuses property.renovateProperty
+// (task #239) rather than inventing a second repair mechanic.
+// ---------------------------------------------------------------------
+
+test('offerRailwayMission points a real org member at a real degraded train-station in their own city', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 69201;
+  engine.WorldState.communities.push({ id: 69201, city_id: 69901 });
+  const org = engine.generateOrganization({ name: 'Rail Operator', type: 'business' });
+  joinOrg(engine.WorldState, npc.id, org.id);
+  const station = landmark(engine.WorldState, 69301, 'train-station', 69201);
+  station.condition = 40;
+  station.operating_organization_id = org.id;
+
+  const offer = missionVariety.offerRailwayMission(engine.WorldState, npc.id);
+  assert.ok(offer, 'no railway mission was opened for a real org member at a real degraded station');
+  assert.equal(offer.stationPropertyId, station.id);
+  assert.match(offer.mission.objective, /railway running again/);
+  assert.equal(offer.mission.reward, missionVariety.MISSION_RAILWAY_REWARD);
+});
+
+test('offerRailwayMission returns null when the city has no real train-station landmark at all', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 69202;
+  engine.WorldState.communities.push({ id: 69202, city_id: 69902 });
+  landmark(engine.WorldState, 69302, 'shop', 69202);
+
+  assert.equal(missionVariety.offerRailwayMission(engine.WorldState, npc.id), null);
+});
+
+test('offerRailwayMission returns null when the city\'s only train-station is already at full condition', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 69203;
+  engine.WorldState.communities.push({ id: 69203, city_id: 69903 });
+  const org = engine.generateOrganization({ name: 'Rail Operator Two', type: 'business' });
+  joinOrg(engine.WorldState, npc.id, org.id);
+  const station = landmark(engine.WorldState, 69303, 'train-station', 69203);
+  station.operating_organization_id = org.id;
+  // landmark()'s own default condition is 100 -- left unchanged here.
+
+  assert.equal(missionVariety.offerRailwayMission(engine.WorldState, npc.id), null);
+});
+
+test('offerRailwayMission returns null for a citizen with no real stake in the station\'s real operating organization', () => {
+  const npc = engine.generateNPC();
+  npc.communityId = 69204;
+  engine.WorldState.communities.push({ id: 69204, city_id: 69904 });
+  const org = engine.generateOrganization({ name: 'Rail Operator Three', type: 'business' });
+  const station = landmark(engine.WorldState, 69304, 'train-station', 69204);
+  station.condition = 40;
+  station.operating_organization_id = org.id;
+  // npc is deliberately never joined to `org`.
+
+  assert.equal(missionVariety.offerRailwayMission(engine.WorldState, npc.id), null);
+});

@@ -11797,3 +11797,63 @@ property), 2 new dispatcher-level tests in `test/actions.test.js`
 confirming both verbs live through `engine.dispatchAction`, and
 `actions.REQUIRED_VERBS`'s own exhaustive list updated to include
 `buildHome`/`renovateProperty`.
+
+**A two-hundred-and-third, closing task #240 — "the train network...
+getting trains back available, up and running, railways back and
+running" — and it is a real, named override of this project's own
+standing Transportation deferral, not a silent one, the same posture
+the casino override (task #64) already recorded for a different gate.**
+
+**The deferral is real and was checked, not assumed away.** The
+"Locked Day 1 / Phase 1 scope" section at the top of this file lists
+"Transportation" among "Explicitly deferred — do not touch," and task
+#197 (planes/air travel) and `world-layer/imports/
+overtureTransportationImport.js` (roads) both already sit closed under
+it, the latter's own header opening "VACON-C DEFERS TRANSPORTATION BY
+POLICY. READ THIS FIRST." The thirty-second standing rule drew the
+real distinction that matters here: Transportation is "an explicit,
+binding project policy, not a design-philosophy tension... where the
+user's own sign-off can reasonably override it." That distinction is
+real, and this task is still the right override, for the identical
+reason Leader mode's own reopening already established for a
+different locked item: explicit, repeated, direct human instruction
+("we also have to add in the train network... that also will be a
+mission") is the one thing this registry's own practice already
+treats as sufficient to reopen a "do not touch" line — Leader mode's
+own header, verbatim, is "reopened by explicit human instruction."
+
+**Deliberately the narrowest real thing actually asked for — not a
+transportation mechanic.** "Getting trains back available... railways
+back and running" asks for RESTORING something, not for inter-city
+train travel, scheduling, or routing — none of which this closes, and
+all of which the Transportation deferral still covers untouched
+(`world-layer`'s own road-network import stays closed; no trade-route
+pathfinding was added). `train-station` was already a real, founding
+Key landmark category (`landmarks.js`'s own twenty-four, `staff:
+'navigator'`) — checked directly before writing anything — and
+`worldgen.js`'s own landmark-operator pass already names it
+explicitly alongside airport/art-museum/zoo-aquarium as getting a
+real, generated business organization as operator. "Restoring the
+railway" is therefore exactly `property.renovateProperty` (task #239,
+the active half of maintenance this file just closed) pointed at a
+real `train-station` — never a second repair mechanic invented beside
+the one just built two tasks ago.
+
+**`missionVariety.offerRailwayMission` is the twelfth `offer*Mission`,
+same shape as all eleven before it.** Finds a real, degraded
+`train-station` in the citizen's own city (resolved through the
+station's own real community → city, the identical read
+`offerExpansionMission` already uses, never a bare `city_id` column
+trusted alone) and requires the citizen to hold the identical real
+stake `renovateProperty` itself re-checks — `canLock`'s own real
+occupant/staff/owner test, reached here through real membership in the
+station's own real operating organization — so a mission is never
+offered that the real verb would then refuse. Reward reuses the flat
+`40` every sibling `offer*Mission` in this file already uses, never a
+thirteenth invented number for a comparable claim.
+
+4 new tests in `test/missionVariety.test.js`: a real org member opens
+a real mission at a real degraded station in their own city; null with
+no real `train-station` in the city at all; null when the city's only
+one is already at full condition; null for a citizen with no real
+stake in its real operating organization.
