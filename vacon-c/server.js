@@ -934,10 +934,18 @@ app.get('/api/properties/:id', (req, res) => {
   const operator = prop.operating_organization_id == null ? null
     : (engine.WorldState.organizations || [])
       .find((o) => o.id === prop.operating_organization_id) || null;
+  // Task #238, by direct instruction: "everything has statistics and a
+  // card" -- not just buildings, lakes/forests/parks/zoos too. Both
+  // reads already work identically regardless of `landmark_category`
+  // (see engine.js's own header on each) -- a park or a lake with no
+  // real staff reads exactly as completely as a skyscraper, down to
+  // the same `requirementsCard` shape `assess-takeover` already uses.
   return res.json({
     ...withValue(prop),
     ownershipHistory: engine.getOwnershipHistory(prop.id),
     operatingOrganization: operator,
+    significance: engine.landmarkSignificanceOf(prop.id),
+    requirementsCard: engine.takeoverRequirementsCardFor(prop.id),
   });
 });
 

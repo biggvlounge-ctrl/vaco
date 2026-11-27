@@ -647,6 +647,26 @@ test('a property response carries both the assessed and the derived value', { sk
   assert.equal(refetched.currentValue, 100000);
 });
 
+// Task #238, by direct instruction: "everything has statistics and a
+// card" -- not just buildings, lakes/forests/parks/zoos too. Both
+// reads are category-agnostic (see engine.js's own header on each), so
+// this asserts the SHAPE on an ordinary, non-landmark property -- the
+// identical shape a park or a lake gets, since neither read branches
+// on `landmark_category` at all.
+test('a property detail carries a real significance reading and a real, actor-independent requirements card', { skip: SKIP }, async () => {
+  const created = await (await post('/properties', {
+    type: 'residential', value: 90000, lifecycleStage: 'operation',
+  })).json();
+
+  const detail = await (await get(`/properties/${created.id}`)).json();
+  assert.equal(detail.significance, 0, 'an ordinary property with no history reads 0, a real reading, never null');
+  assert.ok(detail.requirementsCard, 'a requirements card is present with no tribe asked at all');
+  assert.equal(detail.requirementsCard.locationId, created.id);
+  assert.equal(detail.requirementsCard.scale, 'property');
+  assert.ok(Array.isArray(detail.requirementsCard.requiredRoles));
+  assert.ok(detail.requirementsCard.total >= 1, 'something held by nobody still has to be walked into');
+});
+
 test('a nonexistent property is a 404, not an empty object', { skip: SKIP }, async () => {
   assert.equal((await get('/properties/99999')).status, 404);
   assert.equal((await post('/properties/99999/ownership', {

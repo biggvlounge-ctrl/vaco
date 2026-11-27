@@ -236,6 +236,31 @@ test('an ordinary building has a significance of zero, and a missing one has non
   assert.equal(landmarks.significanceOf(w, 9999), null);
 });
 
+// Task #238, by direct instruction: "not just buildings, but lakes,
+// forests, parks, zoos. Everything has statistics and a card."
+// `control.compositionFor` and `landmarks.significanceOf` both already
+// work on ANY property, uniformly, with no `landmark_category` branch
+// in either — this confirms it directly for all four, including the
+// three genuinely unstaffed ones, rather than trusting the claim.
+test('a lake, forest, park and zoo-aquarium each get a real significance reading and a real, actor-independent requirements card -- the same as any building', () => {
+  const w = world();
+  for (const category of ['lake', 'forest', 'park', 'zoo-aquarium']) {
+    const row = build(w, { type: landmarks.propertyTypeFor(category) });
+    const { record } = landmarks.designate(w, {
+      propertyId: row.id, category, significance: 42, tick: 10,
+    });
+    assert.equal(landmarks.significanceOf(w, row.id), 42, `${category} carries a real significance reading`);
+    assert.equal(record.where_location_id, row.id);
+
+    const card = control.compositionFor(w, { scale: 'property', locationId: row.id });
+    assert.ok(card, `${category} gets a real requirements card, not null`);
+    assert.equal(card.locationId, row.id);
+    assert.equal(card.defenders, 0, `nobody staffs a generated ${category} in this fixture`);
+    assert.ok(card.total >= 1, 'something held by nobody still has to be walked into');
+    assert.ok(Array.isArray(card.requiredRoles) && card.requiredRoles.length > 0);
+  }
+});
+
 test('designating something that is not a category throws', () => {
   const w = world();
   const row = build(w);

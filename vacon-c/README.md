@@ -2872,6 +2872,25 @@ address") does not vary by type. Required at call time inside
 require deeper in the same cycle. 4 new tests in `test/camps.test.js`.
 See CLAUDE.md's two-hundredth standing rule.
 
+### Landmark statistics and cards are already real for every category — now surfaced
+Closes "not just buildings, but lakes, forests, parks, zoos —
+everything has statistics and a card": checked first, and
+`property.generateProperty`/`landmarks.designate`/`property
+.currentValue`/`control.compositionFor` already run identically for
+EVERY landmark category, with zero branch on `landmark_category`
+anywhere in any of them — a lake or a park already carries the same
+real value/condition/significance a skyscraper does, and the real,
+actor-independent requirements card (`control.compositionFor`, needing
+no tribe at all, unlike `control.assess`) already resolves for any of
+them. The only real gap was that `GET /api/properties/:id` never
+surfaced either number. Two new read-only `engine.js` facades
+(`landmarkSignificanceOf`, `takeoverRequirementsCardFor`) and two new
+fields on that one existing route — never a second landmark-statistics
+module. New tests in `test/landmarks.test.js` (a lake/forest/park/
+zoo-aquarium each get a real significance reading and a real,
+non-null card) and `test/routes.test.js` (the same two fields over
+HTTP). See CLAUDE.md's two-hundred-and-first standing rule.
+
 ## Verified
 14 plain-Node checks on `server/missions.js` directly (rejects a
 missing artifact name, rejects a nonexistent `artifactId`, rejects a

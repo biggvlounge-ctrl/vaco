@@ -2212,6 +2212,33 @@ function getOwnershipHistory(entityId) {
   return property.getOwnershipHistory(WorldState, entityId);
 }
 
+// Task #238, by direct instruction: "Everything has statistics and a
+// card" -- not just buildings, lakes/forests/parks/zoos too. Both of
+// these were already fully real and fully generic before this task;
+// what was missing was a single read that surfaces them for ANY
+// property regardless of `landmark_category`, so a park or a lake
+// reads exactly as completely as a skyscraper, with zero new category
+// branches. See `server.js#GET /api/properties/:id`.
+//
+// `landmarks.significanceOf` already returns 0 (a real reading, not
+// an absence) for a property with no history, and null only for a
+// property that does not exist -- no change needed here.
+function landmarkSignificanceOf(propertyId) {
+  return landmarks.significanceOf(WorldState, propertyId);
+}
+
+// The real, actor-independent half of task #97's own "requirements
+// card" -- `control.compositionFor` needs no tribe at all, unlike
+// `control.assess` (which returns null without one). `compositionFor`
+// has no category branch in its own `SCALES.property` definition
+// (`control.js`): a park or a lake with no real staff just resolves
+// `defenders: 0` and a one-person minimum force, the exact same real
+// function a skyscraper's own card runs through. Null only when the
+// property id does not resolve to a real property at all.
+function takeoverRequirementsCardFor(propertyId) {
+  return control.compositionFor(WorldState, { scale: 'property', locationId: Number(propertyId) });
+}
+
 function getHoldings(ownerEntityId) {
   return property.getHoldings(WorldState, ownerEntityId);
 }
@@ -2427,6 +2454,8 @@ module.exports = {
   recordOwnership,
   getCurrentOwner,
   getOwnershipHistory,
+  landmarkSignificanceOf,
+  takeoverRequirementsCardFor,
   getHoldings,
   listGovernments,
   foundGovernment,

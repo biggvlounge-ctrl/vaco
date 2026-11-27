@@ -11685,3 +11685,50 @@ rule's own discipline; and the bonus confirmed identical across a real
 before/after delta rather than one person's evasion compared to
 another's, since two different NPCs' underlying skill draws are not
 guaranteed equal.
+
+**A two-hundred-and-first, closing task #238 — "not just buildings,
+but lakes, forests, parks, zoos. Everything has statistics and a
+card" — and it is a measurement that found the real engine had already
+closed most of its own request, which is worth recording precisely
+rather than building a second, redundant system on top of it.**
+
+**Checked before building anything, and the finding changes the
+shape of the task.** `property.generateProperty` and
+`landmarks.designate` already run identically for every landmark
+category — `worldgen.js`'s `placeHeroLandmark` draws `landSize`,
+`value`, `condition`, `floors`, `age` and a real `significance` band
+for a `lake`/`forest`/`park`/`zoo-aquarium` exactly the same way it
+does for a skyscraper, with zero category branch anywhere in that
+function. `property.currentValue` and `control.compositionFor` (the
+real, actor-independent half of task #97's own "requirements card" —
+unlike `control.assess`, it needs no tribe at all and returns `null`
+only when the property itself does not exist) both already run
+on `SCALES.property.find`, a bare id lookup with no category check in
+it either. **"Everything has statistics and a card" was already true
+of the real engine before this task — the gap was that `GET /api/
+properties/:id` never surfaced either number**, so a client had no
+single read that showed them, for a building OR a landmark.
+
+**The fix is two new engine.js facades, read-only, category-agnostic
+by construction, and a two-field addition to one existing route —
+never a second landmark-statistics module that could disagree with
+`property.js`/`control.js`/`landmarks.js`.** `engine.landmarkSignificanceOf`
+wraps `landmarks.significanceOf` (0 for an ordinary building, same as
+before — a real reading, not an absence); `engine.
+takeoverRequirementsCardFor` wraps `control.compositionFor({scale:
+'property', locationId})`. `GET /api/properties/:id` now returns both
+alongside the ownership/value fields it already had. A `zoo-aquarium`'s
+own real `staff: 'curator'` surfaces through `requiredSpecialists`
+exactly as `compositionFor`'s own `SCALES.property.specialists`
+already computes it (gated on a real `operating_organization_id`, not
+on the category directly) — nothing new had to be taught to read that
+either.
+
+New tests in two places: `test/landmarks.test.js` builds a `lake`,
+`forest`, `park` and `zoo-aquarium` and asserts the real significance
+reading and a real, non-null requirements card for all four — same
+shape as any building, `defenders: 0` confirmed rather than assumed for
+each, since none of the four fixtures sets up any resident or staff;
+`test/routes.test.js` asserts the same two fields appear on an ordinary
+property fetched through the real HTTP route, since that is the one
+layer this task actually had to add anything to.
