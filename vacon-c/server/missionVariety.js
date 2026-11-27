@@ -58,6 +58,8 @@ const extortion = require('./extortion.js');
 const businesses = require('./businesses.js');
 const drugTrade = require('./drugTrade.js');
 const property = require('./property.js');
+const knowledge = require('./knowledge.js');
+const occupations = require('./occupations.js');
 
 const MISSION_RECRUIT_REWARD = 40;
 const MISSION_ALLIANCE_REWARD = 40;
@@ -71,6 +73,7 @@ const MISSION_EXTORTION_REWARD = 40;
 const MISSION_BUSINESS_REWARD = 40;
 const MISSION_DRUG_REWARD = 40;
 const MISSION_RAILWAY_REWARD = 40;
+const MISSION_ENCOUNTER_REWARD = 40;
 
 function communityAnchor(worldState, communityId) {
   return (worldState.properties || []).find((p) => p.community_id === communityId) ?? null;
@@ -738,6 +741,70 @@ function offerRailwayMission(worldState, npcId, options = {}) {
   return { mission, stationPropertyId: station.id };
 }
 
+// ---------------------------------------------------------------------
+// Task #102 — "chance-encounter missions keyed on an NPC's real
+// occupation ('bumping into' someone)"
+// ---------------------------------------------------------------------
+// `knowledge.js#sourcesFor`'s own §24 "experienced NPCs" loop already
+// scans every OTHER real resident of this citizen's own community for
+// a real occupation, resolves it to a real knowledge field
+// (`fieldForSkill(occupations.skillOf(occupation))`) and names the
+// real `teacherId` — the exact substrate "bumping into someone with a
+// real occupation" asks for, reused directly rather than a second,
+// disagreeing resolution of the identical question. This file's own
+// job is naming a real mission around that encounter, the same
+// "already built, never pointed to" gap every other `offer*Mission`
+// in this file closes.
+//
+// Unlike every function above, the thing that determines WHAT the
+// mission is about is a REAL OTHER PERSON's circumstance, not the
+// citizen's own — so this is not a thirteenth variation on "can I
+// personally do X," it reads real state the same way `missionTriggers
+// .js`'s main-character resolution does. Picks the real encountered
+// resident with the HIGHEST real occupation tier among those present
+// — "the most notable person you could plausibly bump into" — the
+// identical "pick the extreme real case" shape `offerBarterMission`/
+// `offerTravelMission` already use for a scarcest resource or a
+// greatest fuel shortfall.
+//
+// Resolves to the real, already-player-facing `study` verb
+// (`knowledge.study`, source `'experienced NPCs'`) rather than
+// inventing a new resolution action — the mission names exactly the
+// `source`/`field`/`teacherId` that verb already validates, so
+// accepting this mission and then calling `study` with those same
+// values is the real, intended path, never a mission pointing at
+// nothing a player can actually do.
+function offerEncounterMission(worldState, npcId, options = {}) {
+  const npc = (worldState.npcs || []).find((n) => n.id === npcId);
+  if (!npc) throw new Error(`offerEncounterMission: no NPC ${npcId}`);
+  if (npc.communityId == null) return null;
+
+  const encounters = knowledge.sourcesFor(worldState, npcId)
+    .filter((s) => s.via === 'person');
+  if (encounters.length === 0) return null;
+
+  const best = encounters.reduce(
+    (a, b) => ((Number(b.tier) || 0) > (Number(a.tier) || 0) ? b : a),
+  );
+  const teacher = (worldState.npcs || []).find((n) => n.id === best.teacherId);
+  const occupation = occupations.occupationOf(worldState, best.teacherId);
+
+  const anchor = options.anchorPropertyId != null
+    ? (worldState.properties || []).find((p) => p.id === options.anchorPropertyId)
+    : communityAnchor(worldState, npc.communityId);
+  if (!anchor) return null;
+
+  const mission = missions.generateMission(worldState, {
+    locationId: anchor.id,
+    objective: `You bump into ${teacher?.name ?? `entity ${best.teacherId}`}, a real `
+      + `${occupation ?? 'tradesperson'} — learn ${best.field} from them`,
+    reward: options.reward ?? MISSION_ENCOUNTER_REWARD,
+  });
+  return {
+    mission, teacherEntityId: best.teacherId, field: best.field, occupation, source: best.source,
+  };
+}
+
 module.exports = {
   MISSION_RECRUIT_REWARD,
   MISSION_ALLIANCE_REWARD,
@@ -751,6 +818,7 @@ module.exports = {
   MISSION_BUSINESS_REWARD,
   MISSION_DRUG_REWARD,
   MISSION_RAILWAY_REWARD,
+  MISSION_ENCOUNTER_REWARD,
   offerRecruitMission,
   offerAllianceMission,
   offerSpyMission,
@@ -763,4 +831,5 @@ module.exports = {
   offerBusinessMission,
   offerDrugMission,
   offerRailwayMission,
+  offerEncounterMission,
 };

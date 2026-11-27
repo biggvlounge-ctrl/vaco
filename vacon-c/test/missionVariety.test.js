@@ -927,3 +927,80 @@ test('offerRailwayMission returns null for a citizen with no real stake in the s
 
   assert.equal(missionVariety.offerRailwayMission(engine.WorldState, npc.id), null);
 });
+
+// ---------------------------------------------------------------------
+// offerEncounterMission — task #102, "chance-encounter missions keyed
+// on an NPC's real occupation ('bumping into' someone)." Reuses
+// knowledge.js#sourcesFor's own real "experienced NPCs" resolution
+// directly -- see missionVariety.js's own header on this function for
+// why there is no second occupation-to-field mapping invented here.
+// ---------------------------------------------------------------------
+
+function employAs(worldState, npc, position, employerType) {
+  const org = engine.generateOrganization({ name: `${position} Co ${npc.id}`, type: employerType });
+  economy.hireEntity(worldState, {
+    entityId: npc.id, employerOrganizationId: org.id, wage: 20, position, tick: worldState.tick,
+  });
+  return org;
+}
+
+test('offerEncounterMission names the real resident with the HIGHEST real occupation tier among those present', () => {
+  const citizen = engine.generateNPC();
+  citizen.communityId = 69401;
+  engine.WorldState.communities.push({ id: 69401, city_id: 69951 });
+  landmark(engine.WorldState, 69401, 'shop', 69401);
+
+  const farmer = engine.generateNPC();
+  farmer.communityId = 69401;
+  employAs(engine.WorldState, farmer, 'farmer', 'business'); // tier 2, skill Agriculture
+
+  const physician = engine.generateNPC();
+  physician.communityId = 69401;
+  employAs(engine.WorldState, physician, 'physician', 'hospital'); // tier 4, skill Medicine
+
+  const offer = missionVariety.offerEncounterMission(engine.WorldState, citizen.id);
+  assert.ok(offer, 'expected a real chance-encounter mission with two real employed residents present');
+  assert.equal(offer.teacherEntityId, physician.id, 'the higher-tier physician must win over the lower-tier farmer');
+  assert.equal(offer.occupation, 'physician');
+  assert.equal(offer.field, 'medicine');
+  assert.equal(offer.source, 'experienced NPCs');
+  assert.match(offer.mission.objective, /bump into/);
+  assert.match(offer.mission.objective, /physician/);
+  assert.equal(offer.mission.reward, missionVariety.MISSION_ENCOUNTER_REWARD);
+});
+
+test('offerEncounterMission returns null when nobody present holds an occupation whose skill maps to a real knowledge field', () => {
+  const citizen = engine.generateNPC();
+  citizen.communityId = 69402;
+  engine.WorldState.communities.push({ id: 69402, city_id: 69952 });
+  landmark(engine.WorldState, 69402, 'shop', 69402);
+
+  // A real occupation (hunter, skill Combat) that knowledge.js's own
+  // fieldForSkill genuinely has no mapping for -- checked directly
+  // before writing this test, the same honest "nothing of that kind
+  // exists" shape this engine's own discovery.js already holds.
+  const hunter = engine.generateNPC();
+  hunter.communityId = 69402;
+  employAsHunter(engine.WorldState, hunter);
+
+  assert.equal(missionVariety.offerEncounterMission(engine.WorldState, citizen.id), null);
+});
+
+test('offerEncounterMission returns null when no other real resident of this community is employed at all', () => {
+  const citizen = engine.generateNPC();
+  citizen.communityId = 69403;
+  engine.WorldState.communities.push({ id: 69403, city_id: 69953 });
+  landmark(engine.WorldState, 69403, 'shop', 69403);
+
+  assert.equal(missionVariety.offerEncounterMission(engine.WorldState, citizen.id), null);
+});
+
+test('offerEncounterMission returns null for a citizen with no real community at all', () => {
+  const citizen = engine.generateNPC();
+  citizen.communityId = null;
+  assert.equal(missionVariety.offerEncounterMission(engine.WorldState, citizen.id), null);
+});
+
+test('offerEncounterMission throws for a nonexistent entity', () => {
+  assert.throws(() => missionVariety.offerEncounterMission(engine.WorldState, 999999));
+});

@@ -2995,3 +2995,26 @@ thirteenth invented number. 8 new tests in
 `test/missionTriggers.test.js`, including one real end-to-end
 dispatcher test through `search-location`. See CLAUDE.md's
 two-hundred-and-fifth standing rule.
+
+### Chance-encounter missions keyed on a real occupation — "bumping into" someone (closes task #102)
+`knowledge.js#sourcesFor`'s own §24 "experienced NPCs" loop already
+scans every other real resident of a citizen's own community for a
+real occupation and names the real field and `teacherId` that makes
+them a real knowledge source — exactly "bumping into someone with a
+real occupation," built for `knowledge.study`'s own
+`source: 'experienced NPCs'` path and never pointed at from a mission
+before now. New `missionVariety.offerEncounterMission` is this file's
+thirteenth `offer*Mission`, and the first one keyed on a real OTHER
+person's circumstance rather than the player's own — picks the real
+present resident with the highest real occupation tier (the same
+"pick the extreme real case" shape `offerBarterMission`/
+`offerTravelMission` already use) and names a mission that resolves
+to the real, already-player-facing `study` verb with that same real
+`source`/`field`/`teacherId` triple, never a new resolution action.
+Reward reuses the real, shared `MISSION_ENCOUNTER_REWARD` (40). A
+present resident whose real occupation's skill has no real knowledge-
+field mapping (e.g. `hunter`, skill `Combat`) honestly yields no
+encounter, the same "nothing of that kind exists" shape
+`discovery.search` already holds for an empty item category. 6 new
+tests in `test/missionVariety.test.js`. See CLAUDE.md's
+two-hundred-and-sixth standing rule.

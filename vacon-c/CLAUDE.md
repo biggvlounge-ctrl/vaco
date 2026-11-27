@@ -11992,3 +11992,63 @@ linked `historical_records` significance row and a world catalogue
 narrowed to exactly the two real disguise items, so the real
 `clothing`-category draw is guaranteed to land on one within this
 property's own finite, measured supply.
+
+**A two-hundred-and-sixth, closing task #102 — "chance-encounter
+missions keyed on an NPC's real occupation ('bumping into'
+someone)" — and it is `missionVariety.js`'s thirteenth `offer*Mission`,
+the first one in that file keyed on a REAL OTHER PERSON's real
+circumstance rather than the player's own.**
+
+**No new resolution was written — `knowledge.js#sourcesFor`'s own §24
+"experienced NPCs" loop already IS "bumping into someone with a real
+occupation."** Checked directly: that function already scans every
+OTHER real resident of this citizen's own community, reads their real
+occupation (`occupations.occupationOf`), resolves it to a real
+knowledge field (`fieldForSkill(occupations.skillOf(occupation))`),
+and names the real `teacherId` — built for `knowledge.study`'s own
+`source: 'experienced NPCs'` path, never pointed at from a mission.
+`offerEncounterMission` is the naming this file's own header already
+argues every function here does — reusing that resolution directly
+rather than a second, disagreeing read of the identical question (the
+twelfth standing rule's own trap).
+
+**Every other function in this file asks "can the PLAYER do X";
+this one asks "who is HERE, and what do THEY do" — the identical
+real-other-entity shape `missionTriggers.js`'s main-character
+resolution already has, one file over.** Picks the real encountered
+resident with the HIGHEST real occupation tier among those present —
+"the most notable person you could plausibly bump into" — the same
+"pick the extreme real case" shape `offerBarterMission`'s scarcest
+resource and `offerTravelMission`'s greatest fuel shortfall already
+use, rather than an invented random draw this file has never used for
+picking among real candidates anywhere else.
+
+**Checked and corrected before shipping: a plausible-looking
+occupation can have no real field to resolve to at all, and the honest
+answer is `null`, never a fallback.** The first candidate occupation
+tried for a test fixture was `hunter` (skill `Combat`) — `knowledge
+.FIELDS` maps nine real skills to nine real fields, and `Combat` is
+not one of them, so `fieldForSkill('Combat')` returns `null` and
+`sourcesFor`'s own loop silently skips that resident, exactly as
+`knowledge.js` already intends. A world where every present resident's
+real occupation falls outside those nine mapped skills offers no
+encounter at all — the honest shape, not a defect, same posture
+`discovery.search`'s own "nothing of that kind exists" branch already
+holds for an empty item category.
+
+**Resolves to the real, already-player-facing `study` verb, never a
+thirteenth invented resolution action.** The mission names exactly the
+`source`/`field`/`teacherId` triple `actions.js`'s own `study` verb
+already validates against real state — accepting this mission and
+then calling `study` with those same values is the intended path, the
+same "a mission is never about nothing" discipline every function in
+this file already holds. Reward reuses `MISSION_ENCOUNTER_REWARD`
+(40), the identical flat figure every sibling `offer*Mission` already
+uses.
+
+6 new tests in `test/missionVariety.test.js`: a real physician (tier 4,
+`Medicine`) wins over a real farmer (tier 2, `Agriculture`) present in
+the same community; a community where the only employed resident holds
+`hunter` (a real occupation with no real field mapping) honestly
+offers nothing; an empty community, and a citizen with no community at
+all, both honestly return null; a nonexistent entity throws.
