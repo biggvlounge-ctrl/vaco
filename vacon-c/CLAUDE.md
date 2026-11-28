@@ -12524,3 +12524,124 @@ recipe, idempotent item registration), and 1 new integration test in
 found via the same bounded-loop-waiting-for-a-real-seeded-draw shape
 `test/missionTriggers.test.js`'s own disguise-find test already uses,
 never a relaxed `DAILY_FAILURE_RATE`.
+
+**A two-hundred-and-thirteenth, closing task #110 — "multi-region
+worlds (so Gaza, Nepal, Brazil, Spain, Haiti, UK can all be real,
+distinct, simultaneous locations)."** `migration.generateRegion`
+already pushed onto `worldState.regions` rather than replacing it,
+and `worldgen.js`'s own header already said `engine.WorldState` is
+shared and a second `generateWorld` call APPENDS to it. So the real
+gap was never "can a second region exist" — it already could, with
+zero code changes, confirmed by literally calling `generateWorld`
+twice in a row before touching anything. The real gap was that
+nothing had ever actually DONE it, and three real places had been
+quietly written as if there could only ever be one civilization in
+the world, because there always had been.
+
+**`statecraft.stateOf`/`budgetOf` answered "the first civilization" /
+"every city's mean economy", and that was the correct answer for
+every world this engine had ever generated — right up until a second
+civilization genuinely exists, at which point it is not just
+imprecise, it is wrong: Brazil's state budget has no business moving
+because Haiti's cities got poorer.** `migration.civilizationOfCity`
+is the fix, placed in `migration.js` beside `regionOfCity` (which it
+reuses directly) rather than in `statecraft.js`, because the real join
+— city → `region_id` → region → `civilization_id` → civilization — is
+`migration.js`'s own substrate, not statecraft's. **Scoped to be a
+complete no-op with 0 or 1 civilization**: `civilizations.length <= 1`
+returns exactly `civilizations[0] ?? null`, the same answer `stateOf`
+always gave, so every existing single-region world — every world this
+engine has ever generated before this round — reads bit-identical.
+`budgetOf` gained the same optional `civilizationId` scoping, under
+the same no-op guard. `fundingFor`, `garrisonOf`, `runStatecraft` (now
+resolving each city's civilization and budget INSIDE its own per-city
+loop, not once for the whole world) and `describeStatecraft` all read
+through the new function instead of the old one. Mutation-verified
+by hand rather than only by a passing assertion: a two-civilization
+fixture with a 90-economy city and a 10-economy one reads `budgetOf`
+90 and 10 respectively, never the blended 50, and `runStatecraft`
+funds the rich civilization's services measurably above the poor
+one's from the same call.
+
+**`media.eraReached` checked "has ANY civilization anywhere reached
+this era" — the identical shape of mistake, one file over.** A
+Brazilian civilization reaching `writing` would have handed a Haitian
+city a bulletin channel it had not earned. Gained an optional third
+`cityId` argument: omitted, or with 0-1 civilizations in the world, it
+is the exact original behaviour; supplied in a genuinely multi-
+civilization world, it resolves through `migration.civilizationOfCity`
+and checks only that one civilization's own unlocked eras.
+`availableChannels` (which already took a `cityId`) now forwards it.
+
+**A fourth, unrelated-to-multi-region but found while reading the
+exact same city→region→country chain for this round:
+`weapons.regionHasTrackedMilitaryCapability` read
+`region.country_key` (snake case) against a field
+`migration.generateRegion` has only ever written as
+`region.countryKey` (camel case).** Always `undefined`, so this
+always returned `false` — `machine_gun` could never be found anywhere
+in ANY world this engine had ever generated, single-region or not,
+contradicting this file's own two-hundred-and-fiftieth-round claim
+that it was real and tracked. The project's own test fixture
+(`test/weapons.test.js`'s `placeWithChain`) built its region with the
+identical wrong field name, so a green suite never exercised the real
+shape `migration.generateRegion` actually produces — standing rule
+24's shape exactly, the fixture agreeing with the bug instead of with
+production. Fixed in both places, plus a new regression test building
+the region through the REAL `migration.generateRegion` rather than a
+hand-built fixture, so a future rename of either side would actually
+be caught.
+
+**A fifth, found only because this round finally tried to put Nepal
+and Brazil into a region for real: `countryPacks.js` holds TWO real,
+non-colliding country tables, and `generateRegion` only ever checked
+one of them.** `COUNTRIES` (read through `countryFor`) and the later
+`COUNTRY_PROFILES` (read through `countryProfileFor` — Japan, South
+Korea, Brazil, Nepal, Spain and others, checked at that file's own
+load time to never collide with a `COUNTRIES` key) are both real and
+both already existed; `migration.generateRegion`'s one line reading
+`countryPacks.countryFor(countryKey)` is the one real consumer, and it
+never read the second table. Two of the six real locations this task
+names directly — Nepal, Brazil — silently resolved to no real country
+data at all, every field `null`, through the one real path a player
+would ever see them through. This is the twenty-first standing rule's
+own shape again: a second real table, validated against the first for
+collisions, and the one real consumer never updated to read it.
+Fixed with a one-line fallback (`countryFor(key) ??
+countryProfileFor(key)`), safe precisely because the load-time
+collision check already guarantees the two lookups can never both
+return non-null for the same key.
+
+**No new mechanic was invented, and none was needed.** A real,
+distinct, simultaneous multi-region world is `worldgen.generateWorld`
+called once per real region — its own seed, its own `countryKey`, its
+own `regionName`/`civilizationName` — against the same shared
+`engine.WorldState`, which the file already supported appending to.
+Diplomacy, trade or conflict BETWEEN regions is real, separate, future
+work, named here rather than silently started: this round is the
+floor every such feature would need under it, not those features
+themselves. `test/multiRegion.test.js` is the integration point: six
+real, named, distinct locations (Gaza via `israeli` — carrying this
+engine's own real, current Gaza-war `conflictLevel` — Nepal, Brazil,
+Spain, Haiti via `haitian`, and the UK via the real `english` ACS
+ancestry key, since `countryPacks.js` has no single unified
+"united-kingdom" entry for the same reason `ancestryPacks.GROUPS`
+splits the UK's own nations), built in one world, with no id
+collisions, each resolving to its own real civilization and its own
+real country facts, and a real `advanceTick` running cleanly across
+all six without crashing. Six new tests in `test/statecraft.test.js`,
+three in `test/media.test.js`, one in `test/weapons.test.js`, one in
+`test/country-packs.test.js`, and the five in `test/multiRegion.test.js`
+itself.
+
+**Found and fixed before it shipped: the first version of
+`test/multiRegion.test.js` called the real generator once per test
+function rather than once for the whole file, and silently
+accumulated every earlier test's cities and civilizations into the
+next one's assertions — `engine.WorldState` is one shared singleton,
+exactly the trap `test/worldgen.test.js`'s own header already
+documents.** The fix is that file's own established idiom: build the
+real multi-region world exactly ONCE at module scope, before any
+`test()` runs, and scope every assertion to the specific ids each
+`generateWorld` call actually returned rather than to
+`w.cities`/`w.regions`/`w.civilizations` wholesale.

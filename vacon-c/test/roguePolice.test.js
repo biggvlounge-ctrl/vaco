@@ -249,7 +249,11 @@ test('formRogueForces: the leader gets the real upgraded weapon only where the r
     id: w.properties.length + 10000, city_id: cityId, landmark_category: 'government-building',
   });
   w.cities.find((c) => c.id === cityId).region_id = 70000 + cityId;
-  w.regions.push({ id: 70000 + cityId, country_key: 'russian' });
+  // `countryKey` (camel case) is the real field `migration.generateRegion`
+  // writes -- not `country_key`, which this fixture used before task
+  // #110's fix to `weapons.regionHasTrackedMilitaryCapability` (see
+  // that file's own header).
+  w.regions.push({ id: 70000 + cityId, countryKey: 'russian' });
 
   const result = roguePolice.formRogueForces(w, { communityId, tick: 0, ...GENERATORS });
   assert.equal(result.armedWithRifle, true);

@@ -721,3 +721,76 @@ test('sendMessage does not use the walkie-talkie channel when only one side carr
   });
   assert.equal(media.sendMessage(w, { fromEntityId: sender.id, toEntityId: recipient.id }), null);
 });
+
+// ---------------------------------------------------------------------
+// Task #110: multi-region worlds -- `eraReached` must not let one
+// civilization's progress leak into another's city once a world
+// genuinely holds more than one. Before this round, `eraReached`
+// checked "has ANY civilization anywhere reached this era", so a
+// Brazilian civilization reaching `writing` would have handed a
+// Haitian city that had not a working bulletin channel it had not
+// earned -- invisible to every existing test, since every fixture
+// here (like every world `worldgen.js` ever built) holds exactly one
+// civilization.
+// ---------------------------------------------------------------------
+
+function twoCivMediaWorld() {
+  const w = {
+    tick: 100,
+    seed: 'media-multi-region-test',
+    civilizations: [
+      { id: 1, name: 'Civ One', era: null, stability_index: 50 },
+      { id: 2, name: 'Civ Two', era: null, stability_index: 50 },
+    ],
+    technologyEras: [],
+    civilizationTechnologyProgress: [],
+    regions: [
+      { id: 100, name: 'Region One', civilization_id: 1 },
+      { id: 200, name: 'Region Two', civilization_id: 2 },
+    ],
+    cities: [
+      { id: 1, name: 'Literate City', region_id: 100 },
+      { id: 2, name: 'Preliterate City', region_id: 200 },
+    ],
+    communities: [],
+    npcs: [],
+    organizations: [],
+    properties: [],
+    relationships: [],
+    entityKnowledge: [],
+    entityTraits: [],
+    governments: [],
+    publicOpinion: [],
+    beliefs: [],
+    infrastructure: [],
+    inventory: [],
+    barterItems: [],
+  };
+  technology.seedTechnologyEras(w);
+  const writing = w.technologyEras.find((e) => e.name === 'writing');
+  assert.ok(writing, 'writing is not one of technology.ERA_NAMES');
+  // Only civilization 1 has ever unlocked writing.
+  w.civilizationTechnologyProgress.push({ civilization_id: 1, era_id: writing.id, unlocked_tick: 1 });
+  return w;
+}
+
+test('eraReached(worldState, era, cityId) does not let one civilization\'s progress leak into another\'s city', () => {
+  const w = twoCivMediaWorld();
+  // Unscoped (no cityId) stays the pre-existing, "has ANY civilization
+  // reached this" answer -- every existing single-civilization caller
+  // is unaffected.
+  assert.equal(media.eraReached(w, 'writing'), true);
+  assert.equal(media.eraReached(w, 'writing', 1), true, 'city 1\'s own civilization has writing');
+  assert.equal(media.eraReached(w, 'writing', 2), false, 'city 2\'s own civilization does not, and must not borrow civ 1\'s');
+});
+
+test('availableChannels does not offer a literate city\'s bulletin to a preliterate one in the same multi-region world', () => {
+  const w = twoCivMediaWorld();
+  assert.ok(media.availableChannels(w, 1).includes('bulletin'));
+  assert.ok(!media.availableChannels(w, 2).includes('bulletin'), 'city 2\'s own civilization has not reached writing');
+});
+
+test('eraReached(worldState, era, cityId) is a no-op with 0 or 1 civilization -- every existing single-region world is unaffected', () => {
+  const w = mediaWorld({ eras: ['writing'] });
+  assert.equal(media.eraReached(w, 'writing', w.cities[0].id), media.eraReached(w, 'writing'));
+});

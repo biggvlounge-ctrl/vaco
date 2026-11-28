@@ -81,6 +81,7 @@
 const tierTraits = require('./tierTraits.js');
 const infrastructure = require('./infrastructure.js');
 const authority = require('./authority.js');
+const migration = require('./migration.js');
 const { seededDraw } = require('./seeded.js');
 
 const clamp = (n, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
@@ -233,18 +234,41 @@ function driftTourism(worldState, city) {
 // The mean economy of its cities — which is now a live reading rather
 // than the founding constant it was until `refreshCityConditions`
 // existed. Null when no city has an economy to read.
-function budgetOf(worldState) {
-  const economies = (worldState.cities || [])
-    .map((c) => Number(c.economy))
-    .filter(Number.isFinite);
+//
+// **Scoped to one civilization's own cities once a world genuinely
+// has more than one** (task #110, multi-region worlds). With 0 or 1
+// civilization in the world `civilizationId` changes nothing — every
+// existing single-region world reads the exact same mean over every
+// city it always did. Only a SECOND civilization makes "every city in
+// the world" the wrong population to average: Brazil's budget has no
+// business moving because Haiti's cities got poorer.
+function budgetOf(worldState, civilizationId = null) {
+  const civilizations = worldState.civilizations || [];
+  let cities = worldState.cities || [];
+  if (civilizationId !== null && civilizations.length > 1) {
+    const regionIds = new Set(
+      (worldState.regions || [])
+        .filter((r) => r.civilization_id === civilizationId)
+        .map((r) => r.id),
+    );
+    cities = cities.filter((c) => regionIds.has(c.region_id));
+  }
+  const economies = cities.map((c) => Number(c.economy)).filter(Number.isFinite);
   if (economies.length === 0) return null;
   return clamp(Math.round(mean(economies)));
 }
 
-// The civilization whose budget this is. A world has one; a world may
-// have none, and after a reset that is the expected state rather than
-// an error — `authority.standingTerm` makes the same argument for
-// governments.
+// The civilization whose budget this is, when nothing more specific
+// is known. A world has one; a world may have none, and after a
+// reset that is the expected state rather than an error —
+// `authority.standingTerm` makes the same argument for governments.
+//
+// **This is deliberately still "the first civilization", not "the
+// right one for a given city"** — see `migration.civilizationOfCity`
+// for that, which every caller below that actually has a `cityId` now
+// uses instead. `stateOf` stays as the honest answer to "is there A
+// state at all", and as the one `setPriority` falls back to when a
+// caller has not said which civilization it means.
 function stateOf(worldState) {
   const civilizations = worldState.civilizations || [];
   return civilizations.length === 0 ? null : civilizations[0];
@@ -311,11 +335,12 @@ function cityWrit(worldState, cityId, writMap = null) {
 // or null when there is nothing to compute from. Pure — writes nothing.
 function fundingFor(worldState, cityId, options = {}) {
   const civilization = options.civilization === undefined
-    ? stateOf(worldState) : options.civilization;
+    ? migration.civilizationOfCity(worldState, cityId) : options.civilization;
   const shares = sharesOf(civilization);
   if (shares === null) return null;
 
-  const budget = options.budget === undefined ? budgetOf(worldState) : options.budget;
+  const budget = options.budget === undefined
+    ? budgetOf(worldState, civilization?.id ?? null) : options.budget;
   if (budget === null) return null;
 
   // **An unmeasurable writ is not a writ of zero.** A world with no
@@ -351,10 +376,11 @@ function fundingFor(worldState, cityId, options = {}) {
 // where it is for.
 function garrisonOf(worldState, cityId, options = {}) {
   const civilization = options.civilization === undefined
-    ? stateOf(worldState) : options.civilization;
+    ? migration.civilizationOfCity(worldState, cityId) : options.civilization;
   const shares = sharesOf(civilization);
   if (shares === null) return 0;
-  const budget = options.budget === undefined ? budgetOf(worldState) : options.budget;
+  const budget = options.budget === undefined
+    ? budgetOf(worldState, civilization?.id ?? null) : options.budget;
   if (budget === null) return 0;
   if (!(worldState.cities || []).some((c) => c.id === cityId)) return 0;
   return clamp01((budget / 100) * shares[tierTraits.FORCE_FAMILY]);
@@ -704,14 +730,25 @@ function runStatecraft(worldState, tick) {
   }
 
   if (!isBudgetDay(tick)) return events;
-
-  const civilization = stateOf(worldState);
-  const budget = budgetOf(worldState);
-  if (!civilization || budget === null) return events;
+  if ((worldState.civilizations || []).length === 0) return events;
 
   const writMap = authority.writByCommunity(worldState);
 
   for (const city of worldState.cities || []) {
+    // **Resolved PER CITY, not once for the whole world** (task #110,
+    // multi-region worlds) — `migration.civilizationOfCity` and
+    // `budgetOf`'s own civilization scoping are both no-ops while this
+    // world has 0 or 1 civilization, so a single-region world still
+    // gets the exact same civilization and budget on every city, every
+    // time. Only a second real civilization makes "whichever city comes
+    // first" matter, and a city with no real civilization to answer to
+    // (an orphaned region link, or none at all in a multi-civ world) is
+    // skipped rather than funded from whichever civ happened to be
+    // first in the array.
+    const civilization = migration.civilizationOfCity(worldState, city.id);
+    if (!civilization) continue;
+    const budget = budgetOf(worldState, civilization.id);
+    if (budget === null) continue;
     const plan = fundingFor(worldState, city.id, { civilization, budget, writMap });
     if (plan === null) continue;
 
@@ -788,7 +825,12 @@ function setPriority(worldState, options = {}) {
 function describeStatecraft(worldState, cityId) {
   const city = (worldState.cities || []).find((c) => c.id === Number(cityId));
   if (!city) return null;
-  const plan = fundingFor(worldState, city.id);
+  // The city's own civilization, resolved once and reused for every
+  // reading below — same civ[0] answer as before while this world has
+  // 0 or 1 civilization; its own civ once a second one genuinely
+  // exists (task #110, multi-region worlds).
+  const civilization = migration.civilizationOfCity(worldState, city.id);
+  const plan = fundingFor(worldState, city.id, { civilization });
   return {
     cityId: city.id,
     name: city.name,
@@ -797,11 +839,11 @@ function describeStatecraft(worldState, cityId) {
     tourismAppeal: tourismAppeal(worldState, city.id),
     stability: cityStability(worldState, city.id),
     stabilityBand: stabilityBand(cityStability(worldState, city.id)),
-    garrison: garrisonOf(worldState, city.id),
+    garrison: garrisonOf(worldState, city.id, { civilization }),
     writ: plan === null ? null : plan.writ,
-    budget: plan === null ? budgetOf(worldState) : plan.budget,
+    budget: plan === null ? budgetOf(worldState, civilization?.id ?? null) : plan.budget,
     funding: plan === null ? null : plan.funding,
-    priorities: stateOf(worldState)?.traits ?? null,
+    priorities: civilization?.traits ?? null,
   };
 }
 

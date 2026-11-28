@@ -229,7 +229,21 @@ function generateRegion(worldState, options = {}) {
   if (!name) {
     throw new Error('migration.generateRegion requires options.name (regions.name is NOT NULL)');
   }
-  const country = countryKey ? countryPacks.countryFor(countryKey) : null;
+  // **Corrected (task #110): `countryPacks.js` holds TWO real,
+  // non-colliding country tables — `COUNTRIES` (read through
+  // `countryFor`) and the later `COUNTRY_PROFILES` (read through
+  // `countryProfileFor`, Japan/South Korea/Brazil/Nepal/Spain and
+  // others) — and this line only ever checked the first. Nepal and
+  // Brazil, two of the six real locations task #110 names directly,
+  // live in `COUNTRY_PROFILES` and silently resolved to no real
+  // country at all through this function until now, exactly the
+  // "two disagreeing answers" shape this project's own twenty-first
+  // standing rule already catalogues: a second real table existed,
+  // validated against the first for collisions, and the one real
+  // consumer never read it.**
+  const country = countryKey
+    ? (countryPacks.countryFor(countryKey) ?? countryPacks.countryProfileFor(countryKey))
+    : null;
   const temperament = temperamentKey ? regionalTemperamentPacks.describeCluster(temperamentKey) : null;
   const region = {
     id: nextRegionId++,
@@ -290,6 +304,34 @@ function regionOfCity(worldState, cityId) {
   const city = (worldState.cities || []).find((c) => c.id === cityId);
   if (!city || city.region_id === undefined || city.region_id === null) return null;
   return (worldState.regions || []).find((r) => r.id === city.region_id) ?? null;
+}
+
+// The civilization that actually governs this city, through its real
+// region -- never the first civilization generated in the world once
+// a SECOND one genuinely exists (task #110, multi-region worlds: a
+// world can now hold Gaza, Nepal, Brazil, Spain, Haiti and the UK
+// simultaneously, each its own real civilization over its own real
+// cities, built by calling `worldgen.generateWorld` once per region).
+//
+// A world with 0 or 1 civilization is unambiguous -- every world this
+// engine has ever generated, until this round -- and this returns
+// exactly `civilizations[0] ?? null`, the same answer
+// `statecraft.stateOf`'s own pre-existing single-civilization logic
+// always gave, so no existing single-region world's behaviour changes
+// by one bit. Only once a second civilization exists does a city's
+// OWN region/civilization link matter, and a city with no real link
+// in that world returns null honestly rather than borrowing the
+// first civilization's budget, priorities or technology -- the same
+// "unknown is not a zero" posture this file's own corollary already
+// holds elsewhere, applied to "which government" rather than "how
+// much".
+function civilizationOfCity(worldState, cityId) {
+  const civilizations = worldState.civilizations || [];
+  if (civilizations.length <= 1) return civilizations[0] ?? null;
+  const region = regionOfCity(worldState, cityId);
+  const civilizationId = region ? region.civilization_id : null;
+  if (civilizationId === null || civilizationId === undefined) return null;
+  return civilizations.find((c) => c.id === civilizationId) ?? null;
 }
 
 // ---------------------------------------------------------------------
@@ -825,6 +867,7 @@ module.exports = {
   reseedIds,
   generateRegion,
   regionOfCity,
+  civilizationOfCity,
   pushFor,
   willingness,
   WORK_WEIGHT,

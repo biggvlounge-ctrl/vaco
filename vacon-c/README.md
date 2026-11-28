@@ -3177,3 +3177,40 @@ real EV/AV and offering them a real mission at their own real home.
 `test/vehicles.test.js` and an end-to-end integration test in
 `test/utilities.test.js`. See CLAUDE.md's two-hundred-and-twelfth
 standing rule.
+
+### Multi-region worlds (closes task #110)
+Gaza, Nepal, Brazil, Spain, Haiti and the UK can now all be real,
+distinct, simultaneous locations in one world -- `worldgen
+.generateWorld` already supported being called more than once against
+the same shared `engine.WorldState` (its own header already said so);
+the real gap was that nothing ever actually did it, which left three
+real places quietly assuming there could only ever be one
+civilization. `statecraft.stateOf`/`budgetOf` answered "the first
+civilization" / "every city's mean economy" -- correct until a second
+one exists, at which point a rich civilization's budget blends into a
+poor one's. `migration.civilizationOfCity` (new) resolves a city to
+its OWN civilization through its own real region, a complete no-op
+with 0 or 1 civilization so every existing single-region world is
+unaffected; `budgetOf`, `fundingFor`, `garrisonOf`, `runStatecraft`
+and `describeStatecraft` all read through it now. `media.eraReached`
+checked "has ANY civilization reached this era" -- fixed the same way,
+with an optional `cityId` that scopes it once a world genuinely holds
+more than one. Two more real defects surfaced reading the same
+region/country chain: `weapons.regionHasTrackedMilitaryCapability`
+read `region.country_key` (always `undefined`) against a field only
+ever written as `region.countryKey`, so `machine_gun` could never be
+found anywhere in any world -- and the project's own test fixture used
+the identical wrong name, so a green suite never caught it. And
+`migration.generateRegion`'s `countryKey` wiring only ever checked
+`countryPacks.countryFor` (the `COUNTRIES` table), never
+`countryProfileFor` (the later `COUNTRY_PROFILES` table) -- so Nepal
+and Brazil, two of the six real locations this task names directly,
+resolved to no real country data at all until now. No new mechanic was
+invented: a multi-region world is `generateWorld` called once per real
+region, each its own real civilization, coexisting in the same world
+and tick loop; diplomacy or trade between regions is real, separate,
+future work. 16 new tests across `test/statecraft.test.js`,
+`test/media.test.js`, `test/weapons.test.js`, `test/country-packs.test.js`
+and a new end-to-end `test/multiRegion.test.js` building all six real
+locations together. See CLAUDE.md's two-hundred-and-thirteenth
+standing rule.

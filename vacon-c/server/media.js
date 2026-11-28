@@ -72,6 +72,7 @@ const infrastructure = require('./infrastructure.js');
 const worldStore = require('./worldStore.js');
 const perception = require('./perception.js');
 const inventory = require('./inventory.js');
+const migration = require('./migration.js');
 const { seededDraw } = require('./seeded.js');
 
 const clamp01 = (n) => Math.max(0, Math.min(1, n));
@@ -183,10 +184,30 @@ const REACH_ORDER = { community: 0, city: 1, world: 2 };
 // would silence a fresh world completely, which is standing rule 12's
 // first clause — the modifier has to leave the world that has none of
 // this exactly as it was.
-function eraReached(worldState, eraName) {
+//
+// **`cityId`, optional, scopes this to the ONE civilization that
+// actually governs that city once a world genuinely holds more than
+// one** (task #110, multi-region worlds). With 0 or 1 civilization —
+// every world this engine generated before this round — `cityId`
+// changes nothing: `migration.civilizationOfCity` itself falls back
+// to "the civilization" the same way this function's own loop over
+// every civilization always effectively did with only one in it.
+// Only a second real civilization makes "has ANY civilization reached
+// this era" the wrong question — Brazil reaching `radio` does not
+// give Haiti a working radio station. Omitted (no caller passes one
+// yet besides `availableChannels`), this keeps its original,
+// world-wide answer, which is also the only honest answer for a
+// caller with no city in hand at all.
+function eraReached(worldState, eraName, cityId = null) {
   if (eraName === null || eraName === undefined) return true;
   const civilizations = worldState.civilizations || [];
   if (civilizations.length === 0) return false;
+  if (cityId !== null && civilizations.length > 1) {
+    const civilization = migration.civilizationOfCity(worldState, cityId);
+    if (!civilization) return false;
+    const unlocked = technology.unlockedEras(worldState, civilization.id);
+    return unlocked.some((u) => u.era?.name === eraName);
+  }
   for (const civilization of civilizations) {
     const unlocked = technology.unlockedEras(worldState, civilization.id);
     if (unlocked.some((u) => u.era?.name === eraName)) return true;
@@ -219,7 +240,7 @@ function availableChannels(worldState, cityId = null) {
   const hasOutlet = outlets(worldState).length > 0;
   return CHANNEL_NAMES.filter((name) => {
     const channel = CHANNELS[name];
-    if (!eraReached(worldState, channel.era)) return false;
+    if (!eraReached(worldState, channel.era, cityId)) return false;
     if (channel.outlet && !hasOutlet) return false;
     if (!infrastructureReady(worldState, channel, cityId)) return false;
     return true;

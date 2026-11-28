@@ -315,7 +315,11 @@ test('gun-store never yields machine_gun or the switch at a property with no tra
 test('gun-store CAN yield machine_gun once availableAt genuinely allows it -- a real government-building in a militarily tracked region', () => {
   const w = world();
   weapons.registerItems(w);
-  w.regions = [{ id: 1, country_key: 'russian' }];
+  // `countryKey` (camel case) is the real field `migration.generateRegion`
+  // writes -- not `country_key`, which this fixture used before task
+  // #110's fix to `weapons.regionHasTrackedMilitaryCapability` (see
+  // that file's own header).
+  w.regions = [{ id: 1, countryKey: 'russian' }];
   w.cities = [{ id: 1, region_id: 1 }];
   const p = person(w, 1);
   const place = landmark(w, 10, 'government-building', 95);

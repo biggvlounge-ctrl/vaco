@@ -1770,3 +1770,30 @@ test('report-only discipline: nothing outside countryPacks.js itself reads RESOU
   const files = out.split('\n').filter(Boolean).map((p) => p.replace(/^server\//, ''));
   assert.deepEqual(files.sort(), ['countryPacks.js', 'fugitives.js'], 'only countryPacks.js and fugitives.js (real, report-only clue flavour) should reference the resource-profile symbols');
 });
+
+// ---------------------------------------------------------------------
+// Task #110: multi-region worlds -- COUNTRY_PROFILES was a real,
+// validated, non-colliding second table and `generateRegion` only
+// ever checked the first (`COUNTRIES`, via `countryFor`). Nepal and
+// Brazil -- two of the six real locations task #110 names directly --
+// live in COUNTRY_PROFILES and silently resolved to no real country
+// at all through `generateRegion` until this round.
+// ---------------------------------------------------------------------
+
+test('generateRegion also reports a real country whose entry lives in COUNTRY_PROFILES, not just COUNTRIES', () => {
+  const w = { regions: [] };
+  // Confirmed directly: countryFor('nepal') returns null (nepal has
+  // no ancestryPacks.GROUPS-keyed COUNTRIES entry) and
+  // countryProfileFor('nepal') is the real, dedicated entry this
+  // reads instead.
+  assert.equal(countryPacks.countryFor('nepal'), null);
+  assert.ok(countryPacks.countryProfileFor('nepal'));
+
+  const nepal = migration.generateRegion(w, { name: 'Test Region', countryKey: 'nepal' });
+  assert.equal(nepal.incomeLevel, 'low-income');
+  assert.equal(nepal.conflictLevel, 'no-active-conflict');
+  assert.equal(nepal.governmentType, 'federal parliamentary republic');
+
+  const brazil = migration.generateRegion(w, { name: 'Test Region 2', countryKey: 'brazil' });
+  assert.ok(brazil.incomeLevel, 'brazil (also a COUNTRY_PROFILES-only entry) should carry a real income level too');
+});

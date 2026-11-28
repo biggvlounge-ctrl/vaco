@@ -657,3 +657,171 @@ test('§7 no longer carries three bare absences, and the new statistics answer',
     assert.ok(keys.has(key), `${key} is not in the catalogue`);
   }
 });
+
+// ---------------------------------------------------------------------
+// Task #110: multi-region worlds -- a second, real civilization must
+// not blend budgets, priorities or garrison with the first.
+//
+// `stateOf`/the pre-existing `budgetOf(worldState)` always answered
+// "the first civilization" / "every city's mean economy", and that
+// was correct for the entire life of this engine because every world
+// it ever generated held exactly one civilization. The moment a
+// SECOND one genuinely exists -- Gaza and Nepal, say, simultaneously
+// -- "the first one" and "every city" both become wrong answers, and
+// nothing in the existing suite could see it: every fixture here, like
+// every world `worldgen.js` ever built, has exactly one civilization.
+// ---------------------------------------------------------------------
+
+// Two complete, independent civilizations in one world, built the way
+// `worldgen.js` links them for real: city -> region_id -> region ->
+// civilization_id -> civilization. Economies and priorities differ on
+// purpose so a blended answer is numerically distinguishable from a
+// correctly scoped one.
+function twoCivWorld() {
+  const w = {
+    tick: 90,
+    seed: 'multi-region-test',
+    cities: [
+      {
+        id: 1, name: 'Richtown', economy: 90, safety: 50, infrastructure: 70,
+        growth: 0, population: 0, dna: null, traits: tierTraits.cityTraits({}),
+        region_id: 100,
+      },
+      {
+        id: 2, name: 'Poorville', economy: 10, safety: 50, infrastructure: 70,
+        growth: 0, population: 0, dna: null, traits: tierTraits.cityTraits({}),
+        region_id: 200,
+      },
+    ],
+    regions: [
+      { id: 100, name: 'Region One', civilization_id: 1 },
+      { id: 200, name: 'Region Two', civilization_id: 2 },
+    ],
+    civilizations: [
+      {
+        id: 1, name: 'Civ One', era: null, stability_index: 50,
+        traits: tierTraits.civilizationTraits({
+          healthcare: 50, education: 50, security: 50, military: 50,
+        }),
+      },
+      {
+        id: 2, name: 'Civ Two', era: null, stability_index: 50,
+        traits: tierTraits.civilizationTraits({
+          healthcare: 50, education: 50, security: 50, military: 50,
+        }),
+      },
+    ],
+    communities: [
+      { id: 9, city_id: 1, safety: 50, employment: 50, education: 50, crime: 0, housing: 50, reputation: 50, population: 0 },
+      { id: 19, city_id: 2, safety: 50, employment: 50, education: 50, crime: 0, housing: 50, reputation: 50, population: 0 },
+    ],
+    npcs: [],
+    resources: [],
+    cultures: [],
+    cultureMemberships: [],
+    territoryBlocks: [],
+    deceased: [],
+    historicalRecords: [],
+    infrastructure: [
+      {
+        id: 1, city_id: 1, type: 'hospitals', capacity: 60, condition: 80,
+        maintenance_level: 50, funding: 50, age: 0, failed_since_tick: null, repair_ticks: null,
+      },
+      {
+        id: 2, city_id: 1, type: 'schools', capacity: 400, condition: 80,
+        maintenance_level: 50, funding: 50, age: 0, failed_since_tick: null, repair_ticks: null,
+      },
+      {
+        id: 3, city_id: 1, type: 'public_safety', capacity: 50, condition: 80,
+        maintenance_level: 50, funding: 50, age: 0, failed_since_tick: null, repair_ticks: null,
+      },
+      {
+        id: 11, city_id: 2, type: 'hospitals', capacity: 60, condition: 80,
+        maintenance_level: 50, funding: 50, age: 0, failed_since_tick: null, repair_ticks: null,
+      },
+      {
+        id: 12, city_id: 2, type: 'schools', capacity: 400, condition: 80,
+        maintenance_level: 50, funding: 50, age: 0, failed_since_tick: null, repair_ticks: null,
+      },
+      {
+        id: 13, city_id: 2, type: 'public_safety', capacity: 50, condition: 80,
+        maintenance_level: 50, funding: 50, age: 0, failed_since_tick: null, repair_ticks: null,
+      },
+    ],
+  };
+  return w;
+}
+
+test('budgetOf scopes to one civilization\'s own cities once a world genuinely holds more than one', () => {
+  const w = twoCivWorld();
+  // Unscoped (no civilizationId) stays the pre-existing, world-wide
+  // answer -- every existing single-civilization caller is unaffected.
+  assert.equal(statecraft.budgetOf(w), 50); // mean(90, 10)
+  assert.equal(statecraft.budgetOf(w, 1), 90, 'civ 1 owns only Richtown');
+  assert.equal(statecraft.budgetOf(w, 2), 10, 'civ 2 owns only Poorville');
+});
+
+test('budgetOf(worldState, civilizationId) is a no-op with 0 or 1 civilization -- every existing single-region world is unaffected', () => {
+  const { w } = stateWorld();
+  // Passing a civilizationId here changes nothing: there is only one
+  // civilization, so scoping and not scoping must agree.
+  assert.equal(statecraft.budgetOf(w, w.civilizations[0].id), statecraft.budgetOf(w));
+});
+
+test('migration.civilizationOfCity resolves each city to its own real civilization, through its own real region', () => {
+  const migration = require('../server/migration.js');
+  const w = twoCivWorld();
+  assert.equal(migration.civilizationOfCity(w, 1).id, 1);
+  assert.equal(migration.civilizationOfCity(w, 2).id, 2);
+});
+
+test('migration.civilizationOfCity falls back to the first/only civilization with 0 or 1 in the world, same as stateOf always did', () => {
+  const migration = require('../server/migration.js');
+  const { w } = stateWorld();
+  assert.equal(migration.civilizationOfCity(w, 1), statecraft.stateOf(w));
+  assert.equal(migration.civilizationOfCity(w, 999), statecraft.stateOf(w), 'even an unknown city, with only one civilization to answer with');
+
+  const empty = { civilizations: [], cities: [], regions: [] };
+  assert.equal(migration.civilizationOfCity(empty, 1), null);
+});
+
+test('describeStatecraft reads EACH city\'s own civilization\'s budget and priorities, never the first civilization\'s', () => {
+  const w = twoCivWorld();
+  // Give the two civilizations visibly different priorities so a
+  // blended or civ[0]-only answer is distinguishable from a correct one.
+  w.civilizations[0].traits.military = 80;
+  w.civilizations[1].traits.military = 5;
+
+  const richReading = statecraft.describeStatecraft(w, 1);
+  const poorReading = statecraft.describeStatecraft(w, 2);
+
+  assert.equal(richReading.budget, 90, 'Richtown reads its own civ 1 budget, not the blended 50');
+  assert.equal(poorReading.budget, 10, 'Poorville reads its own civ 2 budget, not civ 1\'s 90');
+  assert.equal(richReading.priorities.military, 80);
+  assert.equal(poorReading.priorities.military, 5, 'not civ 1\'s military priority');
+});
+
+test('runStatecraft funds each city from its OWN civilization\'s budget -- a poor civ\'s city does not borrow a rich one\'s', () => {
+  const w = twoCivWorld();
+  // Starve every service's maintenance down near the funding line so a
+  // real budget difference actually produces a real, different outcome
+  // -- not a no-op both civilizations would pass regardless.
+  for (const row of w.infrastructure) row.maintenance_level = 5;
+
+  statecraft.runStatecraft(w, 90);
+
+  const richPlan = statecraft.fundingFor(w, 1);
+  const poorPlan = statecraft.fundingFor(w, 2);
+  assert.equal(richPlan.budget, 90);
+  assert.equal(poorPlan.budget, 10);
+  // A civilization with nine times the budget delivers more real
+  // funding to every one of its own services -- this is what "a poor
+  // civilization's city does not borrow a rich one's budget" means in
+  // a number, not just in the two budget fields read above.
+  for (const service of ['healthcare', 'education', 'security']) {
+    assert.ok(
+      richPlan.funding[service] > poorPlan.funding[service],
+      `${service}: Richtown (civ 1) should be funded above Poorville (civ 2)`,
+    );
+  }
+});

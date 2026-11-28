@@ -254,20 +254,33 @@ function fireRound(worldState, entityId) {
 // `countryPacks.js`'s real, SIPRI-sourced `militaryExpenditurePctGDP`
 // per country — read through the one real chain that already exists
 // from a landmark to a country: `properties.city_id` ->
-// `cities.region_id` -> `regions.country_key` ->
+// `cities.region_id` -> `regions.countryKey` ->
 // `countryPacks.countryFor`. A region with no country attached, or a
 // country this file has no tracked figure for, answers `false` —
 // honest absence, not an invented cutoff on the number itself.
+//
+// **Corrected (task #110): this read `region.country_key` (snake
+// case) against a field `migration.generateRegion` has only ever
+// written as `region.countryKey` (camel case) — see that function's
+// own `countryKey` option. The wrong name is always `undefined`, so
+// this returned `false` for every region in every world ever
+// generated, however real a country's military expenditure was, and
+// `machine_gun` could never actually be found anywhere. The project's
+// own test fixture (`test/weapons.test.js`'s `placeWithChain`) built
+// its region with the same wrong `country_key` field, so a green
+// suite never exercised the real shape `migration.generateRegion`
+// actually produces — standing rule 24's shape, the fixture agreeing
+// with the bug instead of with the production code.**
 function regionHasTrackedMilitaryCapability(worldState, propertyId) {
   const property = (worldState.properties || []).find((p) => p.id === propertyId);
   if (!property || !property.city_id) return false;
   const city = (worldState.cities || []).find((c) => c.id === property.city_id);
   if (!city || !city.region_id) return false;
   const region = (worldState.regions || []).find((r) => r.id === city.region_id);
-  if (!region || !region.country_key) return false;
+  if (!region || !region.countryKey) return false;
   // eslint-disable-next-line global-require
   const countryPacks = require('./countryPacks.js');
-  const country = countryPacks.countryFor(region.country_key);
+  const country = countryPacks.countryFor(region.countryKey);
   return !!(country && country.militaryExpenditurePctGDP);
 }
 
@@ -301,13 +314,26 @@ const MANUFACTURING_ERA = 'industrialization';
 const MANUFACTURING_OCCUPATION = 'engineer';
 const ROUNDS_PER_MANUFACTURE = 20;
 
+// The same per-file local `cityOf(worldState, entityId)` join this
+// codebase already repeats in `contacts.js`/`crime.js`/`travel.js`
+// and others (an accepted pattern here, not centralised) — needed so
+// the era check below can ask "has THIS entity's own civilization
+// reached this era", not "has any civilization anywhere" (task #110,
+// multi-region worlds).
+function cityOf(worldState, entityId) {
+  const npc = (worldState.npcs || []).find((n) => n.id === entityId);
+  if (!npc || npc.communityId == null) return null;
+  const community = (worldState.communities || []).find((c) => c.id === npc.communityId);
+  return community ? community.city_id ?? null : null;
+}
+
 function canManufactureAmmunition(worldState, entityId, ammoName) {
   if (!AMMUNITION[ammoName]) {
     return { ok: false, reason: `"${ammoName}" is not an ammunition item` };
   }
   // eslint-disable-next-line global-require
   const media = require('./media.js');
-  if (!media.eraReached(worldState, MANUFACTURING_ERA)) {
+  if (!media.eraReached(worldState, MANUFACTURING_ERA, cityOf(worldState, entityId))) {
     return {
       ok: false,
       reason: `ammunition manufacturing needs the ${MANUFACTURING_ERA} era, not yet reached`,

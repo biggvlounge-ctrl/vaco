@@ -137,7 +137,7 @@ function digitalPlanetReady(worldState, cityId) {
   }
   const available = media.availableChannels(worldState, cityId);
   if (!available.includes(GATE_CHANNEL)) {
-    const eraReached = media.eraReached(worldState, GATE_ERA);
+    const eraReached = media.eraReached(worldState, GATE_ERA, cityId);
     const reason = !eraReached
       ? `era "${GATE_ERA}" not yet reached`
       : 'no working internet infrastructure in this city';

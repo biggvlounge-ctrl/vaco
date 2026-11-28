@@ -66,7 +66,11 @@ function employAsEngineer(w, entityId, { employerType = 'business' } = {}) {
 }
 
 function placeWithChain(w, { landmarkCategory = null, countryKey = null } = {}) {
-  const region = { id: nextId++, country_key: countryKey };
+  // `countryKey` (camel case) is the real field `migration.generateRegion`
+  // writes -- not `country_key`, which earlier versions of both this
+  // fixture and `weapons.js` itself used, so neither ever disagreed
+  // with the other (task #110's fix: see weapons.js's own header).
+  const region = { id: nextId++, countryKey };
   w.regions.push(region);
   const city = { id: nextId++, region_id: region.id };
   w.cities.push(city);
@@ -245,7 +249,7 @@ test('regionHasTrackedMilitaryCapability is honest absence at every missing link
   const regionNoCountry = { id: 3, city_id: 11 };
   w.properties.push(regionNoCountry);
   w.cities.push({ id: 11, region_id: 20 });
-  w.regions.push({ id: 20, country_key: null });
+  w.regions.push({ id: 20, countryKey: null });
   assert.equal(weapons.regionHasTrackedMilitaryCapability(w, 3), false, 'region with no country key');
 
   const untrackedCountry = placeWithChain(w, { countryKey: 'not-a-real-country-key' });
@@ -253,6 +257,23 @@ test('regionHasTrackedMilitaryCapability is honest absence at every missing link
 
   const tracked = placeWithChain(w, { countryKey: 'russian' });
   assert.equal(weapons.regionHasTrackedMilitaryCapability(w, tracked.id), true, 'russia has a real, tracked SIPRI figure');
+});
+
+test('regionHasTrackedMilitaryCapability recognizes a region built through the real migration.generateRegion, not just a hand-built fixture', () => {
+  // The earlier bug (task #110's own fix) read `region.country_key`
+  // against a region that only ever had `region.countryKey` --
+  // invisible to a fixture using the same wrong field name as the
+  // bug. This builds the region the real way, through the one real
+  // generator, so a future rename of either side would actually be
+  // caught here.
+  const w = world();
+  const migration = require('../server/migration.js');
+  const region = migration.generateRegion(w, { name: 'Test Region', countryKey: 'russian' });
+  const city = { id: nextId++, region_id: region.id };
+  w.cities.push(city);
+  const property = { id: nextId++, city_id: city.id };
+  w.properties.push(property);
+  assert.equal(weapons.regionHasTrackedMilitaryCapability(w, property.id), true);
 });
 
 test('availableAt refuses the switch everywhere, and gates machine_gun on a government-building in a militarily tracked region', () => {
