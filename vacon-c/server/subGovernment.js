@@ -93,6 +93,71 @@ const SUBGOVERNMENT_ROLES = ['lieutenant', 'council_member', 'deputy'];
 // never touches a gang).
 const GANG_COMMAND_TIERS = ['lieutenant', 'shot_caller'];
 
+// ---------------------------------------------------------------------
+// Task #111: real sub-leader vocabularies for the three organization
+// types that fell through to the one generic ordinary-organization
+// list above — the identical mismatch the gang/ordinary split already
+// exists to prevent, just unnoticed for three more real
+// `organizations.type` values. A `government` org's own real "City
+// Council" row (`worldgen.js`) used `council_member` sensibly, but a
+// `religion` org's sub-leaders were being called `lieutenant`s and a
+// `military` org's `deputy`s — titles that fit neither institution.
+// ---------------------------------------------------------------------
+
+// `GOVERNMENT_ROLES` keeps `deputy`/`council_member` from the generic
+// list (both already real and already sensible for a government —
+// `council_member` is the exact word `worldgen.js`'s own "City
+// Council" organization already uses) and adds `clerk`: a nearly
+// universal real municipal office (a "City Clerk") for administrative
+// staff below the elected tier, distinct from a policy-making deputy
+// or council seat. Flagged interpretive, the same posture
+// `SUBGOVERNMENT_ROLES` itself already carries — no single document
+// fixes an exact list — but every term here is a real, broadly
+// attested local-government role, not invented.
+const GOVERNMENT_ROLES = ['deputy', 'council_member', 'clerk'];
+
+// `RELIGIOUS_ROLES`: `elder` is the broadest real cross-tradition lay-
+// leadership term available — a council or body of elders exists in
+// some real form across Christian, Jewish (zekenim) and Muslim
+// (majlis al-shura) congregational governance, and is also the real
+// LDS priesthood office this engine's own Mormon archetype
+// (CLAUDE.md's hundred-and-fifty-ninth standing rule) already
+// implies. `deacon` is named alongside it honestly as the narrower
+// term it actually is — real and well-documented, but specifically
+// Christian (Catholic, Orthodox and most Protestant traditions all
+// have one), not claimed to generalise the way `elder` does. Neither
+// term touches `occupations.CLERGY_TITLES`, which stays the one real
+// per-tradition title for the congregation's actual leader.
+const RELIGIOUS_ROLES = ['elder', 'deacon'];
+
+// `MILITARY_ROLES`: the one real structural split every modern
+// military shares — a commissioned officer corps and a non-
+// commissioned-officer (NCO) corps — without committing to any one
+// country's specific rank names, which stays task #180's own job
+// ("full real military rank/branch taxonomy"). `officer` is already
+// `occupations.DEFINING_POST.military`; `non_commissioned_officer` is
+// its real complementary tier, not a third invented rung.
+const MILITARY_ROLES = ['officer', 'non_commissioned_officer'];
+
+// Which real vocabulary a given organization's sub-leaders are drawn
+// from — gang command tiers for a gang/faction (read, never
+// reassigned, per this file's own header), one of the three real
+// per-system-type lists above for a government/religion/military
+// organization, and the generic ordinary-organization list for
+// everything else (business, tribe, club and so on — §14 and this
+// round both apply only where a document or a real institutional
+// shape actually names something more specific).
+const ROLES_BY_ORGANIZATION_TYPE = {
+  government: GOVERNMENT_ROLES,
+  religion: RELIGIOUS_ROLES,
+  military: MILITARY_ROLES,
+};
+
+function subLeaderRolesFor(organization) {
+  if (membership.isGang(organization)) return GANG_COMMAND_TIERS;
+  return ROLES_BY_ORGANIZATION_TYPE[organization?.type] ?? SUBGOVERNMENT_ROLES;
+}
+
 const MEMBERS_PER_SUBLEADER = 10;
 
 // How much of `organizationCohesionOf`'s real loyalty pull survives
@@ -111,7 +176,7 @@ function requiredSubLeadersFor(worldState, organizationId) {
 // once: an organization is one or the other (`membership.isGang`).
 function currentSubLeadersOf(worldState, organizationId) {
   const organization = (worldState.organizations || []).find((o) => o.id === organizationId);
-  const commandRoles = membership.isGang(organization) ? GANG_COMMAND_TIERS : SUBGOVERNMENT_ROLES;
+  const commandRoles = subLeaderRolesFor(organization);
   return (worldState.entityOrganizationMemberships || [])
     .filter((m) => m.organization_id === organizationId && commandRoles.includes(m.role_in_org))
     .map((m) => m.entity_id);
@@ -140,21 +205,25 @@ function organizationCohesionOf(worldState, organizationId) {
   return Math.round(Math.max(0, Math.min(1, cohesion)) * 10000) / 10000;
 }
 
-// Bulk sub-leader assignment for an ORDINARY organization — the
-// identical per-member try/catch shape `playbook.js#assignToPlaybook`
-// already established over the same real `leadership.assignRole`
-// primitive, a different bounded vocabulary. A gang organization is
-// refused by `assignRole` itself, per member, for the real reason
-// stated there -- never re-decided here.
+// Bulk sub-leader assignment for an ORDINARY organization, or a real
+// government/religious/military one — the identical per-member
+// try/catch shape `playbook.js#assignToPlaybook` already established
+// over the same real `leadership.assignRole` primitive, a different
+// bounded vocabulary PER organization type (task #111), never the
+// one flat list regardless of what kind of institution this actually
+// is. A gang organization is refused by `assignRole` itself, per
+// member, for the real reason stated there -- never re-decided here.
 function assignSubLeaders(worldState, leaderEntityId, options = {}) {
   const {
     organizationId, subordinateEntityIds, role, tick = worldState.tick ?? 0,
   } = options;
 
-  if (!SUBGOVERNMENT_ROLES.includes(role)) {
+  const organization = (worldState.organizations || []).find((o) => o.id === organizationId);
+  const validRoles = subLeaderRolesFor(organization);
+  if (!validRoles.includes(role)) {
     throw new Error(
-      `assignSubLeaders: "${role}" is not a real sub-government role. The `
-      + `${SUBGOVERNMENT_ROLES.length} are: ${SUBGOVERNMENT_ROLES.join(', ')}.`,
+      `assignSubLeaders: "${role}" is not a real sub-leader role for this organization. The `
+      + `${validRoles.length} are: ${validRoles.join(', ')}.`,
     );
   }
   if (!Array.isArray(subordinateEntityIds) || subordinateEntityIds.length === 0) {
@@ -179,6 +248,10 @@ function assignSubLeaders(worldState, leaderEntityId, options = {}) {
 module.exports = {
   SUBGOVERNMENT_ROLES,
   GANG_COMMAND_TIERS,
+  GOVERNMENT_ROLES,
+  RELIGIOUS_ROLES,
+  MILITARY_ROLES,
+  subLeaderRolesFor,
   MEMBERS_PER_SUBLEADER,
   UNCOVERED_COHESION_PENALTY,
   requiredSubLeadersFor,

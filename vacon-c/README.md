@@ -3214,3 +3214,28 @@ future work. 16 new tests across `test/statecraft.test.js`,
 and a new end-to-end `test/multiRegion.test.js` building all six real
 locations together. See CLAUDE.md's two-hundred-and-thirteenth
 standing rule.
+
+### Real government/religious/military role hierarchies (closes task #111)
+`subGovernment.js`'s own sub-leader dispatch was a bare binary --
+gang command tiers, or one flat generic list
+(`lieutenant`/`council_member`/`deputy`) for every other
+organization, including `government`, `religion` and `military`
+alike. A government happened to fit reasonably well (a real "City
+Council" organization already uses `council_member`), which is
+exactly why a religious organization's sub-leaders being called
+`lieutenant`s, and a military one's `deputy`s, went unnoticed. Three
+new real vocabularies, dispatched by `organizations.type`:
+`GOVERNMENT_ROLES` (`deputy`/`council_member`/the added `clerk`, a
+real, nearly universal municipal office); `RELIGIOUS_ROLES`
+(`elder` -- the one real term that generalises across Christian,
+Jewish and Muslim congregational governance and LDS priesthood
+structure -- and `deacon`, named honestly as the narrower,
+specifically Christian term it is); `MILITARY_ROLES`
+(`officer`/`non_commissioned_officer`, the one real structural split
+every modern military shares, stopping short of any country's
+specific rank names -- that stays task #180's own job). New
+`subLeaderRolesFor(organization)` is the one dispatch point both
+`currentSubLeadersOf` and `assignSubLeaders` now read, instead of
+each silently assuming the one generic list. 9 new tests in
+`test/subgovernment.test.js`. See CLAUDE.md's two-hundred-and-
+fourteenth standing rule.

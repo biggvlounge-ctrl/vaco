@@ -198,8 +198,119 @@ test('an unreal sub-government role is refused outright, before any member is to
 
   assert.throws(() => subGovernment.assignSubLeaders(w, leaderId, {
     organizationId: orgId, subordinateEntityIds: [s], role: 'strategy',
-  }), /not a real sub-government role/);
+  }), /not a real sub-leader role/);
   assert.equal(membership.findMembership(w, s, orgId).role_in_org, null);
+});
+
+// ---------------------------------------------------------------------
+// Task #111: real government/religious/military sub-leader
+// vocabularies, distinct from the generic ordinary-organization list
+// and from each other
+// ---------------------------------------------------------------------
+
+test('subLeaderRolesFor returns the real, distinct vocabulary for each of government, religion and military', () => {
+  assert.deepEqual(subGovernment.subLeaderRolesFor({ type: 'government' }), subGovernment.GOVERNMENT_ROLES);
+  assert.deepEqual(subGovernment.subLeaderRolesFor({ type: 'religion' }), subGovernment.RELIGIOUS_ROLES);
+  assert.deepEqual(subGovernment.subLeaderRolesFor({ type: 'military' }), subGovernment.MILITARY_ROLES);
+  // And all three are genuinely different from one another, and from
+  // the generic ordinary-organization list -- not the same list under
+  // three names.
+  const lists = [
+    subGovernment.GOVERNMENT_ROLES, subGovernment.RELIGIOUS_ROLES,
+    subGovernment.MILITARY_ROLES, subGovernment.SUBGOVERNMENT_ROLES,
+  ];
+  for (let i = 0; i < lists.length; i += 1) {
+    for (let j = i + 1; j < lists.length; j += 1) {
+      assert.notDeepEqual(lists[i], lists[j]);
+    }
+  }
+});
+
+test('subLeaderRolesFor falls back to the generic ordinary-organization list for a business, tribe or club', () => {
+  for (const type of ['business', 'club', 'corporation', 'tribe']) {
+    assert.deepEqual(subGovernment.subLeaderRolesFor({ type }), subGovernment.SUBGOVERNMENT_ROLES);
+  }
+});
+
+test('subLeaderRolesFor prefers the gang vocabulary over any type-based one when both could apply', () => {
+  // A gang IS `organizations.type === 'gang'`, which is not one of the
+  // three per-system-type keys above, so this also exercises the
+  // ordinary fallback path landing correctly on the gang branch first.
+  assert.deepEqual(subGovernment.subLeaderRolesFor({ type: 'gang' }), subGovernment.GANG_COMMAND_TIERS);
+  assert.deepEqual(subGovernment.subLeaderRolesFor({ type: 'business', isFaction: true }), subGovernment.GANG_COMMAND_TIERS);
+});
+
+test('a real religious organization accepts its own real elder/deacon roles, and refuses a gang or government one', () => {
+  const w = world();
+  const leaderId = person(w);
+  const orgId = organization(w, { leaderId, type: 'religion' });
+  const subs = [person(w), person(w)];
+  for (const s of subs) { member(w, s, orgId); setLoyalty(w, leaderId, s, 100); }
+
+  const elderResult = subGovernment.assignSubLeaders(w, leaderId, {
+    organizationId: orgId, subordinateEntityIds: [subs[0]], role: 'elder',
+  });
+  assert.equal(elderResult[0].complied, true);
+  assert.equal(membership.findMembership(w, subs[0], orgId).role_in_org, 'elder');
+
+  assert.throws(() => subGovernment.assignSubLeaders(w, leaderId, {
+    organizationId: orgId, subordinateEntityIds: [subs[1]], role: 'lieutenant',
+  }), /not a real sub-leader role/, 'a religious organization has no lieutenants');
+  assert.throws(() => subGovernment.assignSubLeaders(w, leaderId, {
+    organizationId: orgId, subordinateEntityIds: [subs[1]], role: 'council_member',
+  }), /not a real sub-leader role/, 'nor council members -- that is the real government vocabulary, not this one');
+});
+
+test('a real military organization accepts its own real officer/NCO roles, and currentSubLeadersOf reads them back', () => {
+  const w = world();
+  const leaderId = person(w);
+  const orgId = organization(w, { leaderId, type: 'military' });
+  const subs = [person(w), person(w)];
+  for (const s of subs) { member(w, s, orgId); setLoyalty(w, leaderId, s, 100); }
+
+  subGovernment.assignSubLeaders(w, leaderId, {
+    organizationId: orgId, subordinateEntityIds: [subs[0]], role: 'non_commissioned_officer',
+  });
+  subGovernment.assignSubLeaders(w, leaderId, {
+    organizationId: orgId, subordinateEntityIds: [subs[1]], role: 'officer',
+  });
+  const current = subGovernment.currentSubLeadersOf(w, orgId);
+  assert.equal(current.length, 2);
+  assert.ok(current.includes(subs[0]) && current.includes(subs[1]));
+});
+
+test('a real government organization keeps the already-sensible council_member/deputy roles, and gains the real clerk one', () => {
+  const w = world();
+  const leaderId = person(w);
+  const orgId = organization(w, { leaderId, type: 'government' });
+  const subs = [person(w), person(w), person(w)];
+  for (const s of subs) { member(w, s, orgId); setLoyalty(w, leaderId, s, 100); }
+
+  const results = [
+    subGovernment.assignSubLeaders(w, leaderId, { organizationId: orgId, subordinateEntityIds: [subs[0]], role: 'council_member' }),
+    subGovernment.assignSubLeaders(w, leaderId, { organizationId: orgId, subordinateEntityIds: [subs[1]], role: 'deputy' }),
+    subGovernment.assignSubLeaders(w, leaderId, { organizationId: orgId, subordinateEntityIds: [subs[2]], role: 'clerk' }),
+  ];
+  for (const r of results) assert.equal(r[0].complied, true);
+  assert.equal(subGovernment.currentSubLeadersOf(w, orgId).length, 3);
+});
+
+test('subGovernmentCoverageOf and organizationCohesionOf work identically for a real religious/military organization as for an ordinary one', () => {
+  // These two functions never branch on organization type themselves
+  // -- they go through `currentSubLeadersOf`, which now does. This is
+  // the integration check that the dispatch change did not silently
+  // break the two real, already-tested consumers.
+  const w = world();
+  const orgId = organization(w, { type: 'religion', internalLoyalty: 80 });
+  const members = [person(w), person(w), person(w), person(w), person(w),
+    person(w), person(w), person(w), person(w), person(w), person(w)];
+  for (const m of members) member(w, m, orgId);
+  member(w, members[0], orgId, 'elder');
+
+  assert.equal(subGovernment.requiredSubLeadersFor(w, orgId), 1);
+  assert.equal(subGovernment.subGovernmentCoverageOf(w, orgId), 1);
+  const cohesion = subGovernment.organizationCohesionOf(w, orgId);
+  assert.equal(cohesion, 0.8, 'full coverage: cohesion is the real loyalty pull, undiminished');
 });
 
 // ---------------------------------------------------------------------

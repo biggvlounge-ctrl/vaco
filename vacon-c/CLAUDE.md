@@ -12645,3 +12645,73 @@ real multi-region world exactly ONCE at module scope, before any
 `test()` runs, and scope every assertion to the specific ids each
 `generateWorld` call actually returned rather than to
 `w.cities`/`w.regions`/`w.civilizations` wholesale.
+
+**A two-hundred-and-fourteenth, closing task #111 — "real government/
+religious/military role hierarchies per system type (structure, not
+named real people)."** The real gap was not an absence of any
+hierarchy at all — `server/subGovernment.js` (task #46) already gave
+every ordinary organization a real sub-leader tier
+(`lieutenant`/`council_member`/`deputy`), gangs already had §14's own
+named command tiers (`membership.GANG_HIERARCHY`), and governments
+already had a real cross-SCOPE ladder
+(`mayor_npc_id`/`governor_npc_id`/`head_of_state_npc_id`, the fifty-
+sixth standing rule's scoped elections). The gap was narrower and
+easy to miss: `currentSubLeadersOf`'s own dispatch was a bare binary
+— `isGang(organization) ? GANG_COMMAND_TIERS : SUBGOVERNMENT_ROLES` —
+so a `religion` organization's sub-leaders were being called
+`lieutenant`s and a `military` organization's `deputy`s, the identical
+generic list applied to every non-gang `organizations.type` with no
+distinction at all. `council_member`/`deputy` happen to fit a
+government reasonably well — `worldgen.js`'s own real "City Council"
+organization already uses `council_member` — which is exactly why the
+mismatch for the other two went unnoticed: one of the three fell
+through to a list that happened to make sense anyway.
+
+**Three new real vocabularies, dispatched by `organizations.type`,
+each flagged interpretive the same way `SUBGOVERNMENT_ROLES` itself
+already is — no single document fixes an exact list for any of the
+three, but every term is real and attested, never invented.**
+`GOVERNMENT_ROLES` keeps `deputy`/`council_member` and adds `clerk` (a
+real, nearly universal municipal office, administrative staff below
+the elected tier). `RELIGIOUS_ROLES` is `['elder', 'deacon']` — `elder`
+chosen specifically because it is the one real term that generalises
+across traditions (a council or body of elders exists in some form in
+Christian, Jewish and Muslim congregational governance, and is also a
+real LDS priesthood office, task #159's own Mormon archetype),
+`deacon` named honestly as the narrower, specifically Christian term
+it actually is rather than smoothed into a false universal.
+`MILITARY_ROLES` is `['officer', 'non_commissioned_officer']` — the
+one real structural split every modern military shares, deliberately
+stopping short of any one country's specific rank names, which stays
+task #180's own separate job ("full real military rank/branch
+taxonomy").
+
+**`subLeaderRolesFor(organization)` is the one real dispatch point,
+read by both functions that used to each make their own
+decision.** `currentSubLeadersOf` now calls it instead of its old
+inline ternary, and `assignSubLeaders` now validates a requested role
+against THIS organization's own real vocabulary rather than always
+checking against the flat ordinary-organization list regardless of
+type — a `government` previously validating against the right list by
+coincidence, a `religion` or `military` organization previously
+validating against the wrong one outright. `subGovernmentCoverageOf`
+and `organizationCohesionOf` take no code change at all, because
+both already go through `currentSubLeadersOf` rather than reading a
+hierarchy directly — confirmed with a new integration test rather than
+assumed from the call graph.
+
+9 new tests in `test/subgovernment.test.js`: the three vocabularies
+are real and distinct from each other and from the generic and gang
+lists; the generic fallback still holds for business/club/corporation/
+tribe; the gang branch still takes precedence over any type-based
+list (checked for both a real `type: 'gang'` and the `isFaction`
+reading `membership.isGang` also honours); a real religious
+organization accepts `elder` and refuses a government or gang role by
+name; a real military organization's `officer`/`non_commissioned_
+officer` round-trip through `currentSubLeadersOf`; a real government
+organization keeps its two already-sensible roles and gains the new
+`clerk`; and the coverage/cohesion integration check above. One
+pre-existing test's own regex (`/not a real sub-government role/`)
+was updated to match `assignSubLeaders`'s now more accurate error
+text (`/not a real sub-leader role/`), since the old wording was
+itself a symptom of the one-vocabulary assumption this round closes.
